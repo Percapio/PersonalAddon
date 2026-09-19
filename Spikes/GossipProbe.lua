@@ -18,6 +18,11 @@ local probe = {
     tokens = {},
     lastAttempt = nil,
     blocked = {},
+    -- Attempts are tracked separately from blocks. Without this, a probe that
+    -- was never run reports identically to one that ran and was not blocked,
+    -- which is a false pass on the question the spike exists to answer.
+    attempted = {},
+    succeeded = {},
 }
 
 local function recordBlocked(addonName, functionName)
@@ -92,13 +97,28 @@ end
 local function reportStatus()
     ns.Log.Info("gossip probe results this session:")
     local kinds = { "gossip", "accept", "reward" }
+    local untested = 0
     for index = 1, #kinds do
         local kind = kinds[index]
-        local blockedBy = probe.blocked[kind]
-        ns.Log.Info(format("  %-7s %s", kind,
-            blockedBy and ("BLOCKED at " .. blockedBy) or "no block recorded"))
+        local verdict
+        if probe.blocked[kind] then
+            verdict = "|cffff5555BLOCKED|r at " .. probe.blocked[kind]
+        elseif probe.succeeded[kind] then
+            verdict = "|cff55ff55PASS|r - called without a block"
+        elseif probe.attempted[kind] then
+            verdict = "|cffffcc00attempted but did not complete|r - preconditions unmet"
+        else
+            verdict = "|cffffcc00NOT TESTED|r - this is not a pass"
+            untested = untested + 1
+        end
+        ns.Log.Info(format("  %-7s %s", kind, verdict))
     end
-    ns.Log.Info("record these in Architecture/20260919-Phase01.md section 12")
+    if untested > 0 then
+        ns.Log.Warn(format("%d of %d probes never ran; the spike is incomplete",
+            untested, #kinds))
+    else
+        ns.Log.Info("all three probes ran; record the verdicts in Architecture/20260919-Phase01.md section 12")
+    end
     return true
 end
 
@@ -120,16 +140,22 @@ function ns.GossipProbe.Command(kind)
 
     local ok, detail
     if kind == "gossip" then
+        probe.attempted[kind] = true
         ok, detail = attemptGossip()
     elseif kind == "accept" then
+        probe.attempted[kind] = true
         ok, detail = attemptAccept()
     elseif kind == "reward" then
+        probe.attempted[kind] = true
         ok, detail = attemptReward()
     else
         return false, "usage: /pa probe <gossip|accept|reward|status>"
     end
 
     if ok then
+        -- Recorded only on a clean return. A block raised during the call sets
+        -- probe.blocked for this kind, and reportStatus prefers that.
+        probe.succeeded[kind] = true
         ns.Log.Info(detail)
         ns.Log.Info("watch for a BLOCKED line; absence of one is the pass condition")
     end

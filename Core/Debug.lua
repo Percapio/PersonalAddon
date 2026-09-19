@@ -188,6 +188,31 @@ local function commandFsr()
     end
 end
 
+local function commandPlates()
+    if not ns.Nameplates then
+        ns.Log.Error("the nameplate feature did not load")
+        return
+    end
+    local view = ns.Nameplates.Inspect()
+    ns.Log.Info(format("tracked=%d inScope=%d outOfScope=%d unreachable=%d coloured=%d sweeps=%d",
+        view.tracked, view.inScope, view.outOfScope, view.unreachable,
+        view.coloured, view.sweeps))
+    ns.Log.Info(format("  ledger: widgets=%d restored=%d widgetGone=%d writeRefused=%d",
+        view.ledgerWidgets, view.ledgerRestored, view.ledgerWidgetGone,
+        view.ledgerWriteRefused))
+    ns.Log.Info(format("  capability: barResizable=%s barRecolourable=%s nameMovable=%s hook=%s",
+        tostring(view.barResizable), tostring(view.barRecolourable),
+        tostring(view.nameTextMovable), tostring(view.hookInstalled)))
+    if view.nameTextMovable == false then
+        ns.Log.Warn("  name repositioning is UNAVAILABLE on this client (restricted region)")
+    end
+    if not view.colouringActive then
+        ns.Log.Warn("  aggro colouring is OFF")
+    elseif not view.aggroResolvedEver then
+        ns.Log.Warn("  colouring is on but no nameplate target has ever resolved")
+    end
+end
+
 local function commandFault()
     faultProbe.armed = true
     commandSetEnabled(FAULT_PROBE_ID, true)
@@ -247,7 +272,9 @@ local function commandHelp()
     ns.Log.Info("/pa fault               arm the fault probe, then cast anything")
     ns.Log.Info("/pa failenable          enable the probe whose enable always fails")
     ns.Log.Info("/pa pool                exercise both frame pool drop policies")
+    ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
     ns.Log.Info("/pa probe <gossip|accept|reward|status>   Phase 5 feasibility spike")
+    ns.Log.Info("/pa probe plates [status] Phase 2 capability spike")
 end
 
 local function handler(input)
@@ -278,12 +305,25 @@ local function handler(input)
         commandSetEnabled(ENABLE_FAIL_PROBE_ID, true)
     elseif command == "pool" then
         commandPool()
+    elseif command == "plates" then
+        commandPlates()
     elseif command == "probe" then
-        if not ns.GossipProbe then
-            ns.Log.Error("the gossip probe did not load")
+        local what = string.lower(words[2] or "status")
+        local prober, label
+        if what == "plates" then
+            prober, label = ns.NameplateProbe, "nameplate probe"
+        else
+            prober, label = ns.GossipProbe, "gossip probe"
+        end
+        if not prober then
+            ns.Log.Error("the " .. label .. " did not load")
             return
         end
-        local ok, detail = ns.GossipProbe.Command(words[2])
+        local argument = what
+        if what == "plates" then
+            argument = words[3] or "run"
+        end
+        local ok, detail = prober.Command(argument)
         if not ok then
             ns.Log.Error(tostring(detail))
         end
