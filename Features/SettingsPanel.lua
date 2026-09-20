@@ -95,11 +95,11 @@ local function writeValue(featureId, key, value)
         return false
     end
 
-    -- Logged because "I moved the slider and nothing happened" is otherwise
-    -- indistinguishable between a control that never called us, a store that
-    -- refused, and a feature with nothing on screen to change.
-    ns.Log.Info(format("%s.%s = %s", featureId, tostring(key), tostring(value)))
-
+    -- This used to print every write. That was worth having while the panel was
+    -- new and "I moved the slider and nothing happened" had three possible causes,
+    -- but a settings panel that narrates itself into chat is noise once it works:
+    -- the user can see the control they just moved. A REFUSED write still speaks,
+    -- below, because that is the case they cannot see.
     local outcome, detail = ns.Registry.NotifyConfigChanged(featureId, key)
     if outcome == ns.CONFIG_RESULT.RELOAD_REQUIRED then
         -- The reason Phase 1 section 6.2 chose a returned value over a registry

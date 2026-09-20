@@ -268,9 +268,12 @@ local function onSpellcastSucceeded(unit, _, spellId)
 
     local predicate = costsMana(spellId)
     if predicate == nil then
+        -- A standing client limitation, not an event: it is equally true on every
+        -- cast for the whole session, so announcing it in chat tells the user
+        -- something they cannot act on at a moment they did not ask. Recorded on
+        -- the tracker and reported by /pa fsr, which is where someone goes when
+        -- the indicator looks wrong.
         tracker.costQueryable = false
-        ns.Log.Once("fsr:nocostapi",
-            "spell mana cost is not queryable on this client, so every successful cast opens the window; a free cast will show a window that is not really running")
         predicate = 1
     else
         tracker.costQueryable = true

@@ -416,7 +416,11 @@ local function ensurePanel()
         state.borderStyle = state.borderStyle .. " via " .. frameTemplate
     end
 
-    panel:SetAlpha(state.settings.panelAlpha)
+    -- Opacity applies to the background texture alone. Setting it on the frame
+    -- faded the rows, icons and border with it, so a readable panel and a subtle
+    -- one were the same slider and could not both be had.
+    panel:SetAlpha(1)
+    panel.background:SetAlpha(state.settings.panelAlpha)
     panel:Hide()
 
     state.panel = panel
@@ -501,7 +505,7 @@ local function renderBreakdown(breakdown)
     local height = PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
         + max(0, shown - 1) * ROW_SPACING
     panel:SetHeight(height)
-    panel:SetAlpha(state.settings.panelAlpha)
+    panel.background:SetAlpha(state.settings.panelAlpha)
     panel:Show()
 end
 
@@ -621,7 +625,25 @@ local function onCombatEnd()
     scheduleSettleReads()
 end
 
+-- Re-resolves the anchor once the UI has settled. Idempotent: anchorPanel clears
+-- and re-sets its point, so running it again costs one SetPoint and nothing else.
+-- Announced only on an upgrade from the fallback, because that is the case where
+-- the panel visibly moves and the user would otherwise wonder why.
+local function onEnteringWorld()
+    if not state.enabled or not state.panel then
+        return
+    end
+    local wasOnScreenFallback = (state.anchorIsPlayerFrame == false)
+    anchorPanel()
+    if wasOnScreenFallback and state.anchorIsPlayerFrame then
+        ns.Log.Once("dps:anchorrecovered",
+            "the breakdown panel found PlayerFrame after the loading screen and moved to it")
+    end
+end
+
 local SIGNALS = {
+    { event = "PLAYER_ENTERING_WORLD", handler = onEnteringWorld, required = false,
+      lost = "the panel keeps whatever anchor it resolved at login; /pa dps reports which" },
     { event = "PLAYER_REGEN_DISABLED", handler = onCombatStart, required = false,
       lost = "the in-combat refresh will never start" },
     { event = "PLAYER_REGEN_ENABLED", handler = onCombatEnd, required = false,

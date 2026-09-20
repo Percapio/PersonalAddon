@@ -193,7 +193,8 @@ local function commandFsr()
         tostring(view.state), tostring(view.visible), view.windowRemaining,
         view.elapsedFraction * 100, tostring(view.manaUser)))
     if view.costQueryable == false then
-        ns.Log.Warn("  spell mana cost is not queryable; every cast opens the window")
+        ns.Log.Warn("  spell mana cost is not queryable on this client, so EVERY successful")
+        ns.Log.Warn("  cast opens the window; a free cast shows a window that is not running")
     end
 end
 

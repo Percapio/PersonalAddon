@@ -194,15 +194,21 @@ end
 -- An unresolvable target and no target at all present identically. Combat state
 -- is the discriminator: a mob in combat necessarily has a target, so if we
 -- cannot see one the client is withholding it (section 9.2).
+-- Returns the classification and whether the attempt could have produced
+-- evidence about the client withholding aggro data at all.
 local function classifyUnresolvedTarget(unitToken)
     local ok, inCombat = pcall(UnitAffectingCombat, unitToken)
     if not ok or inCombat == nil then
-        return AGGRO.UNKNOWN
+        -- Combat state itself unreadable: says nothing either way.
+        return AGGRO.UNKNOWN, false
     end
     if inCombat then
-        return AGGRO.UNKNOWN
+        -- Fighting, yet no target resolves. This IS the evidence.
+        return AGGRO.UNKNOWN, true
     end
-    return AGGRO.ELSEWHERE
+    -- Not fighting, so no target is the correct answer rather than a missing one.
+    state.aggroResolvedEver = true
+    return AGGRO.ELSEWHERE, false
 end
 
 -- With yieldSelectedTarget set, the plate the player is attacking is reported as
@@ -213,16 +219,19 @@ local function isSelectedTarget(unitToken)
     return unitsAreSame(unitToken, "target") == true
 end
 
+-- Returns the classification and whether the attempt bore on the question of
+-- whether this client withholds aggro data.
 local function classifyAggro(unitToken)
     if state.yieldSelectedTarget and isSelectedTarget(unitToken) then
-        return AGGRO.UNKNOWN
+        -- Deliberately not asking, so not evidence of anything.
+        return AGGRO.UNKNOWN, false
     end
 
     local mobTarget = unitToken .. "target"
 
     local resolved, exists = pcall(UnitExists, mobTarget)
     if not resolved then
-        return AGGRO.UNKNOWN
+        return AGGRO.UNKNOWN, true
     end
     if not exists then
         return classifyUnresolvedTarget(unitToken)
@@ -233,30 +242,30 @@ local function classifyAggro(unitToken)
     -- rather than a confidently wrong one.
     local isPlayer = unitsAreSame(mobTarget, "player")
     if isPlayer == nil then
-        return AGGRO.UNKNOWN
+        return AGGRO.UNKNOWN, true
     end
     if isPlayer then
         state.aggroResolvedEver = true
-        return AGGRO.ON_PLAYER
+        return AGGRO.ON_PLAYER, true
     end
 
     -- A nil here is benign rather than unknown: with no pet summoned the "pet"
     -- token does not resolve, and that is a legitimate "no".
     if unitsAreSame(mobTarget, "pet") == true then
         state.aggroResolvedEver = true
-        return AGGRO.ON_GROUP_OR_PET
+        return AGGRO.ON_GROUP_OR_PET, true
     end
 
     local inGroup = groupMembership(mobTarget)
     if inGroup == nil then
-        return AGGRO.UNKNOWN
+        return AGGRO.UNKNOWN, true
     end
 
     state.aggroResolvedEver = true
     if inGroup then
-        return AGGRO.ON_GROUP_OR_PET
+        return AGGRO.ON_GROUP_OR_PET, true
     end
-    return AGGRO.ELSEWHERE
+    return AGGRO.ELSEWHERE, true
 end
 
 -- Styling ---------------------------------------------------------------------
@@ -555,8 +564,15 @@ local function sweep()
                 styleIfInScope(plate)
             end
             if colouringActive() then
-                state.aggroAttempts = state.aggroAttempts + 1
-                applyAggroColour(plate, classifyAggro(plate.unitToken))
+                -- Only evidence-bearing attempts are counted. Counting every plate
+                -- meant a field of idle mobs reached 200 in seconds and triggered
+                -- a warning that the client withholds aggro data -- about a
+                -- feature already observed working in live play.
+                local classification, boreEvidence = classifyAggro(plate.unitToken)
+                if boreEvidence then
+                    state.aggroAttempts = state.aggroAttempts + 1
+                end
+                applyAggroColour(plate, classification)
             else
                 reassertColour(plate)
             end
@@ -567,10 +583,13 @@ local function sweep()
         sweepStalePlates()
     end
 
-    -- Surface once if the client appears to withhold aggro data entirely.
+    -- Surface once if the client appears to withhold aggro data entirely. Every
+    -- counted attempt was a mob that WAS fighting and still yielded no readable
+    -- target, so 200 of them without a single resolution is real evidence rather
+    -- than a quiet afternoon.
     if colouringActive() and not state.aggroResolvedEver and state.aggroAttempts > 200 then
         ns.Log.Once("plates:noaggrodata",
-            "no nameplate target has resolved after 200 attempts; this client appears to withhold aggro data, so colouring conveys nothing")
+            "200 mobs in combat yielded no readable target; this client appears to withhold aggro data, so colouring conveys nothing")
     end
 end
 
@@ -749,6 +768,12 @@ local function enable(config)
         end
     end
 
+    -- The withheld-aggro evidence window belongs to this activation. Carrying a
+    -- count across a disable would let attempts from a previous session decide a
+    -- question about the current one.
+    state.aggroAttempts = 0
+    state.aggroResolvedEver = false
+
     installReassertHook()
     startTicker()
 
@@ -904,6 +929,7 @@ ns.Nameplates = {
             contestedRunning = state.contestedRunning,
             yieldSelectedTarget = state.yieldSelectedTarget,
             aggroResolvedEver = state.aggroResolvedEver,
+            aggroAttempts = state.aggroAttempts,
             ledgerWidgets = held,
             ledgerRestored = restored,
             ledgerWidgetGone = gone,
