@@ -2,10 +2,13 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 0.2.0-phase2
-## SavedVariables: PersonalAddonDB
+## Version: 0.4.0-phase4
+## SavedVariables: PersonalAddonDB, PersonalAddonProbeLog
+# PersonalAddonProbeLog is spike output only, written by /pa probe meter
+# capture. It is deliberately NOT part of the config store, whose hydration
+# prunes undeclared keys. Remove it with the Spikes folder.
 ## X-License: Artistic License 2.0
-## X-Phase: 2
+## X-Phase: 4
 
 # Interface number follows Blizzard's major*10000 + minor*100 + patch
 # convention for the stated client version 1.60.1. If the beta reports a
@@ -29,6 +32,8 @@ Core\Debug.lua
 Features\ReloadCommand.lua
 Features\FiveSecondRule.lua
 Features\Nameplates.lua
+Features\DamageBreakdown.lua
 
 Spikes\GossipProbe.lua
 Spikes\NameplateProbe.lua
+Spikes\MeterProbe.lua

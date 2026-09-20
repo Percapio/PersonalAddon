@@ -213,6 +213,27 @@ local function commandPlates()
     end
 end
 
+local function commandDps()
+    if not ns.DamageBreakdown then
+        ns.Log.Error("the damage breakdown feature did not load")
+        return
+    end
+    ns.DamageBreakdown.Refresh()
+    local view = ns.DamageBreakdown.Inspect()
+    ns.Log.Info(format("session=%s rows=%d/%d truncated=%d panel=%s inCombat=%s",
+        view.sessionType, view.rowsShown, view.maximumRows, view.truncatedRows,
+        tostring(view.panelShown), tostring(view.inCombat)))
+    ns.Log.Info(format("  total=%d over %ds  (compare this against the built-in meter)",
+        view.totalAmount, view.durationSeconds))
+    ns.Log.Info(format("  icons=%s border=%s anchor=%s settlePending=%d",
+        tostring(view.iconsAvailable), tostring(view.borderStyle),
+        view.anchorIsPlayerFrame and "PlayerFrame" or "screen",
+        view.settlePending))
+    ns.Log.Info(format("  ticker=%s pool=%d live / %d free / %d cap",
+        tostring(view.refreshTickerRunning),
+        view.poolLive, view.poolFree, view.poolCapacity))
+end
+
 local function commandFault()
     faultProbe.armed = true
     commandSetEnabled(FAULT_PROBE_ID, true)
@@ -273,8 +294,10 @@ local function commandHelp()
     ns.Log.Info("/pa failenable          enable the probe whose enable always fails")
     ns.Log.Info("/pa pool                exercise both frame pool drop policies")
     ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
+    ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
     ns.Log.Info("/pa probe <gossip|accept|reward|status>   Phase 5 feasibility spike")
     ns.Log.Info("/pa probe plates [status] Phase 2 capability spike")
+    ns.Log.Info("/pa probe meter [capture|model|api|globals|window]  Phase 4 spike; capture writes to disk")
 end
 
 local function handler(input)
@@ -307,11 +330,15 @@ local function handler(input)
         commandPool()
     elseif command == "plates" then
         commandPlates()
+    elseif command == "dps" then
+        commandDps()
     elseif command == "probe" then
         local what = string.lower(words[2] or "status")
         local prober, label
         if what == "plates" then
             prober, label = ns.NameplateProbe, "nameplate probe"
+        elseif what == "meter" then
+            prober, label = ns.MeterProbe, "damage meter probe"
         else
             prober, label = ns.GossipProbe, "gossip probe"
         end
@@ -320,7 +347,7 @@ local function handler(input)
             return
         end
         local argument = what
-        if what == "plates" then
+        if what == "plates" or what == "meter" then
             argument = words[3] or "run"
         end
         local ok, detail = prober.Command(argument)
