@@ -55,7 +55,6 @@ local state = {
     tokens = {},
     aggroResolvedEver = false,
     aggroAttempts = 0,
-    style = { barHeight = 6, barWidth = 110, nameOffsetY = 8 },
     palette = {},
     colouringWanted = true,
     sweepInterval = 0.25,
@@ -65,9 +64,7 @@ local state = {
 
 local capability = {
     plateLookup = false,
-    barResizable = nil,
     barRecolourable = nil,
-    nameTextMovable = nil,
 }
 
 local function namePlateApi()
@@ -94,9 +91,6 @@ local function readSettings(config)
     if not settings then
         return
     end
-    state.style.barHeight = settings.barHeight or state.style.barHeight
-    state.style.barWidth = settings.barWidth or state.style.barWidth
-    state.style.nameOffsetY = settings.nameOffsetY or state.style.nameOffsetY
     state.sweepInterval = settings.sweepInterval or state.sweepInterval
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
@@ -112,8 +106,7 @@ end
 local function resolveParts(frame)
     local unitFrame = frame.UnitFrame or frame.unitFrame or frame
     local healthBar = unitFrame.healthBar or unitFrame.HealthBar or unitFrame.healthbar
-    local nameText = unitFrame.name or unitFrame.Name
-    return unitFrame, healthBar, nameText
+    return unitFrame, healthBar
 end
 
 -- Scope -----------------------------------------------------------------------
@@ -268,114 +261,25 @@ end
 
 -- Styling ---------------------------------------------------------------------
 
-local function applyGeometry(plate)
-    local ledger, style = state.ledger, state.style
-
-    if not plate.healthBar then
-        return false, "BarMissing"
-    end
-
-    local widthOk = ns.StyleLedger.Apply(ledger, plate.healthBar, "BarWidth", style.barWidth)
-    local heightOk = ns.StyleLedger.Apply(ledger, plate.healthBar, "BarHeight", style.barHeight)
-
-    if capability.barResizable == nil then
-        capability.barResizable = (widthOk and heightOk) and true or false
-        if not capability.barResizable then
-            ns.Log.OnceError("plates:barfixed",
-                "this client refuses to resize nameplate health bars; the skinny-bar half of this feature cannot work")
-        end
-    end
-
-    if not (widthOk and heightOk) then
-        return false, "WriteRefused"
-    end
-    return true
-end
-
--- Reading a nameplate name's anchors is a RESTRICTED MEASUREMENT on this client:
--- it logs "Action[FrameMeasurement] failed because[Can't measure restricted
--- regions]" and returns, rather than raising, so pcall suppresses nothing.
+-- Nameplate size is not adjustable on this client ----------------------------
 --
--- The verdict is therefore probed exactly once per session and cached. Calling it
--- per plate per style produced one taint complaint per attempt and the count
--- climbed with every pull; caching turns that into a single line.
-local function nameIsRepositionable(nameText)
-    if capability.nameTextMovable ~= nil then
-        return capability.nameTextMovable
-    end
-
-    -- Cheap pre-check first, so a region the client already flags costs no
-    -- measurement attempt and therefore no complaint at all.
-    if nameText.IsForbidden then
-        local ok, forbidden = pcall(nameText.IsForbidden, nameText)
-        if ok and forbidden then
-            capability.nameTextMovable = false
-            ns.Log.Once("plates:nameforbidden",
-                "the nameplate name is a forbidden region on this client and cannot be repositioned")
-            return false
-        end
-    end
-
-    local countOk, count = pcall(nameText.GetNumPoints, nameText)
-    if not countOk or not count or count == 0 then
-        capability.nameTextMovable = false
-        ns.Log.Once("plates:namerestricted",
-            "this client will not let addons measure the nameplate name, so it cannot be repositioned; nameOffsetY has no effect")
-        return false
-    end
-
-    -- The single measured attempt, ever.
-    local pointOk, firstPoint = pcall(nameText.GetPoint, nameText, 1)
-    if not pointOk or firstPoint == nil then
-        capability.nameTextMovable = false
-        ns.Log.Once("plates:namerestricted",
-            "this client refuses to measure the nameplate name (restricted region), so it cannot be repositioned; nameOffsetY has no effect, and one taint complaint in your error log is from this single probe")
-        return false
-    end
-
-    capability.nameTextMovable = true
-    return true
-end
-
-local function applyNamePosition(plate)
-    if not plate.nameText then
-        if capability.nameTextMovable == nil then
-            capability.nameTextMovable = false
-            ns.Log.Once("plates:nonametext",
-                "no name font string found on this client's nameplates; the name stays where Blizzard puts it")
-        end
-        return false, "NameWidgetMissing"
-    end
-
-    if not nameIsRepositionable(plate.nameText) then
-        return false, "NameWidgetMissing"
-    end
-
-    local current = ns.StyleLedger.Reads(state.ledger, plate.nameText, "Point")
-    if not current or #current == 0 then
-        return false, "NameWidgetMissing"
-    end
-
-    local moved = {}
-    for index = 1, #current do
-        local anchor = current[index]
-        moved[index] = {
-            point = anchor.point,
-            relativeTo = anchor.relativeTo,
-            relativePoint = anchor.relativePoint,
-            offsetX = anchor.offsetX,
-            offsetY = anchor.offsetY + state.style.nameOffsetY,
-        }
-    end
-
-    local ok = ns.StyleLedger.Apply(state.ledger, plate.nameText, "Point", moved)
-    if not ok then
-        capability.nameTextMovable = false
-        ns.Log.Once("plates:nameimmovable",
-            "this client refuses to move the nameplate name; it stays where Blizzard puts it")
-    end
-    return ok
-end
+-- Two mechanisms were tried and both failed, in ways worth keeping written down
+-- because each one looked like it worked.
+--
+-- 1. healthBar:SetHeight -- accepted and discarded. The bar carries two vertical
+--    anchors, so the next layout pass recomputes the height. Phase 2's probe wrote
+--    the bar's CURRENT height back to itself and reported "resizable", which tests
+--    only that the call is permitted.
+--
+-- 2. C_NamePlate.SetNamePlateSize -- accepted, and GetNamePlateSize reads the new
+--    value back, and nothing changes on screen. It sizes the plate's anchor region
+--    while the client's nameplate driver keeps laying out the visible bar from its
+--    own inputs. Read-back is a better test than the call returning, and it was
+--    still the wrong thing to verify.
+--
+-- What both have in common: the addon could confirm its own write and could not
+-- confirm the effect. Nothing here sizes a plate now. What this feature does is
+-- colour, which is verifiable by looking at it.
 
 local COLOUR_TOLERANCE = 0.01
 
@@ -388,6 +292,8 @@ local function coloursMatch(left, right)
         and math.abs((left.blue or 0) - (right.blue or 0)) <= COLOUR_TOLERANCE
 end
 
+local markContested
+
 -- Blizzard is the other writer on this property: it paints the player's current
 -- target red on its own schedule. Re-asserting only when our CLASSIFICATION
 -- changed let those writes stand -- a plate we had painted green went red the
@@ -395,8 +301,7 @@ end
 --
 -- So the comparison is desired-versus-actual, exactly as the geometry re-assert
 -- does, rather than desired-versus-previously-desired.
-local markContested
-
+--
 -- Returns true when it actually had to write, which means someone else wrote
 -- first. That is the signal that this plate is contested.
 local function reassertColour(plate)
@@ -455,14 +360,14 @@ local function applyAggroColour(plate, aggroState)
     end
 end
 
+-- Previously "geometry has been written to this plate". Plate size is now a
+-- client-wide setting, so what remains per-plate is only the colour, and this
+-- means "we have taken responsibility for this plate".
 local function styleIfInScope(plate)
     if plate.scope ~= SCOPE.IN then
         return
     end
-    if applyGeometry(plate) then
-        plate.styleApplied = true
-        applyNamePosition(plate)
-    end
+    plate.styleApplied = true
 end
 
 -- Records are dropped the instant a plate detaches, before the client can
@@ -470,9 +375,6 @@ end
 local function unstylePlate(plate)
     if plate.healthBar then
         ns.StyleLedger.RestoreWidget(state.ledger, plate.healthBar)
-    end
-    if plate.nameText then
-        ns.StyleLedger.RestoreWidget(state.ledger, plate.nameText)
     end
     plate.styleApplied = false
     plate.lastAggro = nil
@@ -509,12 +411,11 @@ local function trackPlate(unitToken)
         untrackPlate(frame)
     end
 
-    local unitFrame, healthBar, nameText = resolveParts(frame)
+    local unitFrame, healthBar = resolveParts(frame)
     local plate = {
         frame = frame,
         unitFrame = unitFrame,
         healthBar = healthBar,
-        nameText = nameText,
         unitToken = unitToken,
         scope = classifyScope(unitToken, frame),
         styleApplied = false,
@@ -574,25 +475,6 @@ end
 
 -- Sweep -----------------------------------------------------------------------
 
-local function reassertGeometry(plate)
-    local bar = plate.healthBar
-    if not bar then
-        return
-    end
-    local style = state.style
-
-    -- Write only on drift. Blizzard is the other writer; re-writing a value that
-    -- already matches is how two systems end up fighting over one property.
-    local currentWidth = ns.StyleLedger.Reads(state.ledger, bar, "BarWidth")
-    if currentWidth and math.abs(currentWidth - style.barWidth) > 0.5 then
-        ns.StyleLedger.Reapply(state.ledger, bar, "BarWidth", style.barWidth)
-    end
-    local currentHeight = ns.StyleLedger.Reads(state.ledger, bar, "BarHeight")
-    if currentHeight and math.abs(currentHeight - style.barHeight) > 0.5 then
-        ns.StyleLedger.Reapply(state.ledger, bar, "BarHeight", style.barHeight)
-    end
-end
-
 -- Blizzard paints the player's selected target red on its own initiative, so on
 -- exactly one plate -- the one you are attacking while someone else holds aggro --
 -- our colour and its colour disagree and both of us keep writing.
@@ -651,7 +533,6 @@ local function reassertPlate(plate)
     if plate.scope ~= SCOPE.IN or not plate.styleApplied then
         return
     end
-    reassertGeometry(plate)
     reassertColour(plate)
 end
 
@@ -670,9 +551,7 @@ local function sweep()
 
     for _, plate in pairs(state.plates) do
         if plate.scope == SCOPE.IN then
-            if plate.styleApplied then
-                reassertGeometry(plate)
-            else
+            if not plate.styleApplied then
                 styleIfInScope(plate)
             end
             if colouringActive() then
@@ -872,6 +751,7 @@ local function enable(config)
 
     installReassertHook()
     startTicker()
+
     return true
 end
 
@@ -942,10 +822,9 @@ end
 
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
+    label = "Nameplates",
+    description = "Slimmer hostile nameplates, coloured by who the monster is attacking.",
     settings = {
-        barHeight = 6,
-        barWidth = 110,
-        nameOffsetY = 8,
         aggroColouring = true,
         -- Set true to stop contesting the bar colour on your current target and
         -- let Blizzard's selected-target red stand. Guaranteed stable, at the
@@ -955,6 +834,30 @@ ns.Registry.Register(FEATURE_ID, {
         colourOnGroup = "40ff40",
         colourElsewhere = "ffffff",
         sweepInterval = 0.25,
+    },
+    schema = {
+        aggroColouring = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour by who has aggro",
+            description = "Red when it is on you, green when a party member or your pet has it, white otherwise.",
+        },
+        yieldSelectedTarget = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone",
+            description = "Stops contesting the bar colour on the unit you have selected. Turn this on if that plate flickers.",
+        },
+        colourOnPlayer = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking you",
+        },
+        colourOnGroup = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking your group or pet",
+        },
+        colourElsewhere = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking neither",
+        },
+        -- Not curated: a frame-rate decision dressed as a preference.
+        sweepInterval = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Sweep interval",
+            minimum = 0.05, maximum = 2.0, curated = false,
+        },
     },
 }, {
     enable = enable,
@@ -1005,9 +908,7 @@ ns.Nameplates = {
             ledgerRestored = restored,
             ledgerWidgetGone = gone,
             ledgerWriteRefused = refused,
-            barResizable = capability.barResizable,
             barRecolourable = capability.barRecolourable,
-            nameTextMovable = capability.nameTextMovable,
         }
     end,
 }

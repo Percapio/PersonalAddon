@@ -40,7 +40,15 @@ function Registry.Register(featureId, defaults, lifecycle)
         lifecycle = lifecycle,
         state = STATE.REGISTERED,
         faultReason = nil,
+        -- Audience, not capability. An internal feature is enabled, disabled and
+        -- configured exactly like any other; it is simply not offered to someone
+        -- browsing settings. Defaults to visible so a new feature must opt out.
+        internal = (defaults.internal == true),
     }
+
+    if defaults.schema and ns.ConfigSchema then
+        ns.ConfigSchema.Declare(featureId, defaults.schema)
+    end
     order[#order + 1] = featureId
     return true
 end
@@ -258,12 +266,57 @@ function Registry.Ids()
     return ids
 end
 
+-- The registration table, for callers that need a feature's label or
+-- description. Returned as-is rather than copied: it is read-only by convention,
+-- and copying it on every panel row would allocate for nothing.
+function Registry.Defaults(featureId)
+    local record = features[featureId]
+    return record and record.defaults or nil
+end
+
+function Registry.IsInternal(featureId)
+    local record = features[featureId]
+    return record ~= nil and record.internal == true
+end
+
+-- The features a settings panel should offer. Ordered as registered, so the panel
+-- reads in the same order as /pa status.
+function Registry.PublicIds()
+    local ids = {}
+    for index = 1, #order do
+        local record = features[order[index]]
+        if not record.internal then
+            ids[#ids + 1] = record.id
+        end
+    end
+    return ids
+end
+
 function Registry.Exists(featureId)
     return features[featureId] ~= nil
 end
 
 function Registry.StoreFailure()
     return storeFailure
+end
+
+-- The five spikes are gone; the SavedVariables table they wrote is not, because
+-- the client rewrites on logout whatever it loaded. Emptied once here so the stale
+-- rows leave the disk, after which the .toc declaration can go too. Dropping the
+-- declaration first would orphan the data: still on disk, nothing able to reach it.
+local function discardProbeLog()
+    if type(_G.PersonalAddonProbeLog) ~= "table" then
+        return
+    end
+    local entries = 0
+    for _ in pairs(_G.PersonalAddonProbeLog) do
+        entries = entries + 1
+    end
+    _G.PersonalAddonProbeLog = nil
+    if entries > 0 then
+        ns.Log.Info(string.format("discarded %d stale probe log entr%s left by the spikes",
+            entries, entries == 1 and "y" or "ies"))
+    end
 end
 
 local boot = CreateFrame("Frame")
@@ -273,6 +326,7 @@ boot:SetScript("OnEvent", function(_, event, loadedAddon)
     if event == "ADDON_LOADED" then
         if loadedAddon == ns.ADDON_NAME then
             Registry.HydrateConfig()
+            discardProbeLog()
             boot:UnregisterEvent("ADDON_LOADED")
         end
         return

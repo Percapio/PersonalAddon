@@ -23,8 +23,12 @@ local faultProbe = { armed = false, tokens = {} }
 -- Subscribes to the same event the FSR tracker uses, so faulting it
 -- demonstrates the property exit criterion 3 asks about: one feature dies, the
 -- other keeps running.
+-- Kept rather than deleted with the spikes: forty lines, and the only way to
+-- verify Phase 1 section 6.1's isolation contract against the live client, which
+-- is exactly what a future client patch would quietly break.
 ns.Registry.Register(FAULT_PROBE_ID, {
     enabledByDefault = false,
+    internal = true,
     settings = {},
 }, {
     enable = function()
@@ -53,6 +57,7 @@ ns.Registry.Register(FAULT_PROBE_ID, {
 
 ns.Registry.Register(ENABLE_FAIL_PROBE_ID, {
     enabledByDefault = false,
+    internal = true,
     settings = {},
 }, {
     enable = function()
@@ -76,7 +81,7 @@ local function reportConfigResult(featureId, key, outcome, detail)
     end
 end
 
-local function commandStatus()
+local function commandStatus(showAll)
     local failure = ns.Registry.StoreFailure()
     if failure then
         ns.Log.Error(format("config store unusable: %s at v%s",
@@ -87,7 +92,8 @@ local function commandStatus()
             tostring(ns.Isolation.ForwardsArguments())))
     end
 
-    local ids = ns.Registry.Ids()
+    local ids = showAll and ns.Registry.Ids() or ns.Registry.PublicIds()
+    local hidden = #ns.Registry.Ids() - #ids
     for index = 1, #ids do
         local id = ids[index]
         local state, reason = ns.Registry.State(id)
@@ -97,6 +103,9 @@ local function commandStatus()
             tostring(ns.ConfigStore.IsEnabled(id)),
             ns.Dispatch.SubscriptionCount(id),
             reason and (" reason=" .. tostring(reason)) or ""))
+    end
+    if hidden > 0 then
+        ns.Log.Info(format("  %d internal feature(s) hidden; /pa status all shows them", hidden))
     end
 end
 
@@ -200,12 +209,8 @@ local function commandPlates()
     ns.Log.Info(format("  ledger: widgets=%d restored=%d widgetGone=%d writeRefused=%d",
         view.ledgerWidgets, view.ledgerRestored, view.ledgerWidgetGone,
         view.ledgerWriteRefused))
-    ns.Log.Info(format("  capability: barResizable=%s barRecolourable=%s nameMovable=%s hook=%s",
-        tostring(view.barResizable), tostring(view.barRecolourable),
-        tostring(view.nameTextMovable), tostring(view.hookInstalled)))
-    if view.nameTextMovable == false then
-        ns.Log.Warn("  name repositioning is UNAVAILABLE on this client (restricted region)")
-    end
+    ns.Log.Info(format("  capability: barRecolourable=%s hook=%s",
+        tostring(view.barRecolourable), tostring(view.hookInstalled)))
     if not view.colouringActive then
         ns.Log.Warn("  aggro colouring is OFF")
     elseif not view.aggroResolvedEver then
@@ -234,6 +239,22 @@ local function commandDps()
         view.poolLive, view.poolFree, view.poolCapacity))
 end
 
+local function commandPanel()
+    if not ns.SettingsPanel then
+        ns.Log.Error("the settings panel did not load")
+        return
+    end
+    local view = ns.SettingsPanel.Inspect()
+    ns.Log.Info(format("panel registered=%s controls=%d skipped=%d",
+        tostring(view.registered), view.controlCount, #view.skipped))
+    for index = 1, #view.skipped do
+        ns.Log.Warn("  skipped " .. view.skipped[index])
+    end
+    if view.registered then
+        ns.SettingsPanel.Open()
+    end
+end
+
 local function commandFault()
     faultProbe.armed = true
     commandSetEnabled(FAULT_PROBE_ID, true)
@@ -242,6 +263,51 @@ end
 
 -- Exercises both drop policies now rather than waiting for Phase 2 to be the
 -- first thing that ever calls the pool (§8).
+-- What the client blocked while naming this addon. An attempt of "unknown" means
+-- no probe of ours was in flight, so the block is taint spreading out of our code
+-- rather than a protected call we made -- which is a different bug with a
+-- different fix, and the readout must not blur them.
+local function commandBlocked()
+    if not ns.BlockWatch then
+        ns.Log.Error("the blocked-action watch did not load")
+        return
+    end
+
+    -- "Saw nothing" and "was not watching" are different facts, and reporting the
+    -- first when the second is true wasted a controlled test run.
+    if not ns.BlockWatch.IsObserving() then
+        ns.Log.Error("NOT OBSERVING: the blocked-action watch is disabled, so an empty tally means nothing")
+        ns.Log.Info("  /pa on blockWatch to start watching, then /reload")
+        return
+    end
+
+    local rows = ns.BlockWatch.Tally()
+    if #rows == 0 then
+        ns.Log.Info("watching, and nothing has been blocked with this addon named")
+        return
+    end
+
+    local total, ours, cascaded = 0, 0, 0
+    for index = 1, #rows do
+        total = total + rows[index].count
+        if rows[index].firstAttempt == "unknown" then
+            cascaded = cascaded + 1
+        else
+            ours = ours + 1
+        end
+    end
+
+    ns.Log.Info(format("%d block(s) across %d distinct function(s)", total, #rows))
+    ns.Log.Info(format("  %d attributable to one of our attempts, %d not (taint spread)",
+        ours, cascaded))
+
+    for index = 1, #rows do
+        local row = rows[index]
+        ns.Log.Info(format("  %dx %s (attempt: %s)", row.count, row.functionName,
+            row.firstAttempt))
+    end
+end
+
 local function commandPool()
     local created = 0
     local function factory()
@@ -285,8 +351,8 @@ local function commandPool()
 end
 
 local function commandHelp()
-    ns.Log.Info("/pa status              feature states, stored preferences, subscription counts")
-    ns.Log.Info("/pa on|off <feature>    toggle a feature at runtime")
+    ns.Log.Info("/pa status [all]        feature states; all includes internal ones")
+    ns.Log.Info("/pa on / off <feature>  toggle a feature at runtime")
     ns.Log.Info("/pa get <feature>       show stored settings")
     ns.Log.Info("/pa set <f> <k> <v>     change a setting and apply it live")
     ns.Log.Info("/pa fsr                 FSR tracker state, phase and window")
@@ -295,9 +361,8 @@ local function commandHelp()
     ns.Log.Info("/pa pool                exercise both frame pool drop policies")
     ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
-    ns.Log.Info("/pa probe <gossip|accept|reward|status>   Phase 5 feasibility spike")
-    ns.Log.Info("/pa probe plates [status] Phase 2 capability spike")
-    ns.Log.Info("/pa probe meter [capture|model|api|globals|window]  Phase 4 spike; capture writes to disk")
+    ns.Log.Info("/pa panel               open the settings panel and report how it built")
+    ns.Log.Info("/pa blocked             protected calls the client blamed on this addon")
 end
 
 local function handler(input)
@@ -311,7 +376,7 @@ local function handler(input)
     if command == "" or command == "help" then
         commandHelp()
     elseif command == "status" then
-        commandStatus()
+        commandStatus(words[2] == "all")
     elseif command == "on" then
         commandSetEnabled(words[2], true)
     elseif command == "off" then
@@ -332,28 +397,10 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
-    elseif command == "probe" then
-        local what = string.lower(words[2] or "status")
-        local prober, label
-        if what == "plates" then
-            prober, label = ns.NameplateProbe, "nameplate probe"
-        elseif what == "meter" then
-            prober, label = ns.MeterProbe, "damage meter probe"
-        else
-            prober, label = ns.GossipProbe, "gossip probe"
-        end
-        if not prober then
-            ns.Log.Error("the " .. label .. " did not load")
-            return
-        end
-        local argument = what
-        if what == "plates" or what == "meter" then
-            argument = words[3] or "run"
-        end
-        local ok, detail = prober.Command(argument)
-        if not ok then
-            ns.Log.Error(tostring(detail))
-        end
+    elseif command == "panel" then
+        commandPanel()
+    elseif command == "blocked" then
+        commandBlocked()
     else
         ns.Log.Error("unknown command: " .. command)
         commandHelp()

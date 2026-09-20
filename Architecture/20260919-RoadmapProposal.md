@@ -96,11 +96,25 @@ Replacing the default floating combat text (inspired by MikScrollingBattleText).
 * **Animation & Behavior:** Add text behaviors, notably a "wobble" effect and size increase for critical strikes.
 * **Fade Timers:** Implement customizable fade delays before text is cleared from the screen.
 
-### Phase 5: Camera — RESCOPED 2026-09-19
+### ~~Phase 5: Camera~~ — NOT DELIVERABLE 2026-09-19
 
-**Phase 5 is camera pitch only.** The NPC interaction work below was rescoped and
-deferred to after v1 ships; its decisions are recorded at the end of this section
-so they are not lost.
+**Phase 5 ships nothing.** Two separate outcomes, recorded so neither is retried
+blindly:
+
+**Camera pitch: attempted, and the client will not do it.** See
+`20260919-Phase05.md` §4.5b. The `test_cameraDynamicPitch` CVars accept the writes
+and the client confirms them with a dialog — *"You have enabled one or more
+experimental camera features"* — and then nothing happens at any value, fully zoomed
+out, with the distance cutoff removed. Accepted and inert, plausibly because the
+Gamepad UI is still Alpha. The design is complete and ready if a later patch wires
+them up.
+
+`SaveView` / `SetView` were verified working and would give a *fixed* low camera
+angle rather than a dynamic one. Not built, because it is a different feature from
+the one asked for.
+
+**NPC interaction: rescoped and deferred to after v1**, with its decisions at the
+end of this section.
 
 Original scope:
 Enhancing the viewport and NPC interactions for a better gamepad experience.

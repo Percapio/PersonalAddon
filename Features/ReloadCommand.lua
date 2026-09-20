@@ -64,7 +64,10 @@ end
 
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
+    label = "Reload command",
+    description = "Adds /rl as a shortcut for reloading the interface.",
     settings = {},
+    schema = {},
 }, {
     enable = enable,
     disable = disable,

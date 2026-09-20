@@ -2,13 +2,15 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 0.4.0-phase4
+## Version: 1.0.0
 ## SavedVariables: PersonalAddonDB, PersonalAddonProbeLog
-# PersonalAddonProbeLog is spike output only, written by /pa probe meter
-# capture. It is deliberately NOT part of the config store, whose hydration
-# prunes undeclared keys. Remove it with the Spikes folder.
+# PersonalAddonProbeLog held spike output. The spikes are gone, and the
+# declaration stays for ONE version only so that Core/Registry.lua can empty the
+# stale table on disk -- dropping the declaration outright would orphan whatever
+# the probes last wrote, leaving it in the user's SavedVariables forever with
+# nothing able to reach it. Remove this line and the wipe together next version.
 ## X-License: Artistic License 2.0
-## X-Phase: 4
+## X-Phase: 6
 
 # Interface number follows Blizzard's major*10000 + minor*100 + patch
 # convention for the stated client version 1.60.1. If the beta reports a
@@ -21,19 +23,19 @@ Core\Constants.lua
 Core\Log.lua
 Core\Isolation.lua
 Core\EscapeGuard.lua
+Core\ConfigSchema.lua
 Core\ConfigStore.lua
 Core\Migrations.lua
 Core\FramePool.lua
 Core\StyleLedger.lua
+Core\CVarSteward.lua
 Core\Registry.lua
 Core\Dispatch.lua
+Core\BlockWatch.lua
 Core\Debug.lua
 
 Features\ReloadCommand.lua
 Features\FiveSecondRule.lua
 Features\Nameplates.lua
 Features\DamageBreakdown.lua
-
-Spikes\GossipProbe.lua
-Spikes\NameplateProbe.lua
-Spikes\MeterProbe.lua
+Features\SettingsPanel.lua

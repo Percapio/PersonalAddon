@@ -745,6 +745,8 @@ end
 
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
+    label = "Damage breakdown",
+    description = "Your own damage by spell, above the player frame, read from the built-in meter.",
     settings = {
         sessionType = "Current",
         maximumRows = 4,
@@ -753,6 +755,42 @@ ns.Registry.Register(FEATURE_ID, {
         panelAlpha = 0.8,
         anchorOffsetX = 0,
         anchorOffsetY = 8,
+    },
+    schema = {
+        sessionType = {
+            kind = ns.ConfigSchema.KIND.CHOICE, label = "Which fight",
+            description = "Current shows the last fight; Overall sums your whole session.",
+            choices = {
+                { value = "Current", label = "Current fight" },
+                { value = "Overall", label = "Whole session" },
+            },
+        },
+        maximumRows = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Rows shown",
+            description = "How many spells to list. Anything beyond this is counted, not dropped.",
+            minimum = 1, maximum = 10, step = 1,
+        },
+        panelAlpha = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity",
+            minimum = 0.1, maximum = 1.0, step = 0.05,
+        },
+        anchorOffsetX = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset",
+            minimum = -300, maximum = 300, step = 1,
+        },
+        anchorOffsetY = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset",
+            minimum = -300, maximum = 300, step = 1,
+        },
+        -- Not curated: redrawing during a fight competes for frame time in the
+        -- one period it matters, and 0 is the right answer for nearly everyone.
+        inCombatRefreshSeconds = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "In-combat refresh",
+            minimum = 0, maximum = 10, curated = false,
+        },
+        showWhenEmpty = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show when empty", curated = false,
+        },
     },
 }, {
     enable = enable,

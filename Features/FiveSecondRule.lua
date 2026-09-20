@@ -386,9 +386,23 @@ end
 
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
+    label = "Five-second rule indicator",
+    description = "A line that sweeps across your mana bar while the five-second rule is running.",
     settings = {
         lineWidth = 2,
         lineAlpha = 0.9,
+    },
+    schema = {
+        lineWidth = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Line width",
+            description = "Thickness of the sweeping line, in pixels.",
+            minimum = 1, maximum = 6, step = 1,
+        },
+        lineAlpha = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Line opacity",
+            description = "How solid the line is.",
+            minimum = 0.1, maximum = 1.0, step = 0.05,
+        },
     },
 }, {
     enable = enable,

@@ -24,9 +24,10 @@ This addon is modular in concept but monolithic in architecture. It targets the 
 
 - **/rl Chat Command:** Type `/rl` to quickly execute `/reload`.
 - **FiveSecondRule (FSR) Tracker:** For mana users, a white vertical line sweeps across the resource bar over the five-second rule, showing how long until spirit regen resumes. Casting again restarts it. (Regen *tick* timing is not shown: the client returns mana as a protected value that addons cannot read, so there is no tick to display.)
-- **Aggro-Coloured Nameplates:** Makes hostile and neutral healthbars skinnier, and colours them by who the monster is actually attacking, from a DPS perspective: red = it is on you, green = it is on a party member or your pet, white = neither. (Name, guild and NPC role tag placement are *not* included: the client treats nameplate text as a restricted region that addons may not measure or move.)
+- **Aggro-Coloured Nameplates:** Colours hostile and neutral nameplates by who the monster is actually attacking, from a DPS perspective: red = it is on you, green = it is on a party member or your pet, white = neither.
+  - **Nameplate size is not adjustable** and no longer offered. Two mechanisms were tried; both were accepted by the client and changed nothing on screen. `healthBar:SetHeight` is discarded on the next layout pass because the bar has two vertical anchors, and `C_NamePlate.SetNamePlateSize` sizes the plate's anchor region while the client keeps laying out the visible bar itself. In both cases the addon could confirm its own write and could not confirm the effect.
+  - Name, guild and NPC role tag placement are *not* included: the client treats nameplate text as a restricted region that addons may not measure or move.
 - **Damage Breakdown Panel:** A small panel above the player frame listing your own damage by spell — icon, DPS and share of your total — read from the client's own damage meter so the numbers match it exactly. Switches between the current fight and your overall session. (This replaces the originally planned scrolling combat text, which cannot be built correctly here: the client restricts addon access to the combat log, and every addon that tries misses hits.)
-- **Camera Vertical Pitch:** Adjusts the vertical pitch of the camera to see less of the floor and more of the "world". Applied on login and restored if the feature is switched off.
 
 ## What the game already does
 
@@ -41,6 +42,24 @@ Gamepad UI (Alpha) already handles, with no addon involved:
 
 Several features originally planned here turned out to be redundant against that
 list. They were dropped rather than reimplemented worse.
+
+## Tried and not deliverable
+
+Attempted and abandoned, with the reason, so nobody spends the time twice:
+
+- **Scrolling combat text.** The client restricts addon access to the combat log —
+  `C_CombatLog.IsCombatLogRestricted()` returns true — and every addon that tries
+  misses hits. Replaced by the damage breakdown panel, which reads the client's own
+  meter.
+- **Camera vertical pitch, DynamicCam style.** The client's
+  `test_cameraDynamicPitch` settings accept the change and even confirm it with a
+  dialog, then do nothing. Possibly because the Gamepad UI is still in Alpha. Worth
+  revisiting if a later client patch wires them up.
+- **Nameplate name, guild and role tag placement.** The client treats nameplate text
+  as a restricted region that addons may not measure or move.
+- **Minimal player frames.** Dropped by choice rather than by the client: vertical
+  bars require repositioning Blizzard's, which may be equally restricted, and it
+  would have broken the FSR indicator that anchors to the mana bar.
 
 ## Planned after v1
 
@@ -61,7 +80,7 @@ Inspired by:
 - Leatrix Plus
 - FiveSecondRule
 - Threat Plates
-- Dynamic Cam
+- Dynamic Cam (for the camera pitch idea, which this client will not do — see above)
 - Immersion (for the paragraph-paging idea, planned after v1)
 
 ## License & Legal
