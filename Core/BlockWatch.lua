@@ -47,6 +47,26 @@ function BlockWatch.CurrentAttempt()
     return watch.attemptLabel
 end
 
+-- Blocks that have been traced to ground, with Blizzard's taint log, so the
+-- report can say what they are instead of raising an alarm about an unknown. A
+-- block is never SUPPRESSED -- it is still recorded and still counted by
+-- /pa blocked -- because deciding something is benign and then hiding it is how a
+-- real regression gets mistaken for a known one.
+--
+-- Traced 2026-09-19 from Logs/taint.log:
+--   SettingsPanel:Close() -> ExitWithCommit() -> (for generator)() over the
+--   registered settings -> OUR proxy setter -> execution insecure -> the same
+--   execution continues into HideUIPanel() and the gamepad binding teardown ->
+--   UpdateInteractIcons() -> SetPreferredGamepadInteractTarget() refused.
+--
+-- The taint is our Lua being ON THE STACK at all, not anything it does: an empty
+-- setter would taint identically. Deferring the work out of Blizzard's stack,
+-- which this addon now does for other good reasons, cannot fix it.
+local KNOWN_BLOCKS = {
+    ["SetPreferredGamepadInteractTarget()"] =
+        "traced: Blizzard's settings panel calls our setting's setter while closing, which taints the gamepad binding teardown. Cost is one stale interact icon; it is not a fault",
+}
+
 local function recordBlocked(addonName, functionName)
     if addonName ~= ADDON_NAME then
         return
@@ -67,6 +87,13 @@ local function recordBlocked(addonName, functionName)
     -- Deduped per function. The un-deduped version printed the same line about
     -- two hundred times in one session and buried the only other line printed,
     -- which is an unbounded log and a defect in its own right.
+    local known = KNOWN_BLOCKS[blockedName]
+    if known then
+        ns.Log.Once("blockwatch:" .. blockedName,
+            format("%s was blocked -- %s", blockedName, known))
+        return
+    end
+
     ns.Log.OnceError("blockwatch:" .. blockedName, format(
         "BLOCKED: a protected function was called with this addon named (%s), attempt in flight: '%s'. /pa blocked for the tally",
         blockedName, attempt))
@@ -89,6 +116,10 @@ end
 
 function BlockWatch.TotalBlocks()
     return watch.totalBlocks
+end
+
+function BlockWatch.IsKnown(functionName)
+    return KNOWN_BLOCKS[tostring(functionName)] ~= nil
 end
 
 -- Distinguishes "observing and saw nothing" from "not observing", which is the

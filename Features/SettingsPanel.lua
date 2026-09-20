@@ -30,6 +30,9 @@ local state = {
     registered = false,
     controlCount = 0,
     skipped = {},
+    pendingApplies = {},
+    pendingOrder = {},
+    flushScheduled = false,
 }
 
 -- API resolution ---------------------------------------------------------------
@@ -80,6 +83,88 @@ local function currentValue(featureId, key)
     return ns.ConfigStore.Get(featureId, key)
 end
 
+-- Applying a setting out of Blizzard's call stack ------------------------------
+--
+-- A control's setter runs inside Blizzard's own settings UI, with their code on
+-- the stack. Applying the change there means OUR frame work -- re-anchoring the
+-- damage panel to PlayerFrame, installing secure hooks when a feature toggle is
+-- ticked -- executes in that borrowed context, which is how an addon taints
+-- Blizzard frames it never touched. The symptom was a protected call blocked on
+-- the SECOND visit to the settings window, ours by attribution and not by call.
+--
+-- So the store write stays synchronous, because the control reads it straight
+-- back and must stay in step, and only the APPLY is deferred one frame into our
+-- own context.
+--
+-- Coalesced per feature+key: dragging a slider fires the setter continuously, and
+-- the old path ran a full onConfigChanged for every intermediate value.
+--
+-- Cancellation belongs here, with the thing that scheduled it. This project has
+-- met "work outliving the thing that scheduled it" often enough to stop treating
+-- it as a surprise: disable() empties the queue, and the flush re-checks that the
+-- feature is still registered before touching it.
+local function applyKey(featureId, key)
+    local outcome, detail = ns.Registry.NotifyConfigChanged(featureId, key)
+    if outcome == ns.CONFIG_RESULT.RELOAD_REQUIRED then
+        -- The reason Phase 1 section 6.2 chose a returned value over a registry
+        -- flag: the caller is the party that knows how to tell the user, and this
+        -- is finally that caller.
+        ns.Log.Warn(format("%s takes effect after a reload", tostring(detail or key)))
+    end
+end
+
+local function flushPendingApplies()
+    state.flushScheduled = false
+
+    local queued, order = state.pendingApplies, state.pendingOrder
+    state.pendingApplies, state.pendingOrder = {}, {}
+
+    if not state.registered then
+        return
+    end
+
+    for index = 1, #order do
+        local entry = queued[order[index]]
+        if entry and ns.Registry.Defaults(entry.featureId) then
+            applyKey(entry.featureId, entry.key)
+        end
+    end
+end
+
+-- A client without C_Timer.After still applies, synchronously, because a setting
+-- that silently never takes effect is worse than the taint this avoids -- and that
+-- trade is stated rather than left to be discovered.
+--
+-- Deliberately not cached. Caching saved two comparisons per setter call and made
+-- the fallback path reachable only by restarting the client, so the branch that
+-- exists for a degraded client could not be exercised on a healthy one.
+local function canDefer()
+    if C_Timer ~= nil and type(C_Timer.After) == "function" then
+        return true
+    end
+    ns.Log.Once("panel:nodefer",
+        "this client has no C_Timer.After, so settings apply inside the settings window rather than a frame later")
+    return false
+end
+
+local function scheduleApply(featureId, key)
+    if not canDefer() then
+        applyKey(featureId, key)
+        return
+    end
+
+    local queueKey = featureId .. "\0" .. tostring(key)
+    if not state.pendingApplies[queueKey] then
+        state.pendingOrder[#state.pendingOrder + 1] = queueKey
+    end
+    state.pendingApplies[queueKey] = { featureId = featureId, key = key }
+
+    if not state.flushScheduled then
+        state.flushScheduled = true
+        C_Timer.After(0, flushPendingApplies)
+    end
+end
+
 -- One writer for every control, and the same one /pa set uses. A control that
 -- wrote to a feature directly would be a second path to keep in step with the
 -- first, and the first is the tested one.
@@ -99,14 +184,8 @@ local function writeValue(featureId, key, value)
     -- new and "I moved the slider and nothing happened" had three possible causes,
     -- but a settings panel that narrates itself into chat is noise once it works:
     -- the user can see the control they just moved. A REFUSED write still speaks,
-    -- below, because that is the case they cannot see.
-    local outcome, detail = ns.Registry.NotifyConfigChanged(featureId, key)
-    if outcome == ns.CONFIG_RESULT.RELOAD_REQUIRED then
-        -- The reason Phase 1 section 6.2 chose a returned value over a registry
-        -- flag: the caller is the party that knows how to tell the user, and this
-        -- is finally that caller.
-        ns.Log.Warn(format("%s takes effect after a reload", tostring(detail or key)))
-    end
+    -- above, because that is the case they cannot see.
+    scheduleApply(featureId, key)
     return true
 end
 
@@ -118,7 +197,19 @@ end
 
 local function enabledSetter(featureId)
     return function(value)
-        ns.Registry.SetEnabled(featureId, value == true)
+        local wanted = (value == true)
+        if not canDefer() then
+            ns.Registry.SetEnabled(featureId, wanted)
+            return
+        end
+        -- Deferred for the same reason as any other apply, and more so: enable()
+        -- creates frames and installs secure hooks, which is the last thing that
+        -- should run inside Blizzard's checkbox handler.
+        C_Timer.After(0, function()
+            if ns.Registry.Defaults(featureId) then
+                ns.Registry.SetEnabled(featureId, wanted)
+            end
+        end)
     end
 end
 
@@ -367,6 +458,16 @@ end
 -- a documented exception like the slash command in Phase 1 section 10 -- it is
 -- inert, because every control reads through the config store.
 local function disable()
+    -- The category cannot be unregistered, so the controls stay on screen; what
+    -- CAN be abandoned is work this feature scheduled and has not run yet.
+    -- Leaving it queued would let a slider moved just before the panel was
+    -- switched off apply a frame later, which is the shape of bug this project
+    -- has hit repeatedly.
+    state.pendingApplies = {}
+    state.pendingOrder = {}
+    -- flushScheduled stays true if a timer is already in flight: the callback is
+    -- not cancellable, so it must remain able to clear the flag when it runs.
+    -- It will find an empty queue and do nothing.
 end
 
 local function onConfigChanged()

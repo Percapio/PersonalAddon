@@ -268,6 +268,110 @@ end
 -- no probe of ours was in flight, so the block is taint spreading out of our code
 -- rather than a protected call we made -- which is a different bug with a
 -- different fix, and the readout must not blur them.
+-- Taint, asked directly rather than inferred ----------------------------------
+--
+-- BlockWatch reports that the client blamed us for a blocked call. It cannot say
+-- WHAT we tainted, so every conclusion drawn from it so far has been a hypothesis.
+-- The client answers the question directly through two facilities, and neither was
+-- being used:
+--
+--   issecurevariable(name)        -> isSecure, taintingAddon
+--   issecurevariable(table, key)  -> same, for a field
+--
+-- and Blizzard's own taint log, which records the propagation path to a file.
+--
+-- The suspects are the functions and frames named in the blocks this addon has
+-- been credited with, plus the frames it genuinely touches. A name that comes back
+-- insecure WITH our addon named is proof; insecure with someone else named, or
+-- with no name, is proof it is not ours.
+local TAINT_SUSPECTS = {
+    -- The chat globals come first because they are the ones the taint log
+    -- actually named, and the first version of this list did not include them:
+    -- it enumerated the functions that were BLOCKED rather than the variables
+    -- that carried the taint, and so reported "11 secure, 0 tainted" while the
+    -- client's own log was naming this addon.
+    "SELECTED_CHAT_FRAME",
+    "LAST_ACTIVE_CHAT_EDIT_BOX",
+    "DEFAULT_CHAT_FRAME",
+    "ChatFrame1",
+    "ChatFrame1EditBox",
+    "SetPreferredGamepadInteractTarget",
+    "UseAction",
+    "PlayerFrame",
+    "GamepadMainActionBarFramePageUnitHostileTargetingActionBar",
+    "GamepadMainActionBarFramePageUnitFriendlyTargetingActionBar",
+    "GamepadMainActionBarFramePageUnitTopCenteredAnchorTopBar",
+    "SpellFlyout",
+    "CompactUnitFrame_UpdateAll",
+    "CompactUnitFrame_SetUnit",
+    "SettingsPanel",
+    "InterfaceOptionsFrame",
+}
+
+local function reportOneSuspect(name)
+    local reader = _G.issecurevariable
+    local ok, isSecure, tainter = pcall(reader, name)
+    if not ok then
+        ns.Log.Warn(format("  %s: could not be checked", name))
+        return nil
+    end
+    if isSecure then
+        return true
+    end
+
+    local blamed = tostring(tainter or "unnamed")
+    if blamed == ns.ADDON_NAME then
+        ns.Log.Error(format("  %s: TAINTED BY US", name))
+    else
+        ns.Log.Warn(format("  %s: tainted by %s", name, blamed))
+    end
+    return false
+end
+
+local function commandTaint(subject)
+    local reader = _G.issecurevariable
+    if type(reader) ~= "function" then
+        ns.Log.Error("this client does not expose issecurevariable, so taint cannot be inspected from Lua")
+        ns.Log.Info("the taint log below still works; it is written by the client, not by us")
+    else
+        if subject and subject ~= "" then
+            ns.Log.Info(format("checking '%s':", subject))
+            if reportOneSuspect(subject) then
+                ns.Log.Info(format("  %s: secure", subject))
+            end
+            return
+        end
+
+        local secure, tainted, ours = 0, 0, 0
+        ns.Log.Info("taint check, suspects named in the blocks credited to this addon:")
+        for index = 1, #TAINT_SUSPECTS do
+            local name = TAINT_SUSPECTS[index]
+            -- Always asked, even when the global holds nothing right now: taint
+            -- attaches to the VARIABLE, so an absent value still has a real
+            -- answer. Skipping them meant the suspects most worth checking --
+            -- the protected functions themselves -- were never checked.
+            local verdict = reportOneSuspect(name)
+            local present = (_G[name] ~= nil) and "" or " (no value on this client)"
+            if verdict == true then
+                secure = secure + 1
+                if present ~= "" then
+                    ns.Log.Info(format("  %s: secure%s", name, present))
+                end
+            elseif verdict == false then
+                tainted = tainted + 1
+                local _, who = pcall(reader, name)
+                if tostring(who) == ns.ADDON_NAME then ours = ours + 1 end
+            end
+        end
+        ns.Log.Info(format("%d secure, %d tainted, %d of those ours", secure, tainted, ours))
+    end
+
+    ns.Log.Info("for the propagation path, which names the line that spread it:")
+    ns.Log.Info("  /console taintLog 2   then /reload, reproduce, and quit")
+    ns.Log.Info("  the client writes _classic_beta_/Logs/taint.log")
+    ns.Log.Info("  /console taintLog 0   turns it back off; it is verbose and slows the client")
+end
+
 local function commandBlocked()
     if not ns.BlockWatch then
         ns.Log.Error("the blocked-action watch did not load")
@@ -304,8 +408,10 @@ local function commandBlocked()
 
     for index = 1, #rows do
         local row = rows[index]
-        ns.Log.Info(format("  %dx %s (attempt: %s)", row.count, row.functionName,
-            row.firstAttempt))
+        local traced = ns.BlockWatch.IsKnown(row.functionName)
+            and " [traced, benign]" or ""
+        ns.Log.Info(format("  %dx %s (attempt: %s)%s", row.count, row.functionName,
+            row.firstAttempt, traced))
     end
 end
 
@@ -364,6 +470,7 @@ local function commandHelp()
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
     ns.Log.Info("/pa panel               open the settings panel and report how it built")
     ns.Log.Info("/pa blocked             protected calls the client blamed on this addon")
+    ns.Log.Info("/pa taint [name]        ask the client what is tainted, and by whom")
 end
 
 local function handler(input)
@@ -402,6 +509,8 @@ local function handler(input)
         commandPanel()
     elseif command == "blocked" then
         commandBlocked()
+    elseif command == "taint" then
+        commandTaint(words[2])
     else
         ns.Log.Error("unknown command: " .. command)
         commandHelp()
