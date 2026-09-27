@@ -30,6 +30,7 @@ Core\StyleLedger.lua
 Core\CVarSteward.lua
 Core\Registry.lua
 Core\Dispatch.lua
+Core\CallWindow.lua
 Core\BlockWatch.lua
 Core\Debug.lua
 
@@ -39,9 +40,7 @@ Features\Nameplates.lua
 Features\DamageBreakdown.lua
 Features\EquippedSkills.lua
 Features\Toasts.lua
+Features\AutoSortBags.lua
+Features\AutoSellJunk.lua
 Features\SettingsPanel.lua
 
-# The Phase 8 bag and merchant write spike (Architecture/20260927-Phase08.md
-# section 8). Temporary: deleted with its /pa probe bags route once section 8.4
-# is filled in. It makes no call until one of those commands is typed.
-Spikes\BagWriteProbe.lua

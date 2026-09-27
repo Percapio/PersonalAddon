@@ -321,17 +321,35 @@ local function commandToasts(subcommand)
         counts.deliveredInsideCall, counts.stackChecked))
 end
 
--- The Phase 8 spike (section 8). Temporary: removed with Spikes/BagWriteProbe.lua.
-local function commandProbe(subject, verb, argument)
-    if string.lower(subject or "") ~= "bags" then
-        ns.Log.Error("usage: /pa probe bags [sort | sell | popup seen | popup none]")
+-- Phase 8 section 7.1: why the last bag close did or did not sort.
+local function commandBags()
+    if not ns.AutoSortBags then
+        ns.Log.Error("tidy bags did not load")
         return
     end
-    if not ns.BagWriteProbe then
-        ns.Log.Error("the bag write probe is not installed")
+    local view = ns.AutoSortBags.Inspect()
+    ns.Log.Info(format("enabled=%s sorts=%d cooldown=%ss last sort %s",
+        tostring(view.enabled), view.sorts, tostring(view.cooldownSeconds),
+        view.secondsSinceSort and format("%.0fs ago", view.secondsSinceSort) or "never"))
+    ns.Log.Info("  skipped: " .. (#view.skips > 0 and table.concat(view.skips, ", ") or "none")
+        .. (view.lastSkip and (" (last: " .. view.lastSkip .. ")") or ""))
+    ns.Log.Info("  inside the last sort: " .. (view.lastInline or "nothing yet"))
+    ns.Log.Info("  listening now: " .. ns.EscapeGuard.Neutralize(tostring(view.listenersNow)))
+end
+
+-- Phase 8 section 7.2: the last sale and why any visit was skipped.
+local function commandVend()
+    if not ns.AutoSellJunk then
+        ns.Log.Error("sell junk did not load")
         return
     end
-    ns.BagWriteProbe.Command(verb, argument)
+    local view = ns.AutoSellJunk.Inspect()
+    ns.Log.Info(format("enabled=%s sales=%d pending=%s", tostring(view.enabled), view.sales,
+        tostring(view.salePending)))
+    ns.Log.Info("  skipped: " .. (#view.skips > 0 and table.concat(view.skips, ", ") or "none")
+        .. (view.lastSkip and (" (last: " .. view.lastSkip .. ")") or ""))
+    ns.Log.Info("  last sale: " .. (view.lastSummary or "none yet")
+        .. (view.lastPosted and (" [" .. view.lastPosted .. "]") or ""))
 end
 
 local function commandPanel()
@@ -581,7 +599,8 @@ local function commandHelp()
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
     ns.Log.Info("/pa skills              what the skills window shows, and how each row resolved")
     ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each toast")
-    ns.Log.Info("/pa probe bags ...      the Phase 8 spike: sort, sell, popup seen|none")
+    ns.Log.Info("/pa bags                tidy bags: sorts, skips, and who listens")
+    ns.Log.Info("/pa vend                sell junk: the last sale and any skips")
     ns.Log.Info("/pa panel               open the settings panel and report how it built")
     ns.Log.Info("/pa blocked             refusals the client blamed on this addon, with their paths")
     ns.Log.Info("/pa blocked stack <n>   one record's stored stack")
@@ -626,8 +645,10 @@ local function handler(input)
         commandSkills()
     elseif command == "toasts" then
         commandToasts(words[2])
-    elseif command == "probe" then
-        commandProbe(words[2], words[3], words[4])
+    elseif command == "bags" then
+        commandBags()
+    elseif command == "vend" then
+        commandVend()
     elseif command == "panel" then
         commandPanel()
     elseif command == "blocked" then

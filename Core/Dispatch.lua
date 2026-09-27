@@ -282,6 +282,12 @@ function Dispatch.RegisteredEventCount()
     return count
 end
 
+-- Whether a frame is this dispatcher's own, so a listener read (CallWindow) can
+-- leave it out of the frames it reports.
+function Dispatch.OwnsFrame(frame)
+    return frame == host
+end
+
 function Dispatch.CallbackCount(featureId)
     local count = 0
     for _, subscription in pairs(liveTokens) do

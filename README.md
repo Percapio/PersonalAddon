@@ -1,179 +1,199 @@
 # PersonalAddon
 
-A lightweight World of Warcraft Forever Beta (API Version 1.60.1) addon specifically tailored for me.
-
-**Why?** I mostly like one or two features from a whole range of addons. Of the list below (under the Credits section), none were updated at the time of creating PersonalAddon to support WoW Forever Beta, and even if they were, I did not use most of their features (besides FiveSecondRule).
-
-**What?** This addon cherry-picks specific features from the emulated addons with minimal frontend customization. The aesthetics of each feature will remain in-line with the Enhanced and/or Classic versions of WoW Forever.
-
-**Controller First:** I play exclusively with a controller, so this addon is built to fully support the Gamepad UI (Alpha) currently being developed by the Blizzard team.
+A small, controller-first addon for the World of Warcraft Forever Beta (API 1.60.1). It
+takes the one or two features I wanted from a handful of larger addons and builds them
+to match the game's own look. It is built for, and tested with, Blizzard's Gamepad UI
+(Alpha).
 
 ## Installation
 
 1. Download or clone this repository.
-2. Place the `PersonalAddon` folder into your WoW directory: `_classic_beta_/Interface/AddOns/`.
-3. Launch World of Warcraft Forever Beta and ensure the addon is enabled in your AddOn list.
+2. Put the `PersonalAddon` folder in `_classic_beta_/Interface/AddOns/`.
+3. Start the game and make sure the addon is enabled in the AddOns list.
 
-## Configuration
-
-Customization for all features can be found in the native Blizzard settings menu under **Settings > Options > Addons > PersonalAddon**. 
-
-## Troubleshooting
-
-`/pa blocked` lists every action the game refused with PersonalAddon named: which function it was, how often it happened, and the path that led to it. Any entry is a bug in this addon, even when nothing looks wrong, so please open an issue with that output.
-
-Without BugGrabber installed, the game reports the same event with its own dialog, saying PersonalAddon was blocked from an action. `/pa blocked` has the detail.
+Every feature can be switched on or off and adjusted in **Settings > Options > AddOns >
+PersonalAddon**, or with `/pa` commands (below).
 
 ## Features
 
-This addon is modular in concept but monolithic in architecture. It targets the following specific features:
+**Combat**
 
-- **/rl Chat Command:** Type `/rl` to quickly execute `/reload`.
-- **FiveSecondRule (FSR) Tracker:** For mana users, a white vertical line sweeps across the resource bar over the five-second rule, showing how long until spirit regen resumes. Casting again restarts it. (Regen *tick* timing is not shown: the client returns mana as a protected value that addons cannot read, so there is no tick to display.)
-- **Aggro-Coloured Nameplates:** Colours hostile and neutral nameplates from a DPS perspective, in this order of priority: red = it is attacking you, grey = tagged by a player outside your group (no credit for you), green = it is on a party member or your pet, yellow = neutral, white = hostile and on neither. A mob hitting you is always red, even when tagged. Grey and yellow default to the game's own colours; all five are adjustable.
-  - **Nameplate size is not adjustable** and no longer offered. Two mechanisms were tried; both were accepted by the client and changed nothing on screen. `healthBar:SetHeight` is discarded on the next layout pass because the bar has two vertical anchors, and `C_NamePlate.SetNamePlateSize` sizes the plate's anchor region while the client keeps laying out the visible bar itself. In both cases the addon could confirm its own write and could not confirm the effect.
-  - Name, guild and NPC role tag placement are *not* included: the client treats nameplate text as a restricted region that addons may not measure or move.
-- **Damage Breakdown Panel:** A small panel above the player frame listing your own damage by spell — icon, DPS and share of your total — read from the client's own damage meter so the numbers match it exactly. Switches between the current fight and your overall session. (This replaces the originally planned scrolling combat text, which cannot be built correctly here: the client restricts addon access to the combat log, and every addon that tries misses hits.)
+- **Five-second rule.** For mana users, a white line sweeps across the mana bar and shows
+  how long until spirit regeneration resumes. Casting again restarts it. The client
+  hides mana values from addons, so the regeneration tick itself cannot be shown.
+- **Nameplate colours.** Hostile and neutral nameplates are coloured from a damage
+  dealer's point of view, highest priority first:
+
+  | Colour | Meaning |
+  |---|---|
+  | Red | It is attacking you, even if another player tagged it |
+  | Grey | Tagged by a player outside your group, so you get no credit |
+  | Green | It is attacking a party member or your pet |
+  | Yellow | Neutral |
+  | White | Hostile and attacking neither |
+
+  Grey and yellow match the game's own colours by default. All five can be changed.
+- **Damage breakdown.** A small panel above the player frame lists your damage by spell,
+  with icon, DPS and share of your total. It reads the game's own damage meter, so its
+  numbers match it exactly. Choose the current fight or the whole session.
+
+**Bags and loot**
+
+- **Equipped skills.** While your bags are open, a small panel at their left edge shows
+  your primary professions, the skill of each equipped weapon, and Defense, as
+  `rank / maximum`. Each weapon slot gets its own row; an empty main hand shows
+  Unarmed, and a fishing pole shows Fishing.
+- **Toasts.** Pop-ups for looted money, looted items of green quality or better, and
+  looted quest items of any quality. Purchases, quest rewards and crafted items do not
+  show. Position, duration and each type can be adjusted.
+- **Tidy bags when closed.** Closing your bags runs the game's own Clean Up Bags, at most
+  once a minute, never in combat, and never while items are moving. It also holds back
+  while something else is watching item locks, such as a bag item tracked in the
+  Cooldown Manager. `/pa bags` says why a close did not sort.
+- **Sell junk automatically.** Opening a merchant sells every grey item with the game's
+  own Sell All Junk, with no confirmation popup, and a toast reports what it earned. If
+  toasts are off, the summary goes to chat.
+
+**Other**
+
+- **`/rl`** reloads the interface.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/pa status` | Every feature and whether it is running |
+| `/pa on <feature>`, `/pa off <feature>` | Switch a feature on or off |
+| `/pa get <feature>`, `/pa set <feature> <key> <value>` | Read or change a setting |
+| `/pa skills` | What the skills panel shows, row by row |
+| `/pa toasts`, `/pa toasts test` | Toast counts; show one of each toast |
+| `/pa bags`, `/pa vend` | The last sort or sale, and why any was skipped |
+| `/pa dps`, `/pa plates`, `/pa fsr` | State of the damage breakdown, nameplates and five-second rule |
+| `/pa blocked` | Actions the game refused with PersonalAddon named |
+| `/pa help` | The full list |
+
+## Troubleshooting
+
+**Any entry in `/pa blocked` is a bug in this addon**, even if nothing looked wrong.
+Please open an issue with that output. Without BugGrabber, the game shows its own dialog
+for the same event.
+
+**Known issue: Options and the Gamepad UI.** Closing Options with the controller can
+leave the Gamepad UI in a state where the game refuses some actions. The most common is
+updating the interact icon; controller presses have been refused too. This is a defect in
+Blizzard's Gamepad UI Alpha, not in any one addon. The same refusal has been blamed on
+PersonalAddon, BugSack, Questie and Chatify, depending on which addon's code last touched
+that state. **`/reload` after changing settings clears it.** Details:
+[Architecture/20260924-Patch01.md](Architecture/20260924-Patch01.md).
 
 ## What the game already does
 
-Worth stating plainly, because it defines what this addon is *not* for. The
-Gamepad UI (Alpha) already handles, with no addon involved:
+The Gamepad UI already covers these, so this addon does not:
 
-- Navigating every interface with the controller.
-- Switching between panels within an open interface using `L2` / `R2`.
-- Accepting and declining quests, and choosing quest rewards.
-- A built-in damage meter, which is where this addon's breakdown panel gets its
-  numbers rather than counting its own.
-- Switching the left stick to strafe and backpedal in combat: Options → Gamepad →
-  the combat face-movement angle. 180 strafes and backpedals and never turns you; 115
-  strafes but turns you around when you pull the stick back. The out-of-combat angle
-  is a separate setting.
-- Sorting tracked quests by distance, which the quest tracker does on every zone
-  change.
+- Navigating every window with the controller, and switching panels with `L2` / `R2`.
+- Accepting and declining quests and choosing rewards.
+- Sorting tracked quests by distance on every zone change.
+- A damage meter, which the breakdown panel reads rather than counting its own.
+- Strafing and backpedalling in combat: Options → Gamepad → combat face-movement angle.
+  180 always strafes; 115 strafes but turns you when you pull the stick back.
+- Clean Up Bags, in the bag's Manage menu.
+- Sell All Junk, a button in the merchant window.
+- Reporting money gained at a merchant, in chat when you leave.
 
-Several features originally planned here turned out to be redundant against that
-list. They were dropped rather than reimplemented worse.
+## Tried and not possible
 
-## Tried and not deliverable
+Attempted and dropped, with the reason, so nobody spends the time twice:
 
-Attempted and abandoned, with the reason, so nobody spends the time twice:
+| Idea | Why not |
+|---|---|
+| Scrolling combat text | The client restricts the combat log for addons, so every attempt misses hits. The damage breakdown replaces it |
+| Camera pitch, DynamicCam style | The client accepts the settings and then ignores them. Worth retrying after a client patch |
+| Moving nameplate names, guilds and role tags | The client treats nameplate text as a restricted region |
+| Resizing nameplates | Both available methods are accepted and change nothing on screen |
+| Minimal player frames | Dropped by choice: it would mean moving Blizzard's frames, and the five-second-rule line anchors to the mana bar |
+| Quest tracker sorted by level | Reordering means removing and re-adding watches, and the game runs the tracker's update inside that call, carrying this addon's taint into the tracker. See [Phase 7 §6.4](Architecture/20260926-Phase07.md) |
+| Blizzard's own loot toasts | Its boss banner does not exist on this client, and its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon |
 
-- **Scrolling combat text.** The client restricts addon access to the combat log —
-  `C_CombatLog.IsCombatLogRestricted()` returns true — and every addon that tries
-  misses hits. Replaced by the damage breakdown panel, which reads the client's own
-  meter.
-- **Camera vertical pitch, DynamicCam style.** The client's
-  `test_cameraDynamicPitch` settings accept the change and even confirm it with a
-  dialog, then do nothing. Possibly because the Gamepad UI is still in Alpha. Worth
-  revisiting if a later client patch wires them up.
-- **Nameplate name, guild and role tag placement.** The client treats nameplate text
-  as a restricted region that addons may not measure or move.
-- **Minimal player frames.** Dropped by choice rather than by the client: vertical
-  bars require repositioning Blizzard's, which may be equally restricted, and it
-  would have broken the FSR indicator that anchors to the mana bar.
-- **Quest tracker sorted by quest level.** The tracker lists the game's quest watch
-  list in order, so the only way to reorder it is to remove and re-add watches. A
-  spike showed the game runs the tracker's own update inside that call, which would
-  carry this addon's taint into the tracker and the controller's navigation. It also
-  puts a re-added watch at the top, not the bottom. Nothing was built. See
-  [Architecture/20260926-Phase07.md](Architecture/20260926-Phase07.md) §6.4.
+## Planned
+
+Both are **on hold** under rule 8 below. The NPC windows are Blizzard panels, and moving
+them goes through the same panel system as the known issue above.
+
+- **NPC windows at lower centre:** move the gossip, quest, vendor and trainer windows to
+  the lower centre of the screen, with an adjustable offset.
+- **Paragraph paging for gossip:** show long gossip text a few lines at a time, in the
+  style of Immersion.
 
 ## Rules for future development
 
-World of Warcraft decides whether code is trusted one run at a time. If Blizzard's own
-interface calls one of our functions, or reads a value our code wrote, the rest of that
-run counts as ours. This is called taint. Any protected action later in that run is then
-refused with PersonalAddon named, even though we never asked for it. Blizzard state
-written during the run can carry the taint into later runs too. It has already happened
-twice: `SetPreferredGamepadInteractTarget()` was traced to the settings panel calling our
-code, and `C_Discord.IsUserOAuthed()` most likely has the same cause. See
-[Architecture/20260924-Patch01.md](Architecture/20260924-Patch01.md).
+The game decides whether code is trusted one run at a time. If Blizzard's interface calls
+our code, or reads a value our code wrote, the rest of that run counts as ours. This is
+called *taint*. A protected action later in that run is then refused in our name, even
+though we never asked for it. Blizzard state written during that run can carry the taint
+into later runs. The design documents in [Architecture/](Architecture/) cite these rules
+by number, so the numbers stay fixed.
 
-Check any new feature against these rules before planning it:
-
-1. **Blizzard's Lua never calls ours inline.** Our code runs only through paths the client
-   keeps separate: our own event handlers, `hooksecurefunc` post-hooks, timers, and
-   callbacks Blizzard delivers through its callback registry.
-   - An event handler is a separate path only when the event arrives on its own. Some
-     events are delivered while the call that caused them is still running, and then
-     our handler runs inside Blizzard's call (rule 9). Before subscribing to an event
-     that Blizzard's own calls raise, find out which kind it is.
-   - Settings are registered with `Settings.RegisterAddOnSetting` and a value-changed
-     callback (a callback-registry delivery), never as proxy settings with getter and
-     setter functions.
-   - No dropdowns: a dropdown's option list is a function Blizzard calls. Two-value
-     choices are checkboxes, and anything longer needs a spike (rule 8).
-   - No canvas commit, default or refresh hooks, no slider label formatters, no
-     colour-picker callbacks, and no functions stored in Blizzard's tables.
-2. **We never write into Blizzard's variables or tables.**
-   - No `print()`, because it resolves a shared chat global.
-   - No fields on Blizzard frames.
-   - No entries in `UIPanelWindows`, `UISpecialFrames` or any other Blizzard registry.
-
-   The standard `SLASH_*` / `SlashCmdList` slash-command registration is the one accepted
-   exception.
+1. **Blizzard's Lua never calls ours inline.** Our code runs only from our own event
+   handlers, `hooksecurefunc` post-hooks, timers, and callbacks delivered through
+   Blizzard's callback registry.
+   - An event handler is a separate run only if the event arrives on its own. Some events
+     arrive while the call that raised them is still running, and then our handler runs
+     inside that call (rule 9). The generated API docs flag each event as
+     `SynchronousEvent` or `UniqueEvent`. A unique event cannot arrive inside a call; for
+     a synchronous one, find out what raises it before subscribing.
+   - Settings use `Settings.RegisterAddOnSetting` with a value-changed callback, never
+     proxy settings with getters and setters.
+   - No dropdowns: their option lists are functions Blizzard calls. Two-value choices are
+     checkboxes.
+   - No commit, default or refresh hooks, slider label formatters, colour-picker
+     callbacks, or functions stored in Blizzard's tables.
+2. **We never write into Blizzard's variables or tables.** No `print()`, which goes
+   through a shared chat global; no fields on Blizzard frames; no entries in
+   `UIPanelWindows`, `UISpecialFrames` or other Blizzard registries. Slash-command
+   registration is the one accepted exception.
 3. **Our frames stay out of Blizzard's panel system.** Never `ShowUIPanel` or
-   `HideUIPanel` one of ours. The panel manager drives the Gamepad UI's binding stack,
-   which is where the refusals happen.
-4. **Hooks are `hooksecurefunc` post-hooks only.** Never replace a Blizzard function or
-   script, and keep every hook O(1).
-5. **Work triggered by Blizzard's interface runs one frame later, in our own code**
+   `HideUIPanel` one of ours. The panel system drives the Gamepad UI's controls, which is
+   where refusals happen.
+4. **Hooks are `hooksecurefunc` post-hooks only**, never replacements, and each is O(1).
+5. **Work triggered by Blizzard's interface runs a frame later**, in our own code
    (`C_Timer.After(0)`), from a queue we own and can cancel.
-6. **We draw on our own frames.** Anchor them to Blizzard's frames; don't add textures or
-   children to Blizzard's frames.
-7. **We never call protected functions.** A refusal naming PersonalAddon is a defect
-   even when it looks harmless. BugGrabber hides Blizzard's dialog for it, so silence is
-   not proof.
-8. **Anything that changes a Blizzard UI panel needs a spike first.** That covers gossip,
-   quest, merchant, trainer, settings, the Game Menu and Edit Mode. The spike must show a
-   safe path before the feature is planned.
+6. **We draw on our own frames**, anchored to Blizzard's but never parented to them. The
+   Gamepad UI rebuilds a panel's navigation, in whoever's code is running, whenever a
+   frame is created under that panel. A child of ours under a Blizzard panel would put
+   our taint there.
+7. **We never call protected functions.** A refusal naming PersonalAddon is a defect even
+   when it looks harmless. BugGrabber hides the game's dialog, so silence is not proof.
+8. **Anything that changes a Blizzard panel needs a test first:** gossip, quest,
+   merchant, trainer, settings, the Game Menu and Edit Mode. The test must show a safe
+   path before the feature is planned.
 9. **A client call we make can run Blizzard's event handlers before it returns.** Treat
-   any call that changes state other interface code listens to — CVars, quest watches,
-   super-tracking, targets, bindings — as running those listeners inside our own run,
-   until a spike shows its events arrive after the call. Confirmed for quest watches:
-   `QUEST_WATCH_LIST_CHANGED` is delivered inside `AddQuestWatch`, which is why the
-   quest-level sort was not built.
+   any call that changes state other code listens to as running those listeners inside
+   our run, until a test shows otherwise. The `SynchronousEvent` flag narrows which calls
+   to test; it does not replace the test. Confirmed so far:
+   - `AddQuestWatch` delivers `QUEST_WATCH_LIST_CHANGED` inside the call, so the
+     quest-level sort was not built.
+   - `C_Container.SortBags` delivers `ITEM_LOCK_CHANGED` and `ITEM_LOCKED` inside the
+     call, so tidy bags checks nothing is listening before every sort.
+   - `C_MerchantFrame.SellAllJunkItems` delivers nothing inside the call.
 
-Known exceptions, kept on purpose and revisited only if a refusal points at them:
+Known exceptions, kept on purpose:
 
-- The FSR marker is a texture created on Blizzard's mana bar (`Features/FiveSecondRule.lua`).
-- `Core/Log.lua` falls back to `print()` only when no chat frame exists at all.
+- The five-second-rule line is a texture on Blizzard's mana bar
+  (`Features/FiveSecondRule.lua`).
+- `Core/Log.lua` falls back to `print()` only when no chat frame exists.
 
-To check a refusal, `/pa blocked` shows what was refused and where it came from. To see
-how taint spread into it:
+To trace how taint reached a refusal:
 
-1. Run `/console taintLog 2`, then `/reload`.
-2. Play until the refusal happens again, then quit.
+1. `/console taintLog 2`, then `/reload`.
+2. Play until the refusal recurs, then quit.
 3. Read `Logs/taint.log`.
-4. Run `/console taintLog 0`, because the log slows the client.
-
-## Planned after v1
-
-Not built yet, and deliberately out of scope for the first release. **Both are on hold
-under rule 8.** The NPC interaction frames are Blizzard UI panels, which the panel manager
-positions and hides itself, through the same path the settings-panel refusals went
-through. Neither goes ahead unless a spike finds a route that never touches Blizzard's
-panel system.
-
-- **Interaction frames at lower-centre:** move the gossip, quest, vendor, trainer
-  and other NPC interaction frames to the lower centre of the screen, with the
-  offset adjustable in the settings menu. The existing frames, repositioned —
-  not replaced.
-- **Paragraph paging for gossip:** break long gossip text into individual
-  paragraphs so it is read a few lines at a time rather than as a wall, in the
-  style of the Immersion addon. The frame stays Blizzard's; only the text
-  presentation changes.
+4. `/console taintLog 0` afterwards; the log slows the game.
 
 ## Credits
 
-Inspired by:
-- Leatrix Plus
-- FiveSecondRule
-- Threat Plates
-- Dynamic Cam (for the camera pitch idea, which this client will not do — see above)
-- Immersion (for the paragraph-paging idea, planned after v1)
+Inspired by Leatrix Plus, FiveSecondRule, Threat Plates, DynamicCam (the camera idea
+this client will not do) and Immersion (the gossip-paging idea).
 
-## License & Legal
+## License
 
-**PersonalAddon** is distributed under the **Artistic License 2.0**.
+PersonalAddon is distributed under the **Artistic License 2.0**.
