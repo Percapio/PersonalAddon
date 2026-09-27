@@ -1,12 +1,12 @@
 -- Features/Nameplates.lua
--- Skinnier hostile and neutral nameplates, name repositioned, and aggro-based
--- colouring from a DPS perspective (Phase 2).
+-- Hostile and neutral nameplates coloured from a DPS perspective: by who the
+-- monster is attacking (Phase 2), and by whether you can get credit for it or it
+-- is merely neutral (Phase 7 section 5).
 --
 -- Restyle in place; own nothing. Blizzard's status bar is the only thing that
 -- knows a unit's health and on this client likely the only thing that ever will,
--- so we resize and recolour ITS bar and move ITS name text. We create no frames,
--- textures or font strings, which is what makes the feature indifferent to
--- whether health is readable.
+-- so we recolour ITS bar. We create no frames, textures or font strings, which is
+-- what makes the feature indifferent to whether health is readable.
 --
 -- Everything we change is recorded in the style ledger first, scoped to one
 -- occupancy of one frame, so disable puts it back and a recycled frame never
@@ -25,6 +25,35 @@ local AGGRO = {
     ELSEWHERE = "Elsewhere",
     UNKNOWN = "Unknown",
 }
+
+-- A unit's standing is independent of whom it is attacking (Phase 7 section 5.3).
+local DISPOSITION = {
+    TAP_DENIED = "TapDenied",
+    NEUTRAL = "Neutral",
+    HOSTILE = "Hostile",
+    UNREADABLE = "Unreadable",
+}
+
+-- What the bar should show. CEDED hands the bar back to Blizzard: the recorded
+-- original is restored and we stop contesting it. It is Phase 2's Unknown
+-- behaviour, renamed here because two different causes now lead to it.
+local VERDICT = {
+    ON_PLAYER = "OnPlayer",
+    TAP_DENIED = "TapDenied",
+    ON_GROUP_OR_PET = "OnGroupOrPet",
+    NEUTRAL = "Neutral",
+    ELSEWHERE = "Elsewhere",
+    CEDED = "Ceded",
+}
+
+local STANDING = {
+    NOT_YET_READ = "NotYetRead",
+    READABLE = "Readable",
+    WITHHELD = "Withheld",
+}
+
+-- The client's reaction scale; 4 is neutral, which is what Blizzard paints yellow.
+local NEUTRAL_REACTION = 4
 
 -- Blizzard re-sets plate geometry on its own schedule. The sweep re-asserts;
 -- a hook, where one is available, only makes it react sooner.
@@ -65,6 +94,9 @@ local state = {
 local capability = {
     plateLookup = false,
     barRecolourable = nil,
+    -- Checked on the first standing read of the session and cached (Phase 2
+    -- section 4.7): a refusal can arrive as a log line and a nil, not an error.
+    standing = STANDING.NOT_YET_READ,
 }
 
 local function namePlateApi()
@@ -94,9 +126,11 @@ local function readSettings(config)
     state.sweepInterval = settings.sweepInterval or state.sweepInterval
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
-    state.palette[AGGRO.ON_PLAYER] = hexToColour(settings.colourOnPlayer, 1, 0.25, 0.25)
-    state.palette[AGGRO.ON_GROUP_OR_PET] = hexToColour(settings.colourOnGroup, 0.25, 1, 0.25)
-    state.palette[AGGRO.ELSEWHERE] = hexToColour(settings.colourElsewhere, 1, 1, 1)
+    state.palette[VERDICT.ON_PLAYER] = hexToColour(settings.colourOnPlayer, 1, 0.25, 0.25)
+    state.palette[VERDICT.TAP_DENIED] = hexToColour(settings.colourTapDenied, 0.9, 0.9, 0.9)
+    state.palette[VERDICT.ON_GROUP_OR_PET] = hexToColour(settings.colourOnGroup, 0.25, 1, 0.25)
+    state.palette[VERDICT.NEUTRAL] = hexToColour(settings.colourNeutral, 1, 1, 0)
+    state.palette[VERDICT.ELSEWHERE] = hexToColour(settings.colourElsewhere, 1, 1, 1)
 end
 
 -- Frame shape -----------------------------------------------------------------
@@ -211,10 +245,11 @@ local function classifyUnresolvedTarget(unitToken)
     return AGGRO.ELSEWHERE, false
 end
 
--- With yieldSelectedTarget set, the plate the player is attacking is reported as
--- Unknown, which restores Blizzard's colour and stops us contesting it. The white
--- target outline still identifies it; what is given up is the aggro colour on the
--- one plate where Blizzard has its own claim on the property.
+-- With yieldSelectedTarget set, the plate the player is attacking is ceded, which
+-- restores Blizzard's colour and stops us contesting it. The white target outline
+-- still identifies it; what is given up is our colour on the one plate where
+-- Blizzard has its own claim on the property. It is decided before anything is
+-- read, so a yielded plate asks the client nothing and is evidence of nothing.
 local function isSelectedTarget(unitToken)
     return unitsAreSame(unitToken, "target") == true
 end
@@ -222,11 +257,6 @@ end
 -- Returns the classification and whether the attempt bore on the question of
 -- whether this client withholds aggro data.
 local function classifyAggro(unitToken)
-    if state.yieldSelectedTarget and isSelectedTarget(unitToken) then
-        -- Deliberately not asking, so not evidence of anything.
-        return AGGRO.UNKNOWN, false
-    end
-
     local mobTarget = unitToken .. "target"
 
     local resolved, exists = pcall(UnitExists, mobTarget)
@@ -266,6 +296,133 @@ local function classifyAggro(unitToken)
         return AGGRO.ON_GROUP_OR_PET, true
     end
     return AGGRO.ELSEWHERE, true
+end
+
+-- Standing --------------------------------------------------------------------
+
+-- Tapped and neutral are what Blizzard's own plates already paint grey and yellow
+-- (CompactUnitFrame_UpdateHealthColor). Our Elsewhere white painted over both;
+-- Phase 7 puts them back under our priority.
+--
+-- None of the three reads carries a secret-return flag in this client's generated
+-- API documentation, and Blizzard's plates make the first two on every colour
+-- update. Documentation is evidence, not proof, so a value is checked before it is
+-- compared: testing a secret value is itself an error for insecure code. A nil is
+-- accepted as "no", the direction that claims nothing.
+local function plainOrNil(value, expectedType)
+    if value == nil then
+        return true
+    end
+    local isSecret = _G.issecretvalue
+    if type(isSecret) == "function" then
+        local ok, secret = pcall(isSecret, value)
+        if not ok or secret then
+            return false
+        end
+    end
+    return type(value) == expectedType
+end
+
+-- Returns tapDenied, playerControlled, reaction, readable.
+local function readStanding(unitToken)
+    local tapOk, tapDenied = pcall(UnitIsTapDenied, unitToken)
+    local controlOk, controlled = pcall(UnitPlayerControlled, unitToken)
+    local reactionOk, reaction = pcall(UnitReaction, "player", unitToken)
+    if not (tapOk and controlOk and reactionOk) then
+        return nil, nil, nil, false
+    end
+    if not plainOrNil(tapDenied, "boolean")
+        or not plainOrNil(controlled, "boolean")
+        or not plainOrNil(reaction, "number") then
+        return nil, nil, nil, false
+    end
+    return tapDenied == true, controlled == true, reaction, true
+end
+
+-- Once per session, on the first in-scope plate the sweep reaches.
+local function checkDispositionCapability(unitToken)
+    local present = type(UnitIsTapDenied) == "function"
+        and type(UnitPlayerControlled) == "function"
+        and type(UnitReaction) == "function"
+    local readable = present and select(4, readStanding(unitToken))
+    if readable then
+        capability.standing = STANDING.READABLE
+        return
+    end
+    capability.standing = STANDING.WITHHELD
+    ns.Log.Once("plates:standingwithheld",
+        "this client withholds whether a nameplate unit is tapped or neutral; those plates keep the aggro colours")
+end
+
+-- Pre: the capability is not withheld; standingOf is the only caller.
+local function classifyDisposition(unitToken)
+    local tapDenied, controlled, reaction, readable = readStanding(unitToken)
+    if not readable then
+        -- Never claim a standing we did not read (Phase 2 section 9.0).
+        return DISPOSITION.UNREADABLE
+    end
+    -- Mirrors CompactUnitFrame_IsTapDenied: a player or pet is never tap-denied.
+    if tapDenied and not controlled then
+        return DISPOSITION.TAP_DENIED
+    end
+    if reaction == NEUTRAL_REACTION then
+        return DISPOSITION.NEUTRAL
+    end
+    return DISPOSITION.HOSTILE
+end
+
+local function standingOf(unitToken)
+    if capability.standing == STANDING.NOT_YET_READ then
+        checkDispositionCapability(unitToken)
+    end
+    if capability.standing == STANDING.WITHHELD then
+        return DISPOSITION.UNREADABLE
+    end
+    return classifyDisposition(unitToken)
+end
+
+-- The one place bar colour is decided (Phase 7 section 5.4). Priority: on you,
+-- then tapped, then group or pet, then neutral, then hostile. Grey never hides a
+-- mob that is hitting you.
+--
+-- Tapped is shown even when aggro is Unknown, because Blizzard paints tapped grey
+-- ahead of its own threat red, so grey is exactly what ceding would show. Neutral
+-- is not: there Blizzard's colour carries threat-list membership we could not
+-- read, and yellow would claim "not on you". Unreadable behaves as Hostile.
+local function resolveColourVerdict(aggro, disposition)
+    if aggro == AGGRO.ON_PLAYER then
+        return VERDICT.ON_PLAYER
+    end
+    if disposition == DISPOSITION.TAP_DENIED then
+        return VERDICT.TAP_DENIED
+    end
+    if aggro == AGGRO.ON_GROUP_OR_PET then
+        return VERDICT.ON_GROUP_OR_PET
+    end
+    if aggro == AGGRO.UNKNOWN then
+        return VERDICT.CEDED
+    end
+    if disposition == DISPOSITION.NEUTRAL then
+        return VERDICT.NEUTRAL
+    end
+    return VERDICT.ELSEWHERE
+end
+
+local function verdictFor(plate)
+    local unitToken = plate.unitToken
+    if state.yieldSelectedTarget and isSelectedTarget(unitToken) then
+        return VERDICT.CEDED
+    end
+
+    -- Only evidence-bearing attempts are counted. Counting every plate meant a
+    -- field of idle mobs reached 200 in seconds and triggered a warning that the
+    -- client withholds aggro data -- about a feature already observed working in
+    -- live play. Standing reads are not aggro evidence.
+    local aggro, boreEvidence = classifyAggro(unitToken)
+    if boreEvidence then
+        state.aggroAttempts = state.aggroAttempts + 1
+    end
+    return resolveColourVerdict(aggro, standingOf(unitToken))
 end
 
 -- Styling ---------------------------------------------------------------------
@@ -323,32 +480,34 @@ local function reassertColour(plate)
         return false
     end
     if not ns.StyleLedger.Reapply(state.ledger, plate.healthBar, "BarColour", desired) then
-        -- The record was dropped, most likely by an Unknown transition. Re-take it.
+        -- The record was dropped, most likely by a Ceded verdict. Re-take it.
         ns.StyleLedger.Apply(state.ledger, plate.healthBar, "BarColour", desired)
     end
     markContested(plate)
     return true
 end
 
-local function applyAggroColour(plate, aggroState)
-    if aggroState == AGGRO.UNKNOWN then
-        if plate.lastAggro ~= AGGRO.UNKNOWN then
-            -- Never hold a claim we can no longer support (section 9.3).
+local function applyColourVerdict(plate, verdict)
+    if verdict == VERDICT.CEDED then
+        if plate.lastVerdict ~= VERDICT.CEDED then
+            -- Never hold a claim we can no longer support (Phase 2 section 9.3).
             if ns.StyleLedger.HasRecord(state.ledger, plate.healthBar, "BarColour") then
                 ns.StyleLedger.RestoreProperty(state.ledger, plate.healthBar, "BarColour")
             end
-            plate.lastAggro = aggroState
+            plate.lastVerdict = verdict
             plate.desiredColour = nil
+            -- A ceded bar is Blizzard's again, so there is nothing left to contest.
+            state.contested[plate] = nil
         end
         return
     end
 
-    local colour = state.palette[aggroState]
+    local colour = state.palette[verdict]
     if not colour then
         return
     end
 
-    if plate.lastAggro == aggroState then
+    if plate.lastVerdict == verdict then
         -- Same verdict, but Blizzard may have overwritten us since.
         plate.desiredColour = colour
         reassertColour(plate)
@@ -360,11 +519,11 @@ local function applyAggroColour(plate, aggroState)
         capability.barRecolourable = ok and true or false
         if not ok then
             ns.Log.Once("plates:barnotcolourable",
-                "this client refuses to recolour nameplate health bars; aggro colouring is off")
+                "this client refuses to recolour nameplate health bars; nameplate colouring is off")
         end
     end
     if ok then
-        plate.lastAggro = aggroState
+        plate.lastVerdict = verdict
         plate.desiredColour = colour
     end
 end
@@ -386,7 +545,7 @@ local function unstylePlate(plate)
         ns.StyleLedger.RestoreWidget(state.ledger, plate.healthBar)
     end
     plate.styleApplied = false
-    plate.lastAggro = nil
+    plate.lastVerdict = nil
     plate.desiredColour = nil
 end
 
@@ -428,7 +587,7 @@ local function trackPlate(unitToken)
         unitToken = unitToken,
         scope = classifyScope(unitToken, frame),
         styleApplied = false,
-        lastAggro = nil,
+        lastVerdict = nil,
         desiredColour = nil,
     }
 
@@ -564,15 +723,7 @@ local function sweep()
                 styleIfInScope(plate)
             end
             if colouringActive() then
-                -- Only evidence-bearing attempts are counted. Counting every plate
-                -- meant a field of idle mobs reached 200 in seconds and triggered
-                -- a warning that the client withholds aggro data -- about a
-                -- feature already observed working in live play.
-                local classification, boreEvidence = classifyAggro(plate.unitToken)
-                if boreEvidence then
-                    state.aggroAttempts = state.aggroAttempts + 1
-                end
-                applyAggroColour(plate, classification)
+                applyColourVerdict(plate, verdictFor(plate))
             else
                 reassertColour(plate)
             end
@@ -819,7 +970,7 @@ local function onConfigChanged(config, changedKey)
     if changedKey == "yieldSelectedTarget" then
         stopContesting()
         for _, plate in pairs(state.plates) do
-            plate.lastAggro = nil
+            plate.lastVerdict = nil
         end
         sweep()
         return ns.CONFIG_RESULT.APPLIED
@@ -828,18 +979,18 @@ local function onConfigChanged(config, changedKey)
     if changedKey == "aggroColouring" and not state.colouringWanted then
         stopContesting()
         for _, plate in pairs(state.plates) do
-            if plate.lastAggro and plate.healthBar then
+            if plate.lastVerdict and plate.healthBar then
                 ns.StyleLedger.RestoreProperty(state.ledger, plate.healthBar, "BarColour")
-                plate.lastAggro = nil
+                plate.lastVerdict = nil
             end
         end
         return ns.CONFIG_RESULT.APPLIED
     end
 
-    -- Geometry and palette changes land on the next sweep, which is under a
-    -- quarter of a second away; forcing one now makes it feel immediate.
+    -- Palette changes land on the next sweep, which is under a quarter of a
+    -- second away; forcing one now makes it feel immediate.
     for _, plate in pairs(state.plates) do
-        plate.lastAggro = nil
+        plate.lastVerdict = nil
     end
     sweep()
     return ns.CONFIG_RESULT.APPLIED
@@ -848,7 +999,7 @@ end
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Nameplates",
-    description = "Slimmer hostile nameplates, coloured by who the monster is attacking.",
+    description = "Hostile and neutral nameplates, coloured by who the monster is attacking.",
     settings = {
         aggroColouring = true,
         -- Set true to stop contesting the bar colour on your current target and
@@ -858,12 +1009,16 @@ ns.Registry.Register(FEATURE_ID, {
         colourOnPlayer = "ff4040",
         colourOnGroup = "40ff40",
         colourElsewhere = "ffffff",
+        -- Both are Blizzard's own colours, so by default neither contests the
+        -- bar: e6 is 0.902, inside COLOUR_TOLERANCE of Blizzard's 0.9 grey.
+        colourTapDenied = "e6e6e6",
+        colourNeutral = "ffff00",
         sweepInterval = 0.25,
     },
     schema = {
         aggroColouring = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour by who has aggro",
-            description = "Red when it is on you, green when a party member or your pet has it, white otherwise.",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour nameplates",
+            description = "Red: it is attacking you. Grey: tagged by a player outside your group. Green: attacking your group or pet. Yellow: neutral. White: hostile, attacking neither.",
         },
         yieldSelectedTarget = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone",
@@ -876,7 +1031,13 @@ ns.Registry.Register(FEATURE_ID, {
             kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking your group or pet",
         },
         colourElsewhere = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking neither",
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Hostile, and attacking neither",
+        },
+        colourTapDenied = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Tagged by a player outside your group",
+        },
+        colourNeutral = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Neutral, and on neither you nor your group",
         },
         -- Not curated: a frame-rate decision dressed as a preference.
         sweepInterval = {
@@ -893,11 +1054,19 @@ ns.Registry.Register(FEATURE_ID, {
 ns.Nameplates = {
     Inspect = function()
         local inScope, outOfScope, unreachable, coloured = 0, 0, 0, 0
+        local verdicts = {}
+        for _, name in pairs(VERDICT) do
+            verdicts[name] = 0
+        end
         for _, plate in pairs(state.plates) do
             if plate.scope == SCOPE.IN then
                 inScope = inScope + 1
-                if plate.lastAggro and plate.lastAggro ~= AGGRO.UNKNOWN then
-                    coloured = coloured + 1
+                local verdict = plate.lastVerdict
+                if verdict then
+                    verdicts[verdict] = (verdicts[verdict] or 0) + 1
+                    if verdict ~= VERDICT.CEDED then
+                        coloured = coloured + 1
+                    end
                 end
             elseif plate.scope == SCOPE.OUT then
                 outOfScope = outOfScope + 1
@@ -917,6 +1086,8 @@ ns.Nameplates = {
             outOfScope = outOfScope,
             unreachable = unreachable,
             coloured = coloured,
+            verdicts = verdicts,
+            standingCapability = capability.standing,
             sweeps = state.sweepCount,
             hookInstalled = state.hookInstalled,
             colouringActive = colouringActive(),

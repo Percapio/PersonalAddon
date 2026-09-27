@@ -37,3 +37,7 @@ Features\FiveSecondRule.lua
 Features\Nameplates.lua
 Features\DamageBreakdown.lua
 Features\SettingsPanel.lua
+
+# The Phase 7 quest-watch spike (Architecture/20260926-Phase07.md section 6.3).
+# Temporary: deleted with its /pa probe route once section 6.4 is filled in.
+Spikes\QuestWatchProbe.lua

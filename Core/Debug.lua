@@ -216,13 +216,22 @@ local function commandPlates()
     ns.Log.Info(format("tracked=%d inScope=%d outOfScope=%d unreachable=%d coloured=%d sweeps=%d",
         view.tracked, view.inScope, view.outOfScope, view.unreachable,
         view.coloured, view.sweeps))
+    -- Phase 7 exit criteria 5 and 7 read these two lines.
+    local verdicts = view.verdicts or {}
+    ns.Log.Info(format("  verdicts: onPlayer=%d tapDenied=%d onGroupOrPet=%d neutral=%d elsewhere=%d ceded=%d",
+        verdicts.OnPlayer or 0, verdicts.TapDenied or 0, verdicts.OnGroupOrPet or 0,
+        verdicts.Neutral or 0, verdicts.Elsewhere or 0, verdicts.Ceded or 0))
+    ns.Log.Info(format("  contested=%d driver=%s yieldSelectedTarget=%s",
+        view.contested or 0, tostring(view.contestedRunning),
+        tostring(view.yieldSelectedTarget)))
     ns.Log.Info(format("  ledger: widgets=%d restored=%d widgetGone=%d writeRefused=%d",
         view.ledgerWidgets, view.ledgerRestored, view.ledgerWidgetGone,
         view.ledgerWriteRefused))
-    ns.Log.Info(format("  capability: barRecolourable=%s hook=%s",
-        tostring(view.barRecolourable), tostring(view.hookInstalled)))
+    ns.Log.Info(format("  capability: barRecolourable=%s standing=%s hook=%s",
+        tostring(view.barRecolourable), tostring(view.standingCapability),
+        tostring(view.hookInstalled)))
     if not view.colouringActive then
-        ns.Log.Warn("  aggro colouring is OFF")
+        ns.Log.Warn("  nameplate colouring is OFF")
     elseif not view.aggroResolvedEver then
         ns.Log.Warn("  colouring is on but no nameplate target has ever resolved")
     end
@@ -263,6 +272,23 @@ local function commandPanel()
     end
     if view.registered then
         ns.SettingsPanel.Open()
+    end
+end
+
+-- The Phase 7 quest-watch spike (Architecture/20260926-Phase07.md section 6.3).
+-- Temporary: this route goes with Spikes/QuestWatchProbe.lua (exit criterion 19).
+local function commandProbe(subject, verb, answer)
+    if string.lower(subject or "") ~= "quests" then
+        ns.Log.Error("usage: /pa probe quests [status | rewrite | animation played|none]")
+        return
+    end
+    if not ns.QuestWatchProbe then
+        ns.Log.Error("the quest watch probe did not load")
+        return
+    end
+    local ok, reason = ns.QuestWatchProbe.Command(verb, answer)
+    if not ok then
+        ns.Log.Error(tostring(reason))
     end
 end
 
@@ -500,6 +526,9 @@ local function commandHelp()
     ns.Log.Info("/pa blocked clear       empty the saved block log")
     ns.Log.Info("/pa blocked selftest    check the recorder against fixed samples")
     ns.Log.Info("/pa taint [name]        ask the client what is tainted, and by whom")
+    ns.Log.Info("/pa probe quests        Phase 7 quest-watch spike: start it, or print its report")
+    ns.Log.Info("/pa probe quests rewrite            Stage A: one rewrite, once Stage P allows it")
+    ns.Log.Info("/pa probe quests animation played|none   record S4, print the decision, stop")
 end
 
 local function handler(input)
@@ -540,6 +569,8 @@ local function handler(input)
         commandBlocked(words[2], words[3])
     elseif command == "taint" then
         commandTaint(words[2])
+    elseif command == "probe" then
+        commandProbe(words[2], words[3], words[4])
     else
         ns.Log.Error("unknown command: " .. command)
         commandHelp()

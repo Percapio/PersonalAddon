@@ -4,7 +4,7 @@
 **Implements:** `20260924-Patch01.md` revision 2 — Stage B, then C4
 **Depends on:** `PersonalAddon.toc`, `Core/BlockWatch.lua`, `Core/Debug.lua`, `Core/Registry.lua` and `Features/SettingsPanel.lua` as of `ff43442`
 **Revision:** 3 — Stage S is not run. Part 2 follows Part 1 directly, on the provisional API, and the evidence from 2026-09-26 is recorded (§2.1). Revision 2 added the audit dispositions (§9).
-**Status, 2026-09-26:** Parts 1 and 2 are implemented and not yet committed. An offline Lua 5.1 harness with stubbed client APIs passes 119 checks, including the self-test at 12 of 12. In-game checks (§4.8, §5.7 checks 1–6) and Stage V are pending.
+**Status, 2026-09-26:** Closed. Parts 1 and 2 shipped in `488abbd`. Stage V found the remaining `SetPreferredGamepadInteractTarget()` refusals to be a Blizzard Gamepad UI defect; the root cause is recorded in `20260924-Patch01.md` §0.
 
 ---
 
