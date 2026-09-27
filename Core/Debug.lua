@@ -258,6 +258,82 @@ local function commandDps()
         view.poolLive, view.poolFree, view.poolCapacity))
 end
 
+-- Phase 8 section 5: what the skills window would show now, and how it resolved.
+local function commandSkills()
+    if not ns.EquippedSkills then
+        ns.Log.Error("the skills window did not load")
+        return
+    end
+    ns.EquippedSkills.Refresh()
+    local view = ns.EquippedSkills.Inspect()
+    ns.Log.Info(format("enabled=%s capability=%s bagShown=%s windowShown=%s poll=%s (%ss)",
+        tostring(view.enabled), tostring(view.capability), tostring(view.bagShown),
+        tostring(view.panelShown), tostring(view.pollRunning), tostring(view.pollSeconds)))
+    if view.capabilityReason then
+        ns.Log.Warn("  withheld: " .. tostring(view.capabilityReason))
+    end
+    for index = 1, #view.rows do
+        local row = view.rows[index]
+        ns.Log.Info(format("  %s%s%s: %d / %d%s",
+            tostring(row.source),
+            row.slot and (" [" .. row.slot .. "]") or "",
+            row.label and (" " .. ns.EscapeGuard.Neutralize(row.label)) or "",
+            row.rank, row.maximum,
+            row.hasIcon and "" or " (no icon)"))
+    end
+    if #view.rows == 0 then
+        ns.Log.Info("  no rows")
+    end
+    for index = 1, #view.unresolved do
+        ns.Log.Warn("  unresolved weapon: " .. view.unresolved[index])
+    end
+    ns.Log.Info(format("  fist weapons and unarmed resolved to skill line %s",
+        view.fistLine and tostring(view.fistLine) or "NotTested"))
+    ns.Log.Info(format("  reads=%d withheld=%d iconFailures=%d border=%s pool=%d live / %d free / %d cap",
+        view.reads, view.withheldReads, view.iconFailures, tostring(view.borderStyle),
+        view.poolLive, view.poolFree, view.poolCapacity))
+end
+
+-- Phase 8 section 6: the toast service and loot capture, or one of each toast.
+local function commandToasts(subcommand)
+    if not ns.Toasts then
+        ns.Log.Error("the toasts feature did not load")
+        return
+    end
+    if string.lower(subcommand or "") == "test" then
+        local outcomes = ns.Toasts.PostSamples()
+        ns.Log.Info("posted one of each toast: " .. table.concat(outcomes, ", "))
+        return
+    end
+    local view = ns.Toasts.Inspect()
+    local counts = view.counts
+    ns.Log.Info(format("enabled=%s visible=%d/%d queued=%d lootCapture=%s%s",
+        tostring(view.enabled), view.visible, view.maximumVisible, view.queued,
+        tostring(view.lootCapture),
+        view.patternFailure and (" (missing " .. tostring(view.patternFailure) .. ")") or ""))
+    ns.Log.Info(format("  posted=%d shown=%d queued=%d coalesced=%d dropped=%d unavailable=%d",
+        counts.posted, counts.shown, counts.queued, counts.coalesced, counts.dropped,
+        counts.unavailable))
+    ns.Log.Info(format("  loot: notOurs=%d notShown=%d unresolved=%d unparsed=%d secret=%d inboxDropped=%d",
+        counts.notOurs, counts.notShown, counts.unresolved, counts.unparsed,
+        counts.secretTexts, counts.inboxDropped))
+    ns.Log.Info(format("  deliveredInsideCall=%d of %d checked (section 6.5 expects 0)",
+        counts.deliveredInsideCall, counts.stackChecked))
+end
+
+-- The Phase 8 spike (section 8). Temporary: removed with Spikes/BagWriteProbe.lua.
+local function commandProbe(subject, verb, argument)
+    if string.lower(subject or "") ~= "bags" then
+        ns.Log.Error("usage: /pa probe bags [sort | sell | popup seen | popup none]")
+        return
+    end
+    if not ns.BagWriteProbe then
+        ns.Log.Error("the bag write probe is not installed")
+        return
+    end
+    ns.BagWriteProbe.Command(verb, argument)
+end
+
 local function commandPanel()
     if not ns.SettingsPanel then
         ns.Log.Error("the settings panel did not load")
@@ -272,23 +348,6 @@ local function commandPanel()
     end
     if view.registered then
         ns.SettingsPanel.Open()
-    end
-end
-
--- The Phase 7 quest-watch spike (Architecture/20260926-Phase07.md section 6.3).
--- Temporary: this route goes with Spikes/QuestWatchProbe.lua (exit criterion 19).
-local function commandProbe(subject, verb, answer)
-    if string.lower(subject or "") ~= "quests" then
-        ns.Log.Error("usage: /pa probe quests [status | rewrite | animation played|none]")
-        return
-    end
-    if not ns.QuestWatchProbe then
-        ns.Log.Error("the quest watch probe did not load")
-        return
-    end
-    local ok, reason = ns.QuestWatchProbe.Command(verb, answer)
-    if not ok then
-        ns.Log.Error(tostring(reason))
     end
 end
 
@@ -520,15 +579,15 @@ local function commandHelp()
     ns.Log.Info("/pa pool                exercise both frame pool drop policies")
     ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
+    ns.Log.Info("/pa skills              what the skills window shows, and how each row resolved")
+    ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each toast")
+    ns.Log.Info("/pa probe bags ...      the Phase 8 spike: sort, sell, popup seen|none")
     ns.Log.Info("/pa panel               open the settings panel and report how it built")
     ns.Log.Info("/pa blocked             refusals the client blamed on this addon, with their paths")
     ns.Log.Info("/pa blocked stack <n>   one record's stored stack")
     ns.Log.Info("/pa blocked clear       empty the saved block log")
     ns.Log.Info("/pa blocked selftest    check the recorder against fixed samples")
     ns.Log.Info("/pa taint [name]        ask the client what is tainted, and by whom")
-    ns.Log.Info("/pa probe quests        Phase 7 quest-watch spike: start it, or print its report")
-    ns.Log.Info("/pa probe quests rewrite            Stage A: one rewrite, once Stage P allows it")
-    ns.Log.Info("/pa probe quests animation played|none   record S4, print the decision, stop")
 end
 
 local function handler(input)
@@ -563,14 +622,18 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
+    elseif command == "skills" then
+        commandSkills()
+    elseif command == "toasts" then
+        commandToasts(words[2])
+    elseif command == "probe" then
+        commandProbe(words[2], words[3], words[4])
     elseif command == "panel" then
         commandPanel()
     elseif command == "blocked" then
         commandBlocked(words[2], words[3])
     elseif command == "taint" then
         commandTaint(words[2])
-    elseif command == "probe" then
-        commandProbe(words[2], words[3], words[4])
     else
         ns.Log.Error("unknown command: " .. command)
         commandHelp()

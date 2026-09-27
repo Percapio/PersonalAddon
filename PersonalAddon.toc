@@ -25,6 +25,7 @@ Core\ConfigSchema.lua
 Core\ConfigStore.lua
 Core\Migrations.lua
 Core\FramePool.lua
+Core\PanelChrome.lua
 Core\StyleLedger.lua
 Core\CVarSteward.lua
 Core\Registry.lua
@@ -36,8 +37,11 @@ Features\ReloadCommand.lua
 Features\FiveSecondRule.lua
 Features\Nameplates.lua
 Features\DamageBreakdown.lua
+Features\EquippedSkills.lua
+Features\Toasts.lua
 Features\SettingsPanel.lua
 
-# The Phase 7 quest-watch spike (Architecture/20260926-Phase07.md section 6.3).
-# Temporary: deleted with its /pa probe route once section 6.4 is filled in.
-Spikes\QuestWatchProbe.lua
+# The Phase 8 bag and merchant write spike (Architecture/20260927-Phase08.md
+# section 8). Temporary: deleted with its /pa probe bags route once section 8.4
+# is filled in. It makes no call until one of those commands is typed.
+Spikes\BagWriteProbe.lua

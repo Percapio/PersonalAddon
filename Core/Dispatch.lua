@@ -9,14 +9,36 @@ local Dispatch = {}
 ns.Dispatch = Dispatch
 
 local type, format, remove = type, string.format, table.remove
+local pcall, select, tostring, unpack = pcall, select, tostring, unpack
 
 local COMBAT_LOG_EVENT = "COMBAT_LOG_EVENT_UNFILTERED"
+-- A subscription to an event Blizzard delivers through EventRegistry, rather than
+-- a client event (Phase 8 section 4.1).
+local CALLBACK = "callback"
 
 local host = CreateFrame("Frame")
 local subsByEvent = {}
 local subsByFeature = {}
 local liveTokens = {}
 local nextToken = 0
+
+-- Callback deliveries wait here for the next frame, keyed by token, latest payload
+-- wins. Consumers are level-triggered -- they read the state, not the event -- so
+-- coalescing an open and a close in one frame loses nothing.
+local callbackPending = {}
+local callbackPendingOrder = {}
+local callbackFlushScheduled = false
+local deliverCallbacks
+
+local function eventRegistry()
+    local registry = _G.EventRegistry
+    if type(registry) ~= "table"
+        or type(registry.RegisterCallback) ~= "function"
+        or type(registry.UnregisterCallback) ~= "function" then
+        return nil
+    end
+    return registry
+end
 
 -- One scratch array per dispatch depth. Handlers can fault a feature, which
 -- unsubscribes mid-iteration, so we always walk a snapshot -- and reusing the
@@ -114,6 +136,88 @@ local function removeFrom(list, subscription)
     end
 end
 
+-- Subscribes a feature to an event Blizzard delivers through EventRegistry (Phase 8
+-- section 4.1). README rule 1 allows this path: the registry calls each callback
+-- through securecallfunction, so our taint does not return to Blizzard's caller.
+--
+-- The registry calls us INSIDE Blizzard's call -- for the bag, inside its OnShow and
+-- OnHide. So the function it holds only records the payload and schedules a flush
+-- one frame later; the feature's handler runs in the flush, in our own execution.
+-- That makes rule 5 structural on this path rather than a discipline each feature
+-- has to remember.
+--
+-- Only EventRegistry is accepted, so no other Blizzard table receives a function of
+-- ours. The owner is a table created per subscription: the registry reserves number
+-- owners, and a nil owner would draw on its internal counter.
+function Dispatch.SubscribeCallback(featureId, eventName, handler)
+    assert(type(featureId) == "string" and featureId ~= "",
+        "Dispatch.SubscribeCallback requires a featureId")
+    assert(type(eventName) == "string" and eventName ~= "",
+        "Dispatch.SubscribeCallback requires an eventName")
+    assert(type(handler) == "function", "Dispatch.SubscribeCallback requires a handler")
+
+    local registry = eventRegistry()
+    if not registry then
+        ns.Log.OnceError("dispatch:noeventregistry", format(
+            "this client has no EventRegistry, so '%s' cannot follow %s",
+            featureId, eventName))
+        return nil, "CALLBACK_REGISTRY_UNAVAILABLE"
+    end
+    -- No synchronous fallback: delivering inline would run the feature's work inside
+    -- Blizzard's call, which is the one thing this path exists to prevent.
+    if not (C_Timer and type(C_Timer.After) == "function") then
+        ns.Log.OnceError("dispatch:nocallbackdefer", format(
+            "this client has no C_Timer.After, so '%s' cannot follow %s without running inside Blizzard's call",
+            featureId, eventName))
+        return nil, "CALLBACK_REGISTRY_UNAVAILABLE"
+    end
+
+    nextToken = nextToken + 1
+    local token = nextToken
+    local subscription = {
+        featureId = featureId,
+        eventName = eventName,
+        handler = handler,
+        kind = CALLBACK,
+        owner = {},
+        token = token,
+    }
+
+    -- What the registry holds. Writes only this file's tables, and calls nothing but
+    -- C_Timer.After.
+    local function onDelivery(_, ...)
+        if not liveTokens[token] then
+            return
+        end
+        if callbackPending[token] == nil then
+            callbackPendingOrder[#callbackPendingOrder + 1] = token
+        end
+        callbackPending[token] = { n = select("#", ...), ... }
+        if not callbackFlushScheduled then
+            callbackFlushScheduled = true
+            C_Timer.After(0, deliverCallbacks)
+        end
+    end
+
+    local ok, err = pcall(registry.RegisterCallback, registry, eventName,
+        onDelivery, subscription.owner)
+    if not ok then
+        ns.Log.OnceError("dispatch:callbackrefused:" .. eventName, format(
+            "EventRegistry refused '%s' a callback for %s: %s",
+            featureId, eventName, tostring(err)))
+        return nil, "CALLBACK_REGISTRY_UNAVAILABLE"
+    end
+
+    local owned = subsByFeature[featureId]
+    if not owned then
+        owned = {}
+        subsByFeature[featureId] = owned
+    end
+    owned[#owned + 1] = subscription
+    liveTokens[token] = subscription
+    return token
+end
+
 function Dispatch.Unsubscribe(token)
     local subscription = liveTokens[token]
     if not subscription then
@@ -121,11 +225,28 @@ function Dispatch.Unsubscribe(token)
     end
     liveTokens[token] = nil
 
-    local list = subsByEvent[subscription.eventName]
-    removeFrom(list, subscription)
-    if list and #list == 0 then
-        subsByEvent[subscription.eventName] = nil
-        host:UnregisterEvent(subscription.eventName)
+    if subscription.kind == CALLBACK then
+        -- A delivery still waiting for the flush is dropped with its token. The
+        -- registry's own unregister only clears a key that exists, so it cannot
+        -- disturb a dispatch in progress; and this never runs inside a delivery.
+        callbackPending[token] = nil
+        local registry = eventRegistry()
+        if registry then
+            local ok, err = pcall(registry.UnregisterCallback, registry,
+                subscription.eventName, subscription.owner)
+            if not ok then
+                ns.Log.OnceError("dispatch:callbackunregister:" .. subscription.eventName,
+                    format("EventRegistry refused to release %s for '%s': %s",
+                        subscription.eventName, subscription.featureId, tostring(err)))
+            end
+        end
+    else
+        local list = subsByEvent[subscription.eventName]
+        removeFrom(list, subscription)
+        if list and #list == 0 then
+            subsByEvent[subscription.eventName] = nil
+            host:UnregisterEvent(subscription.eventName)
+        end
     end
 
     removeFrom(subsByFeature[subscription.featureId], subscription)
@@ -161,11 +282,39 @@ function Dispatch.RegisteredEventCount()
     return count
 end
 
+function Dispatch.CallbackCount(featureId)
+    local count = 0
+    for _, subscription in pairs(liveTokens) do
+        if subscription.kind == CALLBACK
+            and (featureId == nil or subscription.featureId == featureId) then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local function invoke(subscription, ...)
     local ok, err = ns.Isolation.Call(subscription.handler, ...)
     if not ok then
         ns.Registry.Fault(subscription.featureId,
             format("raised handling %s", subscription.eventName), err)
+    end
+end
+
+-- The callback flush, in this addon's own execution. A handler that raises faults
+-- its feature, as for client events, and the fault releases the feature's other
+-- subscriptions -- still here, never inside a delivery.
+deliverCallbacks = function()
+    callbackFlushScheduled = false
+    local pending, order = callbackPending, callbackPendingOrder
+    callbackPending, callbackPendingOrder = {}, {}
+    for index = 1, #order do
+        local token = order[index]
+        local payload = pending[token]
+        local subscription = liveTokens[token]
+        if payload and subscription then
+            invoke(subscription, unpack(payload, 1, payload.n))
+        end
     end
 end
 

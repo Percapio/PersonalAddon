@@ -50,3 +50,25 @@ ns.TRACKER_STATE = {
 -- Enum.PowerType exists on the modern client codebase; 0 is the correct
 -- fallback value for mana on every client that lacks it.
 ns.POWER_TYPE_MANA = (Enum and Enum.PowerType and Enum.PowerType.Mana) or 0
+
+-- Phase 8 (Architecture/20260927-Phase08.md) ----------------------------------
+
+-- Toasts waiting for a free slot, beyond which a new one is dropped and counted.
+ns.TOAST_QUEUE_CAPACITY = 10
+-- The toast pool. Equal to the largest maximumVisible the schema allows, so the
+-- visible toasts can never exhaust it (section 6.2).
+ns.TOAST_POOL_CAPACITY = 5
+-- Loot messages waiting for the next frame (section 6.3).
+ns.LOOT_INBOX_CAPACITY = 20
+-- Loot deliveries per session whose stack is read, to check that no Blizzard Lua
+-- raised them (section 6.5).
+ns.STACK_CHECK_DELIVERIES = 20
+-- Skills window rows: two professions, three weapon slots and Defense fit in six.
+ns.SKILL_ROW_CAPACITY = 8
+-- How long a sale may take to settle before it is reported as it stands (7.2).
+ns.VEND_SETTLE_SECONDS = 3
+-- Blizzard's own Skills tab keeps this as a file-local, so it cannot be read by
+-- name (Camelot/SkillsFrame.lua:34).
+ns.DEFENSE_SKILL_LINE = 95
+-- The icon Blizzard's pet bar uses for Defensive on this client (PetActionBar.lua:3).
+ns.DEFENSE_ICON = "Interface\\Icons\\Ability_Defend"

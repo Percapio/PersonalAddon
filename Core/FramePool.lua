@@ -113,6 +113,21 @@ function FramePool.ReleaseAll(pool)
     return released
 end
 
+-- Constructs frames until the pool holds its capacity, and leaves them free.
+-- Called from enable, so a feature never creates a frame later, from inside
+-- whatever execution first needed one (Phase 8 section 4.3).
+function FramePool.Prewarm(pool)
+    local built = 0
+    while pool.constructed < pool.capacity do
+        local frame = pool.factory()
+        pool.constructed = pool.constructed + 1
+        pool.reset(frame)
+        pool.free[#pool.free + 1] = frame
+        built = built + 1
+    end
+    return built
+end
+
 function FramePool.Stats(pool)
     return pool.constructed, #pool.live, #pool.free, pool.capacity
 end

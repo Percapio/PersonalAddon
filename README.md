@@ -30,7 +30,7 @@ This addon is modular in concept but monolithic in architecture. It targets the 
 
 - **/rl Chat Command:** Type `/rl` to quickly execute `/reload`.
 - **FiveSecondRule (FSR) Tracker:** For mana users, a white vertical line sweeps across the resource bar over the five-second rule, showing how long until spirit regen resumes. Casting again restarts it. (Regen *tick* timing is not shown: the client returns mana as a protected value that addons cannot read, so there is no tick to display.)
-- **Aggro-Coloured Nameplates:** Colours hostile and neutral nameplates by who the monster is actually attacking, from a DPS perspective: red = it is on you, green = it is on a party member or your pet, white = neither.
+- **Aggro-Coloured Nameplates:** Colours hostile and neutral nameplates from a DPS perspective, in this order of priority: red = it is attacking you, grey = tagged by a player outside your group (no credit for you), green = it is on a party member or your pet, yellow = neutral, white = hostile and on neither. A mob hitting you is always red, even when tagged. Grey and yellow default to the game's own colours; all five are adjustable.
   - **Nameplate size is not adjustable** and no longer offered. Two mechanisms were tried; both were accepted by the client and changed nothing on screen. `healthBar:SetHeight` is discarded on the next layout pass because the bar has two vertical anchors, and `C_NamePlate.SetNamePlateSize` sizes the plate's anchor region while the client keeps laying out the visible bar itself. In both cases the addon could confirm its own write and could not confirm the effect.
   - Name, guild and NPC role tag placement are *not* included: the client treats nameplate text as a restricted region that addons may not measure or move.
 - **Damage Breakdown Panel:** A small panel above the player frame listing your own damage by spell — icon, DPS and share of your total — read from the client's own damage meter so the numbers match it exactly. Switches between the current fight and your overall session. (This replaces the originally planned scrolling combat text, which cannot be built correctly here: the client restricts addon access to the combat log, and every addon that tries misses hits.)
@@ -45,6 +45,12 @@ Gamepad UI (Alpha) already handles, with no addon involved:
 - Accepting and declining quests, and choosing quest rewards.
 - A built-in damage meter, which is where this addon's breakdown panel gets its
   numbers rather than counting its own.
+- Switching the left stick to strafe and backpedal in combat: Options → Gamepad →
+  the combat face-movement angle. 180 strafes and backpedals and never turns you; 115
+  strafes but turns you around when you pull the stick back. The out-of-combat angle
+  is a separate setting.
+- Sorting tracked quests by distance, which the quest tracker does on every zone
+  change.
 
 Several features originally planned here turned out to be redundant against that
 list. They were dropped rather than reimplemented worse.
@@ -66,6 +72,12 @@ Attempted and abandoned, with the reason, so nobody spends the time twice:
 - **Minimal player frames.** Dropped by choice rather than by the client: vertical
   bars require repositioning Blizzard's, which may be equally restricted, and it
   would have broken the FSR indicator that anchors to the mana bar.
+- **Quest tracker sorted by quest level.** The tracker lists the game's quest watch
+  list in order, so the only way to reorder it is to remove and re-add watches. A
+  spike showed the game runs the tracker's own update inside that call, which would
+  carry this addon's taint into the tracker and the controller's navigation. It also
+  puts a re-added watch at the top, not the bottom. Nothing was built. See
+  [Architecture/20260926-Phase07.md](Architecture/20260926-Phase07.md) §6.4.
 
 ## Rules for future development
 
@@ -83,6 +95,10 @@ Check any new feature against these rules before planning it:
 1. **Blizzard's Lua never calls ours inline.** Our code runs only through paths the client
    keeps separate: our own event handlers, `hooksecurefunc` post-hooks, timers, and
    callbacks Blizzard delivers through its callback registry.
+   - An event handler is a separate path only when the event arrives on its own. Some
+     events are delivered while the call that caused them is still running, and then
+     our handler runs inside Blizzard's call (rule 9). Before subscribing to an event
+     that Blizzard's own calls raise, find out which kind it is.
    - Settings are registered with `Settings.RegisterAddOnSetting` and a value-changed
      callback (a callback-registry delivery), never as proxy settings with getter and
      setter functions.
@@ -112,6 +128,12 @@ Check any new feature against these rules before planning it:
 8. **Anything that changes a Blizzard UI panel needs a spike first.** That covers gossip,
    quest, merchant, trainer, settings, the Game Menu and Edit Mode. The spike must show a
    safe path before the feature is planned.
+9. **A client call we make can run Blizzard's event handlers before it returns.** Treat
+   any call that changes state other interface code listens to — CVars, quest watches,
+   super-tracking, targets, bindings — as running those listeners inside our own run,
+   until a spike shows its events arrive after the call. Confirmed for quest watches:
+   `QUEST_WATCH_LIST_CHANGED` is delivered inside `AddQuestWatch`, which is why the
+   quest-level sort was not built.
 
 Known exceptions, kept on purpose and revisited only if a refusal points at them:
 

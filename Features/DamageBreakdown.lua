@@ -23,6 +23,7 @@ local SESSION_NAMES = { Current = true, Overall = true }
 
 local state = {
     panel = nil,
+    chrome = nil,
     rowPool = nil,
     liveRows = {},
     tokens = {},
@@ -309,119 +310,24 @@ local function anchorPanel()
         state.settings.anchorOffsetX, state.settings.anchorOffsetY)
 end
 
--- Last resort: four thin edge textures we draw ourselves. Not an in-game border,
--- but it always works, and a visible edge beats none.
-local function buildManualBorder(panel)
-    local function edge(firstPoint, secondPoint, width, height)
-        local texture = panel:CreateTexture(nil, "BORDER")
-        if texture.SetColorTexture then
-            texture:SetColorTexture(0.55, 0.55, 0.55, 0.9)
-        else
-            texture:SetTexture(0.55, 0.55, 0.55, 0.9)
-        end
-        texture:SetPoint(firstPoint, panel, firstPoint, 0, 0)
-        texture:SetPoint(secondPoint, panel, secondPoint, 0, 0)
-        if width then texture:SetWidth(width) end
-        if height then texture:SetHeight(height) end
-        return texture
-    end
-
-    panel.borderTop = edge("TOPLEFT", "TOPRIGHT", nil, 1)
-    panel.borderBottom = edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
-    panel.borderLeft = edge("TOPLEFT", "BOTTOMLEFT", 1, nil)
-    panel.borderRight = edge("TOPRIGHT", "BOTTOMRIGHT", 1, nil)
-end
-
--- Revision 1 guarded this with `if panel.SetBackdrop then`, which on this client
--- is false -- so the border was skipped SILENTLY and no border appeared with no
--- message saying why. The guard was right; failing quietly was not.
---
--- SetBackdrop needs the frame to be created with BackdropTemplate on modern
--- clients, so the frame itself is created through a chain and the border through
--- a second one. Whichever works is reported by /pa dps.
-local FRAME_TEMPLATES = { "BackdropTemplate" }
-local BORDER_TEMPLATES = {
-    "TooltipBorderedFrameTemplate",
-    "DialogBorderTemplate",
-    "ThinBorderTemplate",
-    "InsetFrameTemplate3",
-}
-
-local function createPanelFrame()
-    for index = 1, #FRAME_TEMPLATES do
-        local ok, frame = pcall(CreateFrame, "Frame", "PersonalAddonDamageBreakdown",
-            _G.UIParent, FRAME_TEMPLATES[index])
-        if ok and frame then
-            return frame, FRAME_TEMPLATES[index]
-        end
-    end
-    return CreateFrame("Frame", "PersonalAddonDamageBreakdown", _G.UIParent), nil
-end
-
-local function applyBorder(panel)
-    if panel.SetBackdrop then
-        local ok = pcall(panel.SetBackdrop, panel, {
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            edgeSize = 12,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 },
-        })
-        if ok then
-            if panel.SetBackdropBorderColor then
-                pcall(panel.SetBackdropBorderColor, panel, 1, 1, 1, 0.7)
-            end
-            return "backdrop"
-        end
-    end
-
-    -- A bordered child frame stretched over the panel. This is how the client's
-    -- own windows get their edges, so it is the closest thing to "any border
-    -- currently in game".
-    for index = 1, #BORDER_TEMPLATES do
-        local ok, child = pcall(CreateFrame, "Frame", nil, panel, BORDER_TEMPLATES[index])
-        if ok and child then
-            local anchored = pcall(child.SetAllPoints, child, panel)
-            if anchored then
-                panel.borderFrame = child
-                return BORDER_TEMPLATES[index]
-            end
-            pcall(child.Hide, child)
-        end
-    end
-
-    buildManualBorder(panel)
-    ns.Log.Once("dps:manualborder",
-        "no in-game border template was available on this client; the breakdown panel draws a plain edge instead")
-    return "manual"
-end
-
+-- The frame, border chain and background live in Core/PanelChrome.lua since Phase 8,
+-- which the skills window shares so that the two panels cannot drift apart.
 local function ensurePanel()
     if state.panel then
         return state.panel
     end
 
-    local panel, frameTemplate = createPanelFrame()
-    panel:SetWidth(PANEL_WIDTH)
-    panel:SetHeight(ROW_HEIGHT + PANEL_PADDING * 2)
-
-    panel.background = panel:CreateTexture(nil, "BACKGROUND")
-    panel.background:SetAllPoints(panel)
-    if panel.background.SetColorTexture then
-        panel.background:SetColorTexture(0, 0, 0, 1)
-    else
-        panel.background:SetTexture(0, 0, 0, 1)
-    end
-
-    state.borderStyle = applyBorder(panel)
-    if frameTemplate then
-        state.borderStyle = state.borderStyle .. " via " .. frameTemplate
-    end
-
-    -- Opacity applies to the background texture alone. Setting it on the frame
-    -- faded the rows, icons and border with it, so a readable panel and a subtle
-    -- one were the same slider and could not both be had.
-    panel:SetAlpha(1)
-    panel.background:SetAlpha(state.settings.panelAlpha)
-    panel:Hide()
+    local chrome = ns.PanelChrome.Build({
+        frameName = "PersonalAddonDamageBreakdown",
+        width = PANEL_WIDTH,
+        height = ROW_HEIGHT + PANEL_PADDING * 2,
+        alpha = state.settings.panelAlpha,
+        ownerKey = "dps",
+        ownerLabel = "the breakdown panel",
+    })
+    local panel = chrome.frame
+    state.chrome = chrome
+    state.borderStyle = chrome.borderStyle
 
     state.panel = panel
     anchorPanel()
@@ -505,7 +411,7 @@ local function renderBreakdown(breakdown)
     local height = PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
         + max(0, shown - 1) * ROW_SPACING
     panel:SetHeight(height)
-    panel.background:SetAlpha(state.settings.panelAlpha)
+    ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
     panel:Show()
 end
 
