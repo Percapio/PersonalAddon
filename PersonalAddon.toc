@@ -2,13 +2,11 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 1.0.0
-## SavedVariables: PersonalAddonDB, PersonalAddonProbeLog
-# PersonalAddonProbeLog held spike output. The spikes are gone, and the
-# declaration stays for ONE version only so that Core/Registry.lua can empty the
-# stale table on disk -- dropping the declaration outright would orphan whatever
-# the probes last wrote, leaving it in the user's SavedVariables forever with
-# nothing able to reach it. Remove this line and the wipe together next version.
+## Version: 1.0.1
+## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog
+# PersonalAddonBlockLog holds the refusals BlockWatch records, with their
+# stacks, so they survive a reload (Architecture/20260924-Patch01Implementation.md
+# section 4.4). Bounded at 16 records; /pa blocked clear empties it.
 ## X-License: Artistic License 2.0
 ## X-Phase: 6
 

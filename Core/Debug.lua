@@ -115,6 +115,11 @@ local function commandSetEnabled(featureId, enabled)
         return
     end
     local ok, detail = ns.Registry.SetEnabled(featureId, enabled)
+    -- The stored flag changed whatever SetEnabled returned, so the settings panel's
+    -- copy is brought in step either way (Patch01Implementation section 5.6).
+    if ns.SettingsPanel and ns.SettingsPanel.ReflectEnabled then
+        ns.SettingsPanel.ReflectEnabled(featureId)
+    end
     local state = ns.Registry.State(featureId)
     if ok then
         ns.Log.Info(format("%s -> %s%s", featureId, tostring(state),
@@ -177,6 +182,10 @@ local function commandSet(featureId, key, rawValue)
     if not ok then
         ns.Log.Error(tostring(reason))
         return
+    end
+
+    if ns.SettingsPanel and ns.SettingsPanel.ReflectStoredValue then
+        ns.SettingsPanel.ReflectStoredValue(featureId, key)
     end
 
     local outcome, detail = ns.Registry.NotifyConfigChanged(featureId, key)
@@ -246,8 +255,9 @@ local function commandPanel()
         return
     end
     local view = ns.SettingsPanel.Inspect()
-    ns.Log.Info(format("panel registered=%s controls=%d skipped=%d",
-        tostring(view.registered), view.controlCount, #view.skipped))
+    ns.Log.Info(format("panel registered=%s controls=%d skipped=%d reverts=%d unreadableColours=%d",
+        tostring(view.registered), view.controlCount, #view.skipped,
+        view.reverts or 0, view.unreadable or 0))
     for index = 1, #view.skipped do
         ns.Log.Warn("  skipped " .. view.skipped[index])
     end
@@ -372,9 +382,47 @@ local function commandTaint(subject)
     ns.Log.Info("  /console taintLog 0   turns it back off; it is verbose and slows the client")
 end
 
-local function commandBlocked()
+-- The saved block log (Patch01Implementation section 4.6). Records survive a
+-- reload, carry the path each refusal came through, and are bounded at 16.
+local function commandBlocked(subcommand, argument)
     if not ns.BlockWatch then
         ns.Log.Error("the blocked-action watch did not load")
+        return
+    end
+
+    local verb = string.lower(subcommand or "")
+
+    if verb == "selftest" then
+        local report = ns.BlockWatch.SelfTest()
+        ns.Log.Info(format("selftest: %d/%d passed", report.passed, report.total))
+        for index = 1, #report.failed do
+            local failure = report.failed[index]
+            ns.Log.Error(format("  %s: %s", failure.caseName,
+                ns.EscapeGuard.Neutralize(tostring(failure.reason))))
+        end
+        return
+    end
+
+    if verb == "clear" then
+        ns.Log.Info(format("cleared %d record(s)", ns.BlockWatch.Clear()))
+        return
+    end
+
+    if verb == "stack" then
+        local lines = ns.BlockWatch.StackLines(tonumber(argument))
+        if not lines then
+            ns.Log.Error(format("no record %s; /pa blocked lists them",
+                ns.EscapeGuard.Neutralize(tostring(argument))))
+            return
+        end
+        for index = 1, #lines do
+            ns.Log.Info(lines[index])
+        end
+        return
+    end
+
+    if verb ~= "" then
+        ns.Log.Error("usage: /pa blocked [stack <n> | clear | selftest]")
         return
     end
 
@@ -386,32 +434,10 @@ local function commandBlocked()
         return
     end
 
-    local rows = ns.BlockWatch.Tally()
-    if #rows == 0 then
-        ns.Log.Info("watching, and nothing has been blocked with this addon named")
-        return
-    end
-
-    local total, ours, cascaded = 0, 0, 0
-    for index = 1, #rows do
-        total = total + rows[index].count
-        if rows[index].firstAttempt == "unknown" then
-            cascaded = cascaded + 1
-        else
-            ours = ours + 1
-        end
-    end
-
-    ns.Log.Info(format("%d block(s) across %d distinct function(s)", total, #rows))
-    ns.Log.Info(format("  %d attributable to one of our attempts, %d not (taint spread)",
-        ours, cascaded))
-
-    for index = 1, #rows do
-        local row = rows[index]
-        local traced = ns.BlockWatch.IsKnown(row.functionName)
-            and " [traced, benign]" or ""
-        ns.Log.Info(format("  %dx %s (attempt: %s)%s", row.count, row.functionName,
-            row.firstAttempt, traced))
+    local records = ns.BlockWatch.Records()
+    ns.Log.Info(format("%d record(s); up to %d are kept", #records, ns.BlockWatch.Capacity()))
+    for index = 1, #records do
+        ns.Log.Info("  " .. ns.BlockWatch.Describe(index, records[index]))
     end
 end
 
@@ -469,7 +495,10 @@ local function commandHelp()
     ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
     ns.Log.Info("/pa panel               open the settings panel and report how it built")
-    ns.Log.Info("/pa blocked             protected calls the client blamed on this addon")
+    ns.Log.Info("/pa blocked             refusals the client blamed on this addon, with their paths")
+    ns.Log.Info("/pa blocked stack <n>   one record's stored stack")
+    ns.Log.Info("/pa blocked clear       empty the saved block log")
+    ns.Log.Info("/pa blocked selftest    check the recorder against fixed samples")
     ns.Log.Info("/pa taint [name]        ask the client what is tainted, and by whom")
 end
 
@@ -508,7 +537,7 @@ local function handler(input)
     elseif command == "panel" then
         commandPanel()
     elseif command == "blocked" then
-        commandBlocked()
+        commandBlocked(words[2], words[3])
     elseif command == "taint" then
         commandTaint(words[2])
     else

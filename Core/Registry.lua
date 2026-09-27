@@ -300,25 +300,6 @@ function Registry.StoreFailure()
     return storeFailure
 end
 
--- The five spikes are gone; the SavedVariables table they wrote is not, because
--- the client rewrites on logout whatever it loaded. Emptied once here so the stale
--- rows leave the disk, after which the .toc declaration can go too. Dropping the
--- declaration first would orphan the data: still on disk, nothing able to reach it.
-local function discardProbeLog()
-    if type(_G.PersonalAddonProbeLog) ~= "table" then
-        return
-    end
-    local entries = 0
-    for _ in pairs(_G.PersonalAddonProbeLog) do
-        entries = entries + 1
-    end
-    _G.PersonalAddonProbeLog = nil
-    if entries > 0 then
-        ns.Log.Info(string.format("discarded %d stale probe log entr%s left by the spikes",
-            entries, entries == 1 and "y" or "ies"))
-    end
-end
-
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
 boot:RegisterEvent("PLAYER_LOGIN")
@@ -326,7 +307,6 @@ boot:SetScript("OnEvent", function(_, event, loadedAddon)
     if event == "ADDON_LOADED" then
         if loadedAddon == ns.ADDON_NAME then
             Registry.HydrateConfig()
-            discardProbeLog()
             boot:UnregisterEvent("ADDON_LOADED")
         end
         return

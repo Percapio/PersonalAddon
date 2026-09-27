@@ -18,6 +18,12 @@ A lightweight World of Warcraft Forever Beta (API Version 1.60.1) addon specific
 
 Customization for all features can be found in the native Blizzard settings menu under **Settings > Options > Addons > PersonalAddon**. 
 
+## Troubleshooting
+
+`/pa blocked` lists every action the game refused with PersonalAddon named: which function it was, how often it happened, and the path that led to it. Any entry is a bug in this addon, even when nothing looks wrong, so please open an issue with that output.
+
+Without BugGrabber installed, the game reports the same event with its own dialog, saying PersonalAddon was blocked from an action. `/pa blocked` has the detail.
+
 ## Features
 
 This addon is modular in concept but monolithic in architecture. It targets the following specific features:
@@ -61,9 +67,72 @@ Attempted and abandoned, with the reason, so nobody spends the time twice:
   bars require repositioning Blizzard's, which may be equally restricted, and it
   would have broken the FSR indicator that anchors to the mana bar.
 
+## Rules for future development
+
+World of Warcraft decides whether code is trusted one run at a time. If Blizzard's own
+interface calls one of our functions, or reads a value our code wrote, the rest of that
+run counts as ours. This is called taint. Any protected action later in that run is then
+refused with PersonalAddon named, even though we never asked for it. Blizzard state
+written during the run can carry the taint into later runs too. It has already happened
+twice: `SetPreferredGamepadInteractTarget()` was traced to the settings panel calling our
+code, and `C_Discord.IsUserOAuthed()` most likely has the same cause. See
+[Architecture/20260924-Patch01.md](Architecture/20260924-Patch01.md).
+
+Check any new feature against these rules before planning it:
+
+1. **Blizzard's Lua never calls ours inline.** Our code runs only through paths the client
+   keeps separate: our own event handlers, `hooksecurefunc` post-hooks, timers, and
+   callbacks Blizzard delivers through its callback registry.
+   - Settings are registered with `Settings.RegisterAddOnSetting` and a value-changed
+     callback (a callback-registry delivery), never as proxy settings with getter and
+     setter functions.
+   - No dropdowns: a dropdown's option list is a function Blizzard calls. Two-value
+     choices are checkboxes, and anything longer needs a spike (rule 8).
+   - No canvas commit, default or refresh hooks, no slider label formatters, no
+     colour-picker callbacks, and no functions stored in Blizzard's tables.
+2. **We never write into Blizzard's variables or tables.**
+   - No `print()`, because it resolves a shared chat global.
+   - No fields on Blizzard frames.
+   - No entries in `UIPanelWindows`, `UISpecialFrames` or any other Blizzard registry.
+
+   The standard `SLASH_*` / `SlashCmdList` slash-command registration is the one accepted
+   exception.
+3. **Our frames stay out of Blizzard's panel system.** Never `ShowUIPanel` or
+   `HideUIPanel` one of ours. The panel manager drives the Gamepad UI's binding stack,
+   which is where the refusals happen.
+4. **Hooks are `hooksecurefunc` post-hooks only.** Never replace a Blizzard function or
+   script, and keep every hook O(1).
+5. **Work triggered by Blizzard's interface runs one frame later, in our own code**
+   (`C_Timer.After(0)`), from a queue we own and can cancel.
+6. **We draw on our own frames.** Anchor them to Blizzard's frames; don't add textures or
+   children to Blizzard's frames.
+7. **We never call protected functions.** A refusal naming PersonalAddon is a defect
+   even when it looks harmless. BugGrabber hides Blizzard's dialog for it, so silence is
+   not proof.
+8. **Anything that changes a Blizzard UI panel needs a spike first.** That covers gossip,
+   quest, merchant, trainer, settings, the Game Menu and Edit Mode. The spike must show a
+   safe path before the feature is planned.
+
+Known exceptions, kept on purpose and revisited only if a refusal points at them:
+
+- The FSR marker is a texture created on Blizzard's mana bar (`Features/FiveSecondRule.lua`).
+- `Core/Log.lua` falls back to `print()` only when no chat frame exists at all.
+
+To check a refusal, `/pa blocked` shows what was refused and where it came from. To see
+how taint spread into it:
+
+1. Run `/console taintLog 2`, then `/reload`.
+2. Play until the refusal happens again, then quit.
+3. Read `Logs/taint.log`.
+4. Run `/console taintLog 0`, because the log slows the client.
+
 ## Planned after v1
 
-Not built yet, and deliberately out of scope for the first release:
+Not built yet, and deliberately out of scope for the first release. **Both are on hold
+under rule 8.** The NPC interaction frames are Blizzard UI panels, which the panel manager
+positions and hides itself, through the same path the settings-panel refusals went
+through. Neither goes ahead unless a spike finds a route that never touches Blizzard's
+panel system.
 
 - **Interaction frames at lower-centre:** move the gossip, quest, vendor, trainer
   and other NPC interaction frames to the lower centre of the screen, with the

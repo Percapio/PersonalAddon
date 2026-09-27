@@ -1,38 +1,58 @@
 -- Features/SettingsPanel.lua
--- A panel in the client's own Settings > AddOns menu (Phase 6 section 9).
+-- A panel in the client's own Settings > AddOns menu (Phase 6 section 9), built
+-- from Blizzard-stored settings (Architecture/20260924-Patch01Implementation.md
+-- section 5, option C4).
 --
 -- Built on the client's Settings API rather than Ace3, reversing a Phase 1
 -- decision. The reason is the Gamepad UI: it navigates every client interface
 -- with no addon involved, so a registered category is controller-navigable for
--- free, while AceGUI widgets are not built for controller focus at all. For a
--- controller-first addon the dependency would have bought less boilerplate at the
--- cost of the one interface the user could not drive.
+-- free, while AceGUI widgets are not built for controller focus at all.
 --
--- The panel writes through the SAME path as /pa set: ConfigStore then
--- Registry.NotifyConfigChanged. It touches no feature directly and gains nothing
--- the slash command does not have.
+-- Why Blizzard-stored settings and not proxy settings. A proxy setting hands the
+-- settings panel our getter and setter, and the panel calls them inline: for every
+-- value it draws, and in the close-time commit loop. Our code on Blizzard's stack
+-- is taint, whatever that code does. On this beta, closing Options after a change
+-- left the gamepad binding state tainted, and controller presses -- action,
+-- cancel, targeting -- were refused until a reload (Patch01Implementation
+-- section 2.1). A Blizzard-stored setting reads and writes a field of panelValues
+-- itself, and reaches this addon only through its value-changed callback.
 --
--- It subscribes to NOTHING (section 9.1). State is read when the panel is built
--- and after each action it takes. A feature that faults while the panel sits open
--- and untouched reads as enabled until the user interacts -- a stale reading of
--- one idle panel, against no teardown path to get wrong. This project has met
--- "work outliving the thing that scheduled it" four times; this is the one
--- instance fixed by not scheduling.
+-- One rule follows, and everything below keeps it: after registration this file
+-- writes only panelValues, and calls no method on a Blizzard setting or control.
+-- A setting:SetValue from here would run Blizzard's setting and control code in
+-- our execution, and whatever that code wrote would carry our taint. The cost is
+-- that a control on screen shows a reverted or reflected value only the next time
+-- it is drawn.
+--
+-- The panel writes through the SAME path as /pa set: ConfigStore, then
+-- Registry.NotifyConfigChanged, one frame later. /pa set and /pa on|off keep
+-- panelValues in step through the two Reflect functions at the bottom.
 
 local ADDON_NAME, ns = ...
 
 local FEATURE_ID = "settingsPanel"
 
-local format, type, pairs, tostring = string.format, type, pairs, tostring
+local format, type, tostring = string.format, type, tostring
+
+local SWITCH, KEY = "Switch", "Key"
+local CHECKBOX, SLIDER, COLOUR_SWATCH, CHOICE_CHECKBOX =
+    "Checkbox", "Slider", "ColourSwatch", "ChoiceCheckbox"
 
 local state = {
     categoryId = nil,
     registered = false,
     controlCount = 0,
     skipped = {},
-    pendingApplies = {},
+    -- The one table Blizzard's settings read and write. In memory for the
+    -- session; the config store stays the only persisted copy.
+    panelValues = {},
+    bindings = {},
+    settings = {},
+    pending = {},
     pendingOrder = {},
     flushScheduled = false,
+    reverts = 0,
+    unreadable = 0,
 }
 
 -- API resolution ---------------------------------------------------------------
@@ -55,89 +75,184 @@ local function firstFunction(api, ...)
     return nil
 end
 
--- Reading the enumerated list carefully matters here. The namespace also carries
--- SetupCVarCheckbox and friends, which bind a control straight to a CVar and are
--- the more prominent names. This addon's config lives in its own store, so the
--- proxy form -- which takes a getter and a setter -- is the correct one.
 local function resolveControls(api)
     local controls = {}
     controls.registerCategory = firstFunction(api,
         "RegisterVerticalLayoutCategory", "RegisterCanvasLayoutCategory")
     controls.addCategory = firstFunction(api, "RegisterAddOnCategory")
-    controls.registerSetting = firstFunction(api,
-        "RegisterProxySetting", "RegisterAddOnSetting")
+    -- Blizzard-stored settings only. RegisterProxySetting is deliberately not a
+    -- fallback: it would silently restore the carrier this panel exists to remove.
+    controls.registerSetting = firstFunction(api, "RegisterAddOnSetting")
     controls.checkbox = firstFunction(api, "CreateCheckbox", "CreateCheckBox")
     controls.slider = firstFunction(api, "CreateSlider")
     controls.sliderOptions = firstFunction(api, "CreateSliderOptions")
-    controls.dropdown = firstFunction(api, "CreateDropdown", "CreateDropDown")
-    controls.textContainer = firstFunction(api, "CreateControlTextContainer")
     -- CreateColorSwatch, not CreateColorPicker: the Phase 6 spike guessed both
     -- picker spellings wrong and the enumeration supplied the real name.
     controls.colourSwatch = firstFunction(api, "CreateColorSwatch")
+
+    local varType = (type(api.VarType) == "table") and api.VarType or nil
+    controls.varTypes = {
+        boolean = varType and varType.Boolean or "boolean",
+        number = varType and varType.Number or "number",
+        string = varType and varType.String or "string",
+    }
     return controls
 end
 
--- Binding ----------------------------------------------------------------------
+-- Presentation (section 5.3) ----------------------------------------------------
 
-local function currentValue(featureId, key)
-    return ns.ConfigStore.Get(featureId, key)
+local function variableFor(featureId, key)
+    return format("PersonalAddon_%s_%s", featureId, tostring(key))
 end
 
--- Applying a setting out of Blizzard's call stack ------------------------------
+-- How one curated key is shown. A two-value choice is a checkbox: a dropdown's
+-- option list is a function Blizzard calls, and README rule 1 keeps our functions
+-- off Blizzard's stack. The feature itself does not change; what it stores does
+-- not change either.
+local function presentationFor(declaration)
+    local KIND = ns.ConfigSchema.KIND
+    if not declaration then
+        return nil, "no schema"
+    end
+    if declaration.kind == KIND.TOGGLE then
+        return { kind = CHECKBOX }
+    end
+    if declaration.kind == KIND.NUMBER then
+        if declaration.minimum and declaration.maximum and declaration.step then
+            return {
+                kind = SLIDER,
+                minimum = declaration.minimum,
+                maximum = declaration.maximum,
+                step = declaration.step,
+            }
+        end
+        return nil, "a slider needs a minimum, a maximum and a step"
+    end
+    if declaration.kind == KIND.COLOUR then
+        return { kind = COLOUR_SWATCH }
+    end
+    if declaration.kind == KIND.CHOICE then
+        local choices = declaration.choices or {}
+        if #choices == 2 then
+            return {
+                kind = CHOICE_CHECKBOX,
+                offValue = choices[1].value,
+                onValue = choices[2].value,
+                label = choices[2].label or tostring(choices[2].value),
+            }
+        end
+        return nil, format("%d choices; only two-value choices are shown, as checkboxes (README rule 1)",
+            #choices)
+    end
+    return nil, "no control for kind " .. tostring(declaration.kind)
+end
+
+local function toPanelForm(presentation, storedValue)
+    if presentation.kind == COLOUR_SWATCH then
+        -- The swatch wants AARRGGBB; the store holds RRGGBB.
+        return ns.ConfigSchema.ToSwatchHex(storedValue)
+    end
+    if presentation.kind == CHOICE_CHECKBOX then
+        return storedValue == presentation.onValue
+    end
+    return storedValue
+end
+
+-- The value in store form, or nil when a colour cannot be read.
+local function toStoreForm(presentation, panelValue)
+    if presentation.kind == COLOUR_SWATCH then
+        return ns.ConfigSchema.FromSwatch(panelValue)
+    end
+    if presentation.kind == CHOICE_CHECKBOX then
+        if panelValue == true then
+            return presentation.onValue
+        end
+        return presentation.offValue
+    end
+    if presentation.kind == CHECKBOX then
+        return panelValue == true
+    end
+    return panelValue
+end
+
+local function panelVarType(controls, presentation)
+    if presentation.kind == CHECKBOX or presentation.kind == CHOICE_CHECKBOX then
+        return controls.varTypes.boolean
+    end
+    if presentation.kind == SLIDER then
+        return controls.varTypes.number
+    end
+    return controls.varTypes.string
+end
+
+local function storedValueFor(binding)
+    if binding.target == SWITCH then
+        return ns.ConfigStore.IsEnabled(binding.featureId)
+    end
+    return ns.ConfigStore.Get(binding.featureId, binding.key)
+end
+
+-- Sets the panel's copy of one value to what the config store holds. Writes
+-- panelValues only; calls nothing on the setting or its control. Reverting a
+-- refused value and reflecting a slash command are both this.
+local function copyStoredValueToPanel(binding)
+    local stored = storedValueFor(binding)
+    if stored == nil then
+        return
+    end
+    state.panelValues[binding.variable] = toPanelForm(binding.presentation, stored)
+end
+
+-- Applying a change out of Blizzard's call stack --------------------------------
 --
--- A control's setter runs inside Blizzard's own settings UI, with their code on
--- the stack. Applying the change there means OUR frame work -- re-anchoring the
--- damage panel to PlayerFrame, installing secure hooks when a feature toggle is
--- ticked -- executes in that borrowed context, which is how an addon taints
--- Blizzard frames it never touched. The symptom was a protected call blocked on
--- the SECOND visit to the settings window, ours by attribution and not by call.
+-- The store write happens in the value-changed callback; the APPLY is deferred one
+-- frame into our own execution, coalesced per variable: dragging a slider fires
+-- the callback continuously, and each intermediate value need not be applied.
 --
--- So the store write stays synchronous, because the control reads it straight
--- back and must stay in step, and only the APPLY is deferred one frame into our
--- own context.
---
--- Coalesced per feature+key: dragging a slider fires the setter continuously, and
--- the old path ran a full onConfigChanged for every intermediate value.
---
--- Cancellation belongs here, with the thing that scheduled it. This project has
--- met "work outliving the thing that scheduled it" often enough to stop treating
--- it as a surprise: disable() empties the queue, and the flush re-checks that the
--- feature is still registered before touching it.
+-- Cancellation belongs here, with the thing that scheduled it: disable() empties
+-- the queue, and the flush re-checks that the feature is still registered.
+
 local function applyKey(featureId, key)
     local outcome, detail = ns.Registry.NotifyConfigChanged(featureId, key)
     if outcome == ns.CONFIG_RESULT.RELOAD_REQUIRED then
         -- The reason Phase 1 section 6.2 chose a returned value over a registry
-        -- flag: the caller is the party that knows how to tell the user, and this
-        -- is finally that caller.
+        -- flag: the caller is the party that knows how to tell the user.
         ns.Log.Warn(format("%s takes effect after a reload", tostring(detail or key)))
     end
+end
+
+local function applyBinding(binding)
+    if binding.target == SWITCH then
+        ns.Registry.SetEnabled(binding.featureId, state.panelValues[binding.variable] == true)
+        return
+    end
+    applyKey(binding.featureId, binding.key)
 end
 
 local function flushPendingApplies()
     state.flushScheduled = false
 
-    local queued, order = state.pendingApplies, state.pendingOrder
-    state.pendingApplies, state.pendingOrder = {}, {}
+    local queued, order = state.pending, state.pendingOrder
+    state.pending, state.pendingOrder = {}, {}
 
     if not state.registered then
         return
     end
 
     for index = 1, #order do
-        local entry = queued[order[index]]
-        if entry and ns.Registry.Defaults(entry.featureId) then
-            applyKey(entry.featureId, entry.key)
+        local binding = queued[order[index]]
+        if binding and ns.Registry.Defaults(binding.featureId) then
+            applyBinding(binding)
         end
     end
 end
 
 -- A client without C_Timer.After still applies, synchronously, because a setting
--- that silently never takes effect is worse than the taint this avoids -- and that
--- trade is stated rather than left to be discovered.
+-- that silently never takes effect is worse than applying inside the callback --
+-- and that trade is stated rather than left to be discovered.
 --
--- Deliberately not cached. Caching saved two comparisons per setter call and made
--- the fallback path reachable only by restarting the client, so the branch that
--- exists for a degraded client could not be exercised on a healthy one.
+-- Deliberately not cached, so the fallback branch stays reachable on a healthy
+-- client instead of only after a restart.
 local function canDefer()
     if C_Timer ~= nil and type(C_Timer.After) == "function" then
         return true
@@ -147,17 +262,16 @@ local function canDefer()
     return false
 end
 
-local function scheduleApply(featureId, key)
+local function scheduleApply(binding)
     if not canDefer() then
-        applyKey(featureId, key)
+        applyBinding(binding)
         return
     end
 
-    local queueKey = featureId .. "\0" .. tostring(key)
-    if not state.pendingApplies[queueKey] then
-        state.pendingOrder[#state.pendingOrder + 1] = queueKey
+    if not state.pending[binding.variable] then
+        state.pendingOrder[#state.pendingOrder + 1] = binding.variable
     end
-    state.pendingApplies[queueKey] = { featureId = featureId, key = key }
+    state.pending[binding.variable] = binding
 
     if not state.flushScheduled then
         state.flushScheduled = true
@@ -165,51 +279,50 @@ local function scheduleApply(featureId, key)
     end
 end
 
--- One writer for every control, and the same one /pa set uses. A control that
--- wrote to a feature directly would be a second path to keep in step with the
--- first, and the first is the tested one.
-local function writeValue(featureId, key, value)
-    local ok, reason = ns.ConfigStore.Set(featureId, key, value)
+-- The value-changed callback (section 5.4) --------------------------------------
+
+-- Receives a change the panel has already stored in panelValues. A refused or
+-- unreadable value is set back in panelValues at once; the control on screen
+-- shows the stored value the next time it is drawn, and the notice says so.
+local function onPanelValueChanged(binding, panelValue)
+    if binding.target == SWITCH then
+        scheduleApply(binding)
+        return "Accepted"
+    end
+
+    local storeValue = toStoreForm(binding.presentation, panelValue)
+    if storeValue == nil and binding.presentation.kind == COLOUR_SWATCH then
+        state.unreadable = state.unreadable + 1
+        ns.Log.OnceError("panel:colour:" .. binding.variable, format(
+            "the colour control returned something unreadable for %s.%s (%s); the stored colour stands and the control shows it when next drawn",
+            binding.featureId, tostring(binding.key), type(panelValue)))
+        copyStoredValueToPanel(binding)
+        return "UnreadableColour"
+    end
+
+    local ok, reason = ns.ConfigStore.Set(binding.featureId, binding.key, storeValue)
     if not ok then
         -- A control whose range came from the same schema should not be able to
-        -- produce an out-of-bounds value. If this fires, the schema and the
-        -- control disagree, and that is worth seeing rather than smoothing over.
-        ns.Log.OnceError("panel:refused:" .. featureId .. "." .. key, format(
-            "the settings panel offered a value the store refused (%s.%s): %s",
-            featureId, tostring(key), tostring(reason)))
-        return false
+        -- produce an out-of-bounds value. If this fires, the schema and the control
+        -- disagree, and that is worth seeing rather than smoothing over.
+        state.reverts = state.reverts + 1
+        ns.Log.OnceError("panel:refused:" .. binding.variable, format(
+            "the settings panel offered a value the store refused (%s.%s): %s; the stored value stands and the control shows it when next drawn",
+            binding.featureId, tostring(binding.key), tostring(reason)))
+        copyStoredValueToPanel(binding)
+        return "Refused"
     end
 
-    -- This used to print every write. That was worth having while the panel was
-    -- new and "I moved the slider and nothing happened" had three possible causes,
-    -- but a settings panel that narrates itself into chat is noise once it works:
-    -- the user can see the control they just moved. A REFUSED write still speaks,
-    -- above, because that is the case they cannot see.
-    scheduleApply(featureId, key)
-    return true
+    scheduleApply(binding)
+    return "Accepted"
 end
 
-local function enabledGetter(featureId)
-    return function()
-        return ns.ConfigStore.IsEnabled(featureId)
-    end
-end
-
-local function enabledSetter(featureId)
-    return function(value)
-        local wanted = (value == true)
-        if not canDefer() then
-            ns.Registry.SetEnabled(featureId, wanted)
-            return
-        end
-        -- Deferred for the same reason as any other apply, and more so: enable()
-        -- creates frames and installs secure hooks, which is the last thing that
-        -- should run inside Blizzard's checkbox handler.
-        C_Timer.After(0, function()
-            if ns.Registry.Defaults(featureId) then
-                ns.Registry.SetEnabled(featureId, wanted)
-            end
-        end)
+-- The function handed to SetValueChangedCallback: the registry calls it with
+-- (setting, value). If an export ever shows different arguments, this is the one
+-- place that changes.
+local function valueChangedHandlerFor(binding)
+    return function(_, value)
+        return onPanelValueChanged(binding, value)
     end
 end
 
@@ -220,145 +333,90 @@ local function noteSkipped(featureId, key, why)
         featureId, tostring(key), why)
 end
 
-local function addToggle(api, controls, category, featureId, key, declaration,
-                         getter, setter)
-    if not controls.checkbox or not controls.registerSetting then
-        noteSkipped(featureId, key, "no checkbox control")
-        return false
-    end
-
-    local variable = format("PersonalAddon_%s_%s", featureId, tostring(key))
-    local ok, setting = pcall(controls.registerSetting, category, variable,
-        "boolean", declaration.label, getter() == true, getter, setter)
-    if not ok or not setting then
-        noteSkipped(featureId, key, "setting refused")
-        return false
-    end
-
-    local created = pcall(controls.checkbox, category, setting, declaration.description)
-    if not created then
-        noteSkipped(featureId, key, "checkbox refused")
-        return false
-    end
-    return true
-end
-
-local function addSlider(api, controls, category, featureId, key, declaration)
-    if not controls.slider or not controls.registerSetting then
-        noteSkipped(featureId, key, "no slider control")
-        return false
-    end
-
-    local variable = format("PersonalAddon_%s_%s", featureId, tostring(key))
-    local ok, setting = pcall(controls.registerSetting, category, variable,
-        "number", declaration.label, currentValue(featureId, key),
-        function() return currentValue(featureId, key) end,
-        function(value) writeValue(featureId, key, value) end)
-    if not ok or not setting then
-        noteSkipped(featureId, key, "setting refused")
-        return false
-    end
-
-    local options = nil
-    if controls.sliderOptions then
-        local optionsOk, built = pcall(controls.sliderOptions,
-            declaration.minimum, declaration.maximum, declaration.step)
-        options = optionsOk and built or nil
-    end
-
-    local created = pcall(controls.slider, category, setting, options,
-        declaration.description)
-    if not created then
-        noteSkipped(featureId, key, "slider refused")
-        return false
-    end
-    return true
-end
-
-local function addChoice(api, controls, category, featureId, key, declaration)
-    if not controls.dropdown or not controls.registerSetting or not controls.textContainer then
-        noteSkipped(featureId, key, "no dropdown control")
-        return false
-    end
-
-    local variable = format("PersonalAddon_%s_%s", featureId, tostring(key))
-    local ok, setting = pcall(controls.registerSetting, category, variable,
-        "string", declaration.label, currentValue(featureId, key),
-        function() return currentValue(featureId, key) end,
-        function(value) writeValue(featureId, key, value) end)
-    if not ok or not setting then
-        noteSkipped(featureId, key, "setting refused")
-        return false
-    end
-
-    local function optionsGenerator()
-        local container = controls.textContainer()
-        for index = 1, #(declaration.choices or {}) do
-            local option = declaration.choices[index]
-            container:Add(option.value, option.label or tostring(option.value))
+local function createControl(controls, presentation, category, setting, tooltip)
+    if presentation.kind == SLIDER then
+        if not controls.slider then
+            return false, "no slider control"
         end
-        return container:GetData()
-    end
-
-    local created = pcall(controls.dropdown, category, setting, optionsGenerator,
-        declaration.description)
-    if not created then
-        noteSkipped(featureId, key, "dropdown refused")
-        return false
-    end
-    return true
-end
-
-local function addColour(api, controls, category, featureId, key, declaration)
-    if not controls.colourSwatch or not controls.registerSetting then
-        noteSkipped(featureId, key, "no colour swatch control")
-        return false
-    end
-
-    local variable = format("PersonalAddon_%s_%s", featureId, tostring(key))
-    -- The swatch wants AARRGGBB; the store holds RRGGBB. Handing it six digits
-    -- made CreateColorFromHexString refuse and the control index a nil colour.
-    local function swatchGetter()
-        return ns.ConfigSchema.ToSwatchHex(currentValue(featureId, key))
-    end
-    local function swatchSetter(value)
-        local stored = ns.ConfigSchema.FromSwatch(value)
-        if not stored then
-            ns.Log.OnceError("panel:colour:" .. featureId .. "." .. key, format(
-                "the colour control returned something unreadable for %s.%s (%s)",
-                featureId, tostring(key), type(value)))
-            return
+        local options = nil
+        if controls.sliderOptions then
+            local optionsOk, built = pcall(controls.sliderOptions,
+                presentation.minimum, presentation.maximum, presentation.step)
+            options = optionsOk and built or nil
         end
-        writeValue(featureId, key, stored)
+        return pcall(controls.slider, category, setting, options, tooltip), "slider refused"
     end
+    if presentation.kind == COLOUR_SWATCH then
+        if not controls.colourSwatch then
+            return false, "no colour swatch control"
+        end
+        return pcall(controls.colourSwatch, category, setting, tooltip), "colour swatch refused"
+    end
+    if not controls.checkbox then
+        return false, "no checkbox control"
+    end
+    return pcall(controls.checkbox, category, setting, tooltip), "checkbox refused"
+end
 
-    local ok, setting = pcall(controls.registerSetting, category, variable,
-        "string", declaration.label, swatchGetter(), swatchGetter, swatchSetter)
-    if not ok or not setting then
-        noteSkipped(featureId, key, "setting refused")
+-- Registers one control over panelValues. The value-changed handler is the only
+-- function of this addon's handed to the settings API; the default is the
+-- feature's DECLARED default, so Blizzard's Defaults button does what it says.
+-- (Revision 1 passed the current value, so Defaults restored the login-time
+-- values: Patch01 R8.)
+local function buildControl(controls, category, binding, declaredDefault, label, tooltip)
+    local keyName = binding.key or "enabled"
+    if declaredDefault == nil then
+        noteSkipped(binding.featureId, keyName, "no declared default")
         return false
     end
 
-    local created = pcall(controls.colourSwatch, category, setting,
-        declaration.description)
+    local stored = storedValueFor(binding)
+    if stored == nil then
+        stored = declaredDefault
+    end
+    state.panelValues[binding.variable] = toPanelForm(binding.presentation, stored)
+
+    local ok, setting = pcall(controls.registerSetting, category, binding.variable, binding.variable,
+        state.panelValues, panelVarType(controls, binding.presentation), label,
+        toPanelForm(binding.presentation, declaredDefault))
+    if not ok or type(setting) ~= "table" then
+        state.panelValues[binding.variable] = nil
+        noteSkipped(binding.featureId, keyName, "setting refused")
+        return false
+    end
+
+    if type(setting.SetValueChangedCallback) ~= "function"
+        or not pcall(setting.SetValueChangedCallback, setting, valueChangedHandlerFor(binding)) then
+        state.panelValues[binding.variable] = nil
+        noteSkipped(binding.featureId, keyName, "value-changed callback refused")
+        return false
+    end
+
+    local created, why = createControl(controls, binding.presentation, category, setting, tooltip)
     if not created then
-        noteSkipped(featureId, key, "colour swatch refused")
+        state.panelValues[binding.variable] = nil
+        noteSkipped(binding.featureId, keyName, why)
         return false
     end
+
+    state.bindings[binding.variable] = binding
+    state.settings[binding.variable] = setting
     return true
 end
 
-local KIND_BUILDERS = nil
-
-local function addFeatureSection(api, controls, category, featureId)
-    local KIND = ns.ConfigSchema.KIND
+local function addFeatureSection(controls, category, featureId)
     local defaults = ns.Registry.Defaults(featureId)
     local label = (defaults and defaults.label) or featureId
 
     -- The feature's own on/off switch, always first.
-    if addToggle(api, controls, category, featureId, "enabled",
-        { label = label, description = defaults and defaults.description },
-        enabledGetter(featureId), enabledSetter(featureId)) then
+    local switch = {
+        variable = variableFor(featureId, "enabled"),
+        featureId = featureId,
+        target = SWITCH,
+        presentation = { kind = CHECKBOX },
+    }
+    if buildControl(controls, category, switch, defaults ~= nil and defaults.enabledByDefault == true,
+        label, defaults and defaults.description) then
         state.controlCount = state.controlCount + 1
     end
 
@@ -366,12 +424,25 @@ local function addFeatureSection(api, controls, category, featureId)
     for index = 1, #keys do
         local key = keys[index]
         local declaration = ns.ConfigSchema.For(featureId, key)
-        local builder = KIND_BUILDERS[declaration.kind]
+        local presentation, why = presentationFor(declaration)
+        local declaredDefault = defaults and defaults.settings and defaults.settings[key]
 
-        if not builder then
-            noteSkipped(featureId, key, "no builder for kind " .. tostring(declaration.kind))
-        elseif builder(api, controls, category, featureId, key, declaration) then
-            state.controlCount = state.controlCount + 1
+        if not presentation then
+            noteSkipped(featureId, key, why)
+        else
+            local binding = {
+                variable = variableFor(featureId, key),
+                featureId = featureId,
+                target = KEY,
+                key = key,
+                presentation = presentation,
+            }
+            local controlLabel = (presentation.kind == CHOICE_CHECKBOX) and presentation.label
+                or declaration.label
+            if buildControl(controls, category, binding, declaredDefault, controlLabel,
+                declaration.description) then
+                state.controlCount = state.controlCount + 1
+            end
         end
     end
 end
@@ -386,18 +457,9 @@ local function buildPanel()
     if not controls.registerCategory or not controls.addCategory then
         return nil, "this client will not let an addon register a settings category"
     end
-
-    local KIND = ns.ConfigSchema.KIND
-    KIND_BUILDERS = {
-        [KIND.TOGGLE] = function(a, c, cat, f, k, d)
-            return addToggle(a, c, cat, f, k, d,
-                function() return currentValue(f, k) == true end,
-                function(value) writeValue(f, k, value == true) end)
-        end,
-        [KIND.NUMBER] = addSlider,
-        [KIND.CHOICE] = addChoice,
-        [KIND.COLOUR] = addColour,
-    }
+    if not controls.registerSetting then
+        return nil, "this client offers no Blizzard-stored settings, so the panel is not built; /pa set remains"
+    end
 
     state.controlCount = 0
     state.skipped = {}
@@ -408,10 +470,10 @@ local function buildPanel()
     end
 
     -- Only the features a user should see. The probes and the isolation test
-    -- scaffolding are marked internal and never reach here (section 6).
+    -- scaffolding are marked internal and never reach here (Phase 6 section 6).
     local ids = ns.Registry.PublicIds()
     for index = 1, #ids do
-        addFeatureSection(api, controls, category, ids[index])
+        addFeatureSection(controls, category, ids[index])
     end
 
     if state.controlCount == 0 then
@@ -452,18 +514,12 @@ local function enable()
     return true
 end
 
--- The panel subscribes to nothing and schedules nothing, so there is nothing to
--- tear down. Whether a registered category can be removed is unanswered by the
--- spike (Phase 6 section 4.0); until it is, the panel persisting after disable is
--- a documented exception like the slash command in Phase 1 section 10 -- it is
--- inert, because every control reads through the config store.
+-- Neither the category nor its settings can be unregistered, so the controls
+-- stay on screen and keep writing through, as the proxy setters did before them
+-- (Phase 6 section 9's documented exception). What CAN be abandoned is work this
+-- feature scheduled and has not run yet.
 local function disable()
-    -- The category cannot be unregistered, so the controls stay on screen; what
-    -- CAN be abandoned is work this feature scheduled and has not run yet.
-    -- Leaving it queued would let a slider moved just before the panel was
-    -- switched off apply a frame later, which is the shape of bug this project
-    -- has hit repeatedly.
-    state.pendingApplies = {}
+    state.pending = {}
     state.pendingOrder = {}
     -- flushScheduled stays true if a timer is already in flight: the callback is
     -- not cancellable, so it must remain able to clear the flag when it runs.
@@ -500,6 +556,33 @@ ns.SettingsPanel = {
             registered = state.registered,
             controlCount = state.controlCount,
             skipped = state.skipped,
+            reverts = state.reverts,
+            unreadable = state.unreadable,
         }
+    end,
+    -- Called by /pa set after its write succeeds. No callback fires; an open panel
+    -- shows the value the next time the control is drawn.
+    ReflectStoredValue = function(featureId, key)
+        if not state.registered then
+            return false
+        end
+        local binding = state.bindings[variableFor(featureId, key)]
+        if not binding or binding.target ~= KEY then
+            return false
+        end
+        copyStoredValueToPanel(binding)
+        return true
+    end,
+    -- Called by /pa on|off whatever SetEnabled returned: the stored flag changed.
+    ReflectEnabled = function(featureId)
+        if not state.registered then
+            return false
+        end
+        local binding = state.bindings[variableFor(featureId, "enabled")]
+        if not binding or binding.target ~= SWITCH then
+            return false
+        end
+        copyStoredValueToPanel(binding)
+        return true
     end,
 }

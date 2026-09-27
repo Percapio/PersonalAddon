@@ -1,0 +1,254 @@
+9/19 22:44:34.730  Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:594
+9/19 22:44:34.730  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:34.730      SetPreferredGamepadInteractTarget()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:264 DeactivateBindingGroup()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:113 CheckForInputBinding()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:537 FrameHidden()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:222
+9/19 22:44:34.730      securecallfunction()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+9/19 22:44:34.730      secureexecuterange()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:526 Frame:BroadcastForcePanelHide()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:481 Frame:SetUIPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:513 Frame:MoveUIPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:570 Frame:HideUIPanelImplementation()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:530 Frame:HideUIPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:133
+9/19 22:44:34.730      Frame:SetAttribute()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:929 HideUIPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:296 SettingsPanel:TransitionBackOpeningPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:291 SettingsPanel:ExitWithCommit()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:260 SettingsPanel:Close()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:65
+9/19 22:44:34.730  Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:594
+9/19 22:44:34.730  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:34.730      SetPreferredGamepadInteractTarget()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:164 AddBindingSet()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:257 ActivateBindingGroup()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:369 ShowAndActivateBindings()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:78
+9/19 22:44:34.730      GameMenuFrame:Show()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:294 Frame:ShowUIPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+9/19 22:44:34.730      Frame:SetAttribute()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:898 ShowUIPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:40 GameMenuFrame_Show()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:111 ToggleGameMenu()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:300 SettingsPanel:TransitionBackOpeningPanel()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:291 SettingsPanel:ExitWithCommit()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:260 SettingsPanel:Close()
+9/19 22:44:34.730      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:65
+9/19 22:44:34.734  Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:594
+9/19 22:44:34.734  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:34.734      SetPreferredGamepadInteractTarget()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:264 DeactivateBindingGroup()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:326 RefreshBindingGroup()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:362 Refresh()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:373 ShowAndActivateBindings()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:78
+9/19 22:44:34.734      GameMenuFrame:Show()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:294 Frame:ShowUIPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+9/19 22:44:34.734      Frame:SetAttribute()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:898 ShowUIPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:40 GameMenuFrame_Show()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:111 ToggleGameMenu()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:300 SettingsPanel:TransitionBackOpeningPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:291 SettingsPanel:ExitWithCommit()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:260 SettingsPanel:Close()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:65
+9/19 22:44:34.734  Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:594
+9/19 22:44:34.734  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:34.734      SetPreferredGamepadInteractTarget()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:164 AddBindingSet()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:257 ActivateBindingGroup()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:355 RefreshBindingGroup()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:362 Refresh()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:373 ShowAndActivateBindings()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:78
+9/19 22:44:34.734      GameMenuFrame:Show()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:294 Frame:ShowUIPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+9/19 22:44:34.734      Frame:SetAttribute()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:898 ShowUIPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:40 GameMenuFrame_Show()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:111 ToggleGameMenu()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:300 SettingsPanel:TransitionBackOpeningPanel()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:291 SettingsPanel:ExitWithCommit()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:260 SettingsPanel:Close()
+9/19 22:44:34.734      Interface/AddOns/Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua:65
+9/19 22:44:36.183  Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:380 HideAndDeactivateBindings()
+9/19 22:44:36.183  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:36.183      SetPreferredGamepadInteractTarget()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:264 DeactivateBindingGroup()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:113 CheckForInputBinding()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:537 FrameHidden()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:222
+9/19 22:44:36.183      securecallfunction()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+9/19 22:44:36.183      secureexecuterange()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:526 Frame:BroadcastForcePanelHide()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:481 Frame:SetUIPanel()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:513 Frame:MoveUIPanel()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:570 Frame:HideUIPanelImplementation()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:530 Frame:HideUIPanel()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:133
+9/19 22:44:36.183      Frame:SetAttribute()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:929 HideUIPanel()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:32
+9/19 22:44:36.183      securecallfunction()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:101 TryHandleGameMenuEsc()
+9/19 22:44:36.183      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:110 ToggleGameMenu()
+9/19 22:44:36.183      TOGGLEGAMEMENU:1
+9/19 22:44:38.797  Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:369 ShowAndActivateBindings()
+9/19 22:44:38.797  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:38.797      SetPreferredGamepadInteractTarget()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:164 AddBindingSet()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:257 ActivateBindingGroup()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:369 ShowAndActivateBindings()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:78
+9/19 22:44:38.797      GameMenuFrame:Show()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:294 Frame:ShowUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+9/19 22:44:38.797      Frame:SetAttribute()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:898 ShowUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:40 GameMenuFrame_Show()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:111 ToggleGameMenu()
+9/19 22:44:38.797      TOGGLEGAMEMENU:1
+9/19 22:44:38.797  Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:369 ShowAndActivateBindings()
+9/19 22:44:38.797  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:38.797      SetPreferredGamepadInteractTarget()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:264 DeactivateBindingGroup()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:326 RefreshBindingGroup()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:362 Refresh()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:373 ShowAndActivateBindings()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:78
+9/19 22:44:38.797      GameMenuFrame:Show()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:294 Frame:ShowUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+9/19 22:44:38.797      Frame:SetAttribute()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:898 ShowUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:40 GameMenuFrame_Show()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:111 ToggleGameMenu()
+9/19 22:44:38.797      TOGGLEGAMEMENU:1
+9/19 22:44:38.797  Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:369 ShowAndActivateBindings()
+9/19 22:44:38.797  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:38.797      SetPreferredGamepadInteractTarget()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:164 AddBindingSet()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:257 ActivateBindingGroup()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:355 RefreshBindingGroup()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:362 Refresh()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:373 ShowAndActivateBindings()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:78
+9/19 22:44:38.797      GameMenuFrame:Show()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:294 Frame:ShowUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+9/19 22:44:38.797      Frame:SetAttribute()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:898 ShowUIPanel()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:40 GameMenuFrame_Show()
+9/19 22:44:38.797      Interface/AddOns/Blizzard_GameMenuEsc/Blizzard_GameMenuEsc.lua:111 ToggleGameMenu()
+9/19 22:44:38.797      TOGGLEGAMEMENU:1
+9/19 22:44:39.571  Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:380 HideAndDeactivateBindings()
+9/19 22:44:39.571  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:39.571      SetPreferredGamepadInteractTarget()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:264 DeactivateBindingGroup()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:113 CheckForInputBinding()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:537 FrameHidden()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:222
+9/19 22:44:39.571      securecallfunction()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+9/19 22:44:39.571      secureexecuterange()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:526 Frame:BroadcastForcePanelHide()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:481 Frame:SetUIPanel()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:513 Frame:MoveUIPanel()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:570 Frame:HideUIPanelImplementation()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:530 Frame:HideUIPanel()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:133
+9/19 22:44:39.571      Frame:SetAttribute()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:929 HideUIPanel()
+9/19 22:44:39.571      Interface/AddOns/Blizzard_GameMenu/Shared/GameMenuFrame.lua:172
+9/19 22:44:39.673  (for generator)()
+9/19 22:44:39.673  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:39.673      SetPreferredGamepadInteractTarget()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:164 AddBindingSet()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:257 ActivateBindingGroup()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:590 SetFallThroughCatcherActive()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:445 FrameShown()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:549 HandlePopupShown()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:222
+9/19 22:44:39.673      securecallfunction()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+9/19 22:44:39.673      secureexecuterange()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:616 StaticPopup_OnShow()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:725
+9/19 22:44:39.673      StaticPopup1:Show()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:188 HandlePlayerQuiting()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:64 handler()
+9/19 22:44:39.673      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+9/19 22:44:40.955  Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:249
+9/19 22:44:40.955  An action was blocked because of taint from PersonalAddon - SetPreferredGamepadInteractTarget()
+9/19 22:44:40.955      SetPreferredGamepadInteractTarget()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:264 DeactivateBindingGroup()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:113 CheckForInputBinding()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:537 FrameHidden()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:557 HandlePopupHide()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:260
+9/19 22:44:40.955      securecallfunction()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+9/19 22:44:40.955      secureexecuterange()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:659 StaticPopup_OnHide()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:736
+9/19 22:44:40.955      StaticPopup1:Hide()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:748 StaticPopup_OnClick()
+9/19 22:44:40.955      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:56
