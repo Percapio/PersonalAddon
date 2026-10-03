@@ -33,6 +33,7 @@ PersonalAddon**, or with `/pa` commands (below).
   | White | Hostile and attacking neither |
 
   Grey and yellow match the game's own colours by default. All five can be changed.
+  Colours come from the game's threat data, so they also work in dungeons and raids.
 - **Damage breakdown.** A small panel above the player frame lists your damage by spell,
   with icon, DPS and share of your total. It reads the game's own damage meter, so its
   numbers match it exactly. Choose the current fight or the whole session.
@@ -70,6 +71,8 @@ PersonalAddon**, or with `/pa` commands (below).
 | `/pa bags`, `/pa vend` | The last sort or sale, and why any was skipped |
 | `/pa dps`, `/pa plates`, `/pa fsr` | State of the damage breakdown, nameplates and five-second rule |
 | `/pa blocked` | Actions the game refused with PersonalAddon named |
+| `/pa diag` | Counters and fault notes from the last five sessions |
+| `/pa diag clear` | Drop all but the current session's record |
 | `/pa help` | The full list |
 
 ## Troubleshooting
@@ -78,13 +81,16 @@ PersonalAddon**, or with `/pa` commands (below).
 Please open an issue with that output. Without BugGrabber, the game shows its own dialog
 for the same event.
 
-**Known issue: Options and the Gamepad UI.** Closing Options with the controller can
-leave the Gamepad UI in a state where the game refuses some actions. The most common is
-updating the interact icon; controller presses have been refused too. This is a defect in
-Blizzard's Gamepad UI Alpha, not in any one addon. The same refusal has been blamed on
-PersonalAddon, BugSack, Questie and Chatify, depending on which addon's code last touched
-that state. **`/reload` after changing settings clears it.** Details:
-[Architecture/20260924-Patch01.md](Architecture/20260924-Patch01.md).
+**Known issue: the Gamepad UI and refused actions.** Any code that is not Blizzard's (an
+addon, or `/run`) opening or closing a window, or closing Options with the controller after
+an addon's page was drawn, can leave the Gamepad UI's focus and binding state tainted.
+Later controller actions are then refused, most often updating the interact icon, in the
+name of whichever addon's taint that state carries: it has been PersonalAddon, BugSack,
+Questie, Chatify, SnapPrice and Auctionator, and with no addons at all, `/run`. This is a
+Blizzard defect, still present on build 1.60.1.70205. **`/reload` clears it.** Keep
+BugGrabber installed: without it, Blizzard's own warning dialog takes part, and one session
+flooded until it disconnected. PersonalAddon now counts such a flood quietly and says
+`/reload`. Details: [Architecture/20261002-GAPBugs01.md](Architecture/20261002-GAPBugs01.md).
 
 ## What the game already does
 
@@ -175,19 +181,38 @@ by number, so the numbers stay fixed.
    - `C_Container.SortBags` delivers `ITEM_LOCK_CHANGED` and `ITEM_LOCKED` inside the
      call, so tidy bags checks nothing is listening before every sort.
    - `C_MerchantFrame.SellAllJunkItems` delivers nothing inside the call.
+10. **A value from the client may be secret.** A successful call is not a readable
+    answer. On addon-restricted maps such as dungeons and raids, and in combat, many
+    functions return secret values, and comparing, testing or doing arithmetic on one
+    raises in our code. Read client values through `ClientRead`
+    (`Core/ClientRead.lua`), which checks `canaccessvalue` before anything else touches
+    the value. Treat `Withheld` as "could not tell", never as "no". The generated docs
+    flag which functions can return secrets (`SecretWhen*`, `SecretReturnsForAspect`),
+    and the harness's secret-read lint fails any read that bypasses `ClientRead`.
 
 Known exceptions, kept on purpose:
 
 - The five-second-rule line is a texture on Blizzard's mana bar
   (`Features/FiveSecondRule.lua`).
 - `Core/Log.lua` falls back to `print()` only when no chat frame exists.
+- Chat output: `Core/Log.lua` calls the chat frame's `AddMessage`, which stores our
+  text in its history. From there it reaches the shared fade list `FADEFRAMES`, so
+  Blizzard's chat refresh and fade code run tainted while our lines are fading. No path
+  from there to a protected call has been seen.
+- The settings page: Blizzard's Settings API stores our controls' initializer data and
+  callback handles in its own tables when we register them. Every addon with a settings
+  page does this.
 
 To trace how taint reached a refusal:
 
-1. `/console taintLog 2`, then `/reload`.
-2. Play until the refusal recurs, then quit.
-3. Read `Logs/taint.log`.
-4. `/console taintLog 0` afterwards; the log slows the game.
+1. Keep BugGrabber installed. `/console taintLog 1`, then `/reload`.
+2. Do the one thing that triggers the refusal, then quit.
+3. In `Logs/taint.log`, the line just above each "An action was blocked" entry is where
+   that execution became tainted; look that line up in the exported UI source. An
+   "Execution tainted by … while reading …" line names the variable outright.
+4. `/console taintLog 0`. Never use level 4: it logged 32,000 lines in ten seconds and
+   helped one session flood until it disconnected. Copy `taint.log` before logging in
+   again, because the client rewrites it.
 
 ## Credits
 

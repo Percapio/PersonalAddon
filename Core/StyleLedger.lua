@@ -12,66 +12,34 @@
 -- Restore need only be non-permanent, not exact. We are not the only writer:
 -- once we stop re-asserting, Blizzard's own update path re-establishes its
 -- current values on the next event it fires on.
+--
+-- Reads go through ClientRead (Phase 9 section 4.4). GetStatusBarColor returns
+-- secrets once Blizzard has coloured the bar from a secret value, and a secret
+-- original can be neither compared nor trusted to restore. The width, height and
+-- point handlers went in Phase 9: nothing had used them since Phase 7, and they
+-- read Blizzard widget geometry unguarded.
 
 local ADDON_NAME, ns = ...
 
 local StyleLedger = {}
 ns.StyleLedger = StyleLedger
 
-local type, format, pcall = type, string.format, pcall
+local pcall = pcall
+local ClientRead = ns.ClientRead
+local PLAIN = ClientRead.PLAIN
 
 -- Each property knows how to read and write itself, so the ledger stores plain
--- values rather than closures.
+-- values rather than closures. read returns a ClientRead kind and then the value
+-- or the reason.
 local PROPERTY = {}
-
-PROPERTY.BarWidth = {
-    read = function(widget) return widget:GetWidth() end,
-    write = function(widget, value) widget:SetWidth(value) end,
-}
-
-PROPERTY.BarHeight = {
-    read = function(widget) return widget:GetHeight() end,
-    write = function(widget, value) widget:SetHeight(value) end,
-}
-
--- Anchors are captured as the full point list, because a widget with two or
--- three points restored from one point lands somewhere else entirely.
-PROPERTY.Point = {
-    read = function(widget)
-        local count = widget:GetNumPoints()
-        if not count or count == 0 then
-            return nil
-        end
-        local points = {}
-        for index = 1, count do
-            local point, relativeTo, relativePoint, offsetX, offsetY = widget:GetPoint(index)
-            points[index] = {
-                point = point,
-                relativeTo = relativeTo,
-                relativePoint = relativePoint,
-                offsetX = offsetX or 0,
-                offsetY = offsetY or 0,
-            }
-        end
-        return points
-    end,
-    write = function(widget, points)
-        widget:ClearAllPoints()
-        for index = 1, #points do
-            local anchor = points[index]
-            widget:SetPoint(anchor.point, anchor.relativeTo, anchor.relativePoint,
-                anchor.offsetX, anchor.offsetY)
-        end
-    end,
-}
 
 PROPERTY.BarColour = {
     read = function(widget)
-        if not widget.GetStatusBarColor then
-            return nil
+        local kind, red, green, blue, alpha = ClientRead.CallMany(widget.GetStatusBarColor, 4, "number", widget)
+        if kind ~= PLAIN then
+            return kind, red
         end
-        local red, green, blue, alpha = widget:GetStatusBarColor()
-        return { red = red, green = green, blue = blue, alpha = alpha }
+        return PLAIN, { red = red, green = green, blue = blue, alpha = alpha }
     end,
     write = function(widget, colour)
         widget:SetStatusBarColor(colour.red, colour.green, colour.blue, colour.alpha)
@@ -128,12 +96,18 @@ function StyleLedger.Apply(ledger, widget, property, newValue)
 
     local original
     if firstTouch then
-        local readable, value = pcall(handler.read, widget)
+        local readable, kind, value = pcall(handler.read, widget)
         if not readable then
             ledger.writeRefused = ledger.writeRefused + 1
             return false, "READ_REFUSED"
         end
-        if value == nil then
+        if kind ~= PLAIN then
+            -- A secret original is its own reason: the caller must not read it as
+            -- "this client refuses the write", which would switch colouring off for
+            -- the session over one bar Blizzard happened to colour from a secret.
+            if value == ClientRead.SECRET_VALUE then
+                return false, "ORIGINAL_WITHHELD"
+            end
             return false, "NOT_READABLE"
         end
         original = value
@@ -171,16 +145,18 @@ function StyleLedger.Reapply(ledger, widget, property, newValue)
     return true
 end
 
+-- The widget's current value, as a ClientRead kind and then the value or the
+-- reason. Callers compare only a Plain value.
 function StyleLedger.Reads(ledger, widget, property)
     local handler = PROPERTY[property]
     if not handler or widget == nil then
-        return nil
+        return ClientRead.WITHHELD, ClientRead.UNAVAILABLE
     end
-    local ok, value = pcall(handler.read, widget)
+    local ok, kind, value = pcall(handler.read, widget)
     if not ok then
-        return nil
+        return ClientRead.WITHHELD, ClientRead.CALL_FAILED
     end
-    return value
+    return kind, value
 end
 
 function StyleLedger.HasRecord(ledger, widget, property)
@@ -192,7 +168,7 @@ function StyleLedger.HasRecord(ledger, widget, property)
 end
 
 -- Restores one property and forgets it, leaving the widget's other records
--- intact. Used when a colour must revert without unstyling the geometry.
+-- intact.
 function StyleLedger.RestoreProperty(ledger, widget, property)
     local records = recordsFor(ledger, widget, false)
     if not records then
@@ -219,9 +195,7 @@ function StyleLedger.RestoreProperty(ledger, widget, property)
     return false
 end
 
--- Replays in INSERTION order, which restores dimensions before anchors. An
--- anchor written against a size we have not yet reverted lands in the wrong
--- place, and callers record dimensions first.
+-- Replays every record in insertion order, then forgets the widget.
 function StyleLedger.RestoreWidget(ledger, widget)
     local records = recordsFor(ledger, widget, false)
     if not records then

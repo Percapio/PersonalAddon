@@ -205,6 +205,10 @@ local function commandFsr()
         ns.Log.Warn("  spell mana cost is not queryable on this client, so EVERY successful")
         ns.Log.Warn("  cast opens the window; a free cast shows a window that is not running")
     end
+    if view.withheldSpellIds > 0 or view.withheldBarGeometry > 0 then
+        ns.Log.Info(format("  withheld reads: spell ids=%d (each opened the window) bar geometry=%d",
+            view.withheldSpellIds, view.withheldBarGeometry))
+    end
 end
 
 local function commandPlates()
@@ -230,10 +234,15 @@ local function commandPlates()
     ns.Log.Info(format("  capability: barRecolourable=%s standing=%s hook=%s",
         tostring(view.barRecolourable), tostring(view.standingCapability),
         tostring(view.hookInstalled)))
+    -- Phase 9 section 4.5: aggro comes from threat, so these replace the old
+    -- "no nameplate target has ever resolved" warning.
+    ns.Log.Info(format("  threat: plain=%d absent=%d withheld=%d  faults=%d  restricted map now=%s",
+        view.threatReadsPlain, view.threatReadsAbsent, view.threatReadsWithheld,
+        view.plateFaults, tostring(view.restrictedMapNow)))
+    ns.Log.Info(format("  withheld reads: comparison=%d standing=%d barColour=%d",
+        view.comparisonReadsWithheld, view.standingReadsWithheld, view.barColourReadsWithheld))
     if not view.colouringActive then
         ns.Log.Warn("  nameplate colouring is OFF")
-    elseif not view.aggroResolvedEver then
-        ns.Log.Warn("  colouring is on but no nameplate target has ever resolved")
     end
 end
 
@@ -253,9 +262,8 @@ local function commandDps()
         tostring(view.iconsAvailable), tostring(view.borderStyle),
         view.anchorIsPlayerFrame and "PlayerFrame" or "screen",
         view.settlePending))
-    ns.Log.Info(format("  ticker=%s pool=%d live / %d free / %d cap",
-        tostring(view.refreshTickerRunning),
-        view.poolLive, view.poolFree, view.poolCapacity))
+    ns.Log.Info(format("  withheldReads=%d pool=%d live / %d free / %d cap",
+        view.withheldReads, view.poolLive, view.poolFree, view.poolCapacity))
 end
 
 -- Phase 8 section 5: what the skills window would show now, and how it resolved.
@@ -479,10 +487,14 @@ local function commandTaint(subject)
         ns.Log.Info(format("%d secure, %d tainted, %d of those ours", secure, tainted, ours))
     end
 
+    -- Level 1 since Phase 9 (README, "To trace how taint reached a refusal"): the
+    -- line above each blocked entry already names where that execution became
+    -- tainted, and level 4 helped one session flood until it disconnected.
     ns.Log.Info("for the propagation path, which names the line that spread it:")
-    ns.Log.Info("  /console taintLog 2   then /reload, reproduce, and quit")
-    ns.Log.Info("  the client writes _classic_beta_/Logs/taint.log")
-    ns.Log.Info("  /console taintLog 0   turns it back off; it is verbose and slows the client")
+    ns.Log.Info("  keep BugGrabber installed, then /console taintLog 1, /reload, reproduce once, and quit")
+    ns.Log.Info("  in _classic_beta_/Logs/taint.log the line above each \"An action was blocked\"")
+    ns.Log.Info("  is where that execution became tainted; copy the file before logging in again")
+    ns.Log.Info("  /console taintLog 0   turns it back off; never use level 4")
 end
 
 -- The saved block log (Patch01Implementation section 4.6). Records survive a
@@ -541,6 +553,76 @@ local function commandBlocked(subcommand, argument)
     ns.Log.Info(format("%d record(s); up to %d are kept", #records, ns.BlockWatch.Capacity()))
     for index = 1, #records do
         ns.Log.Info("  " .. ns.BlockWatch.Describe(index, records[index]))
+    end
+
+    -- Phase 9 section 6.2: during a storm only counts are kept, so they are listed.
+    local storm = ns.BlockWatch.StormSummary()
+    if storm.storming then
+        ns.Log.Warn(format("STORM since %.0fs ago: %d refusals counted, no stacks read; /reload clears it",
+            GetTime() - (storm.since or GetTime()), storm.refusals))
+        for index = 1, #storm.byFunction do
+            local entry = storm.byFunction[index]
+            ns.Log.Info(format("  %dx %s", entry.count, ns.EscapeGuard.Neutralize(entry.name)))
+        end
+    else
+        ns.Log.Info(format("no refusal storm this session (%d within %ds would start one)",
+            storm.threshold, storm.windowSeconds))
+    end
+end
+
+-- Phase 9 section 3.6: what earlier sessions counted, from the saved diagnostics.
+local function describeCounters(counters)
+    local names = {}
+    for name, value in pairs(counters) do
+        if value ~= 0 and value ~= false then
+            names[#names + 1] = name
+        end
+    end
+    table.sort(names)
+    local parts = {}
+    for index = 1, #names do
+        parts[#parts + 1] = format("%s=%s", names[index], tostring(counters[names[index]]))
+    end
+    return table.concat(parts, " ")
+end
+
+local function commandDiag(subcommand)
+    local verb = string.lower(subcommand or "")
+    if verb == "clear" then
+        ns.Log.Info(format("dropped %d earlier session record(s); this session keeps counting",
+            ns.Diagnostics.ClearPrevious()))
+        return
+    end
+    if verb ~= "" then
+        ns.Log.Error("usage: /pa diag [clear]")
+        return
+    end
+
+    local sessions, current = ns.Diagnostics.Sessions()
+    local dateOf = _G.date
+    ns.Log.Info(format("%d session record(s), newest first:", #sessions))
+    for index = #sessions, 1, -1 do
+        local record = sessions[index]
+        local when = (type(dateOf) == "function") and dateOf("%Y-%m-%d %H:%M", record.startedAt)
+            or tostring(record.startedAt)
+        ns.Log.Info(format("%s %s build %s, addon %s",
+            record == current and "*" or " ", when,
+            ns.EscapeGuard.Neutralize(record.clientBuild), ns.EscapeGuard.Neutralize(record.addonVersion)))
+        local featureIds = {}
+        for featureId in pairs(record.counters) do
+            featureIds[#featureIds + 1] = featureId
+        end
+        table.sort(featureIds)
+        for position = 1, #featureIds do
+            local line = describeCounters(record.counters[featureIds[position]])
+            if line ~= "" then
+                ns.Log.Info(format("    %s: %s", featureIds[position], line))
+            end
+        end
+        for position = 1, #record.faults do
+            local note = record.faults[position]
+            ns.Log.Warn(format("    fault in %s: %s", ns.EscapeGuard.Neutralize(note.featureId), note.message))
+        end
     end
 end
 
@@ -606,6 +688,8 @@ local function commandHelp()
     ns.Log.Info("/pa blocked stack <n>   one record's stored stack")
     ns.Log.Info("/pa blocked clear       empty the saved block log")
     ns.Log.Info("/pa blocked selftest    check the recorder against fixed samples")
+    ns.Log.Info("/pa diag                counters and fault notes from the last five sessions")
+    ns.Log.Info("/pa diag clear          drop all but the current session's record")
     ns.Log.Info("/pa taint [name]        ask the client what is tainted, and by whom")
 end
 
@@ -653,6 +737,8 @@ local function handler(input)
         commandPanel()
     elseif command == "blocked" then
         commandBlocked(words[2], words[3])
+    elseif command == "diag" then
+        commandDiag(words[2])
     elseif command == "taint" then
         commandTaint(words[2])
     else

@@ -55,13 +55,20 @@ local function inCombat()
     return type(_G.InCombatLockdown) == "function" and _G.InCombatLockdown() == true
 end
 
+-- Blizzard's bag frame, whose Shown aspect can be secret: read through ClientRead
+-- (Phase 9 section 5.2). Withheld reads as SHOWN here, because a hidden bag is what
+-- lets a sort run: "shown" is the answer that does nothing.
 local function combinedBagShown()
     local bag = _G.ContainerFrameCombinedBags
     if not bag then
         return false
     end
-    local ok, shown = pcall(bag.IsShown, bag)
-    return ok and shown == true
+    local kind, shown = ns.ClientRead.Call(bag.IsShown, "boolean", bag)
+    if kind == ns.ClientRead.WITHHELD then
+        ns.Diagnostics.Bump(ns.Diagnostics.CountersFor(FEATURE_ID), "bagReadsWithheld")
+        return true
+    end
+    return shown == true
 end
 
 local function cursorHasItem()

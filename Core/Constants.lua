@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "0.4.0-phase4"
+ns.VERSION = "1.0.2-phase9"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -72,3 +72,24 @@ ns.VEND_SETTLE_SECONDS = 3
 ns.DEFENSE_SKILL_LINE = 95
 -- The icon Blizzard's pet bar uses for Defensive on this client (PetActionBar.lua:3).
 ns.DEFENSE_ICON = "Interface\\Icons\\Ability_Defend"
+
+-- Phase 9 (Architecture/20261002-Phase09.md) ----------------------------------
+
+-- Diagnostics: UI loads kept in PersonalAddonDiagnostics, fault notes kept per UI
+-- load, and the length each note is cut to (section 3.3).
+ns.DIAGNOSTICS_FORMAT_VERSION = 1
+ns.DIAGNOSTICS_SESSION_CAPACITY = 5
+ns.DIAGNOSTICS_FAULT_NOTE_CAPACITY = 8
+ns.DIAGNOSTICS_FAULT_NOTE_LENGTH = 300
+-- The client's threat scale: 2 and 3 mean the unit is the mob's current target.
+-- A client fact, not a preference (GAPBugs01 section 3.6).
+ns.TANKING_STATUS = 2
+-- Every eighth nameplate sweep asks whether this is an addon-restricted map: once
+-- every two seconds at the default interval (section 4.2).
+ns.RESTRICTION_SAMPLE_EVERY = 8
+-- A refusal storm: this many refusals within this many seconds. Twenty is far
+-- above any one panel change (a handful at most) and far below the 2026-10-02
+-- storm's eight a second (section 6.2).
+ns.STORM_REFUSALS = 20
+ns.STORM_WINDOW_SECONDS = 10
+ns.STORM_FUNCTION_CAPACITY = 16

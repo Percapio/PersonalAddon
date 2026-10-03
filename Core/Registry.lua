@@ -307,6 +307,11 @@ boot:SetScript("OnEvent", function(_, event, loadedAddon)
     if event == "ADDON_LOADED" then
         if loadedAddon == ns.ADDON_NAME then
             Registry.HydrateConfig()
+            -- Saved variables are loaded now, and no feature has enabled yet: the
+            -- one moment the diagnostics log can bind safely (Phase 9 section 3.2).
+            if ns.Diagnostics then
+                ns.Diagnostics.OpenSession()
+            end
             boot:UnregisterEvent("ADDON_LOADED")
         end
         return

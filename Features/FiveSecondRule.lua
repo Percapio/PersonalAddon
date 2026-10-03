@@ -22,6 +22,12 @@ local STATE = ns.TRACKER_STATE
 local MANA = ns.POWER_TYPE_MANA
 local FSR_WINDOW = ns.FSR_WINDOW
 
+-- The spellcast payload and the mana bar's geometry are client values that can be
+-- secret (Phase 9 section 5.2), so they are read through ClientRead.
+local ClientRead = ns.ClientRead
+local PLAIN, WITHHELD = ClientRead.PLAIN, ClientRead.WITHHELD
+local bump = ns.Diagnostics.Bump
+
 local tracker = {
     state = STATE.REGENERATING,
     windowStartedAt = 0,
@@ -37,6 +43,8 @@ local tracker = {
     costQueryable = nil,
     lineWidth = 2,
     lineAlpha = 0.9,
+    -- This UI load's diagnostics table, bound at enable.
+    counters = {},
 }
 
 -- Window ---------------------------------------------------------------------
@@ -69,10 +77,13 @@ local function applyAppearance()
         return
     end
     marker:SetWidth(tracker.lineWidth)
-    if tracker.markerBar then
-        local height = tracker.markerBar:GetHeight()
-        if height and height > 0 then
+    local bar = tracker.markerBar
+    if bar then
+        local kind, height = ClientRead.Call(bar.GetHeight, "number", bar)
+        if kind == PLAIN and height > 0 then
             marker:SetHeight(height)
+        elseif kind == WITHHELD then
+            bump(tracker.counters, "withheldBarGeometry")
         end
     end
     marker:SetAlpha(tracker.lineAlpha)
@@ -122,14 +133,21 @@ local function shouldRender()
 end
 
 -- One SetPoint against the same anchor point, which replaces it rather than
--- stacking. No allocation in the update path.
+-- stacking. No allocation in the update path. A withheld width skips that frame's
+-- positioning: the line stays where it was for one frame.
 local function positionMarker()
     local marker, bar = tracker.marker, tracker.markerBar
     if not marker or not bar then
         return
     end
-    local width = bar:GetWidth()
-    if not width or width <= 0 then
+    local kind, width = ClientRead.Call(bar.GetWidth, "number", bar)
+    if kind ~= PLAIN then
+        if kind == WITHHELD then
+            bump(tracker.counters, "withheldBarGeometry")
+        end
+        return
+    end
+    if width <= 0 then
         return
     end
     marker:SetPoint("LEFT", bar, "LEFT", width * windowElapsedFraction(GetTime()), 0)
@@ -261,12 +279,24 @@ local function startWindow(now)
     refreshVisibility()
 end
 
+-- UNIT_SPELLCAST_SUCCEEDED is SecretWhenUnitSpellCastRestricted: individual spells
+-- can be flagged always secret, even for the player. A withheld unit is not the
+-- player's; a withheld spell is treated as costing mana, the same fallback as a
+-- cost the client will not report, and counted.
 local function onSpellcastSucceeded(unit, _, spellId)
-    if unit ~= "player" then
+    local unitKind, unitToken = ClientRead.Classify(unit, "string")
+    if unitKind ~= PLAIN or unitToken ~= "player" then
         return
     end
 
-    local predicate = costsMana(spellId)
+    local spellKind, spell = ClientRead.Classify(spellId, "number")
+    if spellKind ~= PLAIN then
+        bump(tracker.counters, "withheldSpellIds")
+        startWindow(GetTime())
+        return
+    end
+
+    local predicate = costsMana(spell)
     if predicate == nil then
         -- A standing client limitation, not an event: it is equally true on every
         -- cast for the whole session, so announcing it in chat tells the user
@@ -325,6 +355,7 @@ end
 
 local function enable(config)
     readSettings(config)
+    tracker.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
 
     if not ensureMarker() then
         return nil, "the player mana bar was not found; cannot anchor the window indicator"
@@ -424,6 +455,8 @@ ns.FiveSecondRule = {
             windowRemaining = max(0, tracker.windowEndsAt - now),
             manaUser = tracker.manaUser,
             costQueryable = tracker.costQueryable,
+            withheldSpellIds = tracker.counters.withheldSpellIds or 0,
+            withheldBarGeometry = tracker.counters.withheldBarGeometry or 0,
         }
     end,
 }

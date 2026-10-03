@@ -3,6 +3,17 @@
 -- monster is attacking (Phase 2), and by whether you can get credit for it or it
 -- is merely neutral (Phase 7 section 5).
 --
+-- Who a monster is attacking comes from threat since Phase 9
+-- (Architecture/20261002-Phase09.md section 4, GAPBugs01 section 3). Phase 2 asked
+-- the client whether the monster's target was you or a group member, with
+-- UnitIsUnit("nameplate1target", ...). On an addon-restricted map -- a dungeon or
+-- a raid -- the client makes every comparison involving a compound token secret,
+-- the comparison raised outside its pcall, and every sweep stopped at the first
+-- monster in combat: 7,843 times in the 2026-10-01 dungeon. Threat between you, or
+-- an ally, and a nameplate is "generally not secret" per the client's own docs, and
+-- it does not flicker when a monster retargets for a tick (Phase 2 section 4.8).
+-- Every value the client returns here goes through ClientRead (README rule 10).
+--
 -- Restyle in place; own nothing. Blizzard's status bar is the only thing that
 -- knows a unit's health and on this client likely the only thing that ever will,
 -- so we recolour ITS bar. We create no frames, textures or font strings, which is
@@ -17,6 +28,18 @@ local ADDON_NAME, ns = ...
 local FEATURE_ID = "nameplates"
 
 local format, pcall, pairs, tonumber = string.format, pcall, pairs, tonumber
+
+local ClientRead = ns.ClientRead
+local PLAIN, ABSENT, WITHHELD = ClientRead.PLAIN, ClientRead.ABSENT, ClientRead.WITHHELD
+local bump = ns.Diagnostics.Bump
+
+-- The allies whose threat makes a monster green: your pet first, then the party
+-- or the raid. Built once, so a sweep concatenates no strings (Phase 9 section 4).
+local PARTY_ALLIES = { "pet", "party1", "party2", "party3", "party4" }
+local RAID_ALLIES = { "pet" }
+for index = 1, 40 do
+    RAID_ALLIES[#RAID_ALLIES + 1] = "raid" .. index
+end
 
 local SCOPE = { IN = "InScope", OUT = "OutOfScope", UNREACHABLE = "Unreachable" }
 local AGGRO = {
@@ -82,11 +105,16 @@ local state = {
     enabled = false,
     hookInstalled = false,
     tokens = {},
-    aggroResolvedEver = false,
-    aggroAttempts = 0,
     palette = {},
     colouringWanted = true,
     sweepInterval = 0.25,
+    -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
+    -- enable binds it, so nothing here ever indexes nil.
+    counters = {},
+    -- The client's enum value for the map restriction, resolved once at enable
+    -- through ClientRead (Phase 9 audit finding 4).
+    mapTypeKind = WITHHELD,
+    mapType = nil,
 }
 
 -- Capability ------------------------------------------------------------------
@@ -145,18 +173,23 @@ end
 
 -- Scope -----------------------------------------------------------------------
 
+-- A withheld "is this the player's own plate?" falls through to UnitCanAttack:
+-- the player cannot attack themselves, so that read settles it either way.
 local function classifyScope(unitToken, frame)
     if not frame then
         return SCOPE.UNREACHABLE
     end
 
-    local ok, isPlayer = pcall(UnitIsUnit, unitToken, "player")
-    if ok and isPlayer then
+    local playerKind, isPlayer = ClientRead.Call(UnitIsUnit, "boolean", unitToken, "player")
+    if playerKind == PLAIN and isPlayer then
         return SCOPE.OUT
     end
+    if playerKind == WITHHELD then
+        bump(state.counters, "comparisonReadsWithheld")
+    end
 
-    local readable, attackable = pcall(UnitCanAttack, "player", unitToken)
-    if not readable then
+    local attackKind, attackable = ClientRead.Call(UnitCanAttack, "boolean", "player", unitToken)
+    if attackKind == WITHHELD then
         return SCOPE.UNREACHABLE
     end
     if attackable then
@@ -167,135 +200,91 @@ end
 
 -- Aggro -----------------------------------------------------------------------
 
--- Every comparison must distinguish "no" from "could not tell".
---
--- This used to read `select(2, pcall(UnitIsUnit, a, b))`, which returns the
--- error MESSAGE when the call fails -- and a message is truthy. A failed
--- comparison therefore read as "yes, it is targeting the player" and painted the
--- plate red while another player held aggro. Returns nil for unknown.
-local function unitsAreSame(leftUnit, rightUnit)
-    local ok, same = pcall(UnitIsUnit, leftUnit, rightUnit)
-    if not ok then
-        return nil
-    end
-    return same == true
-end
-
--- Returns true, false, or nil when no membership test could be completed.
-local function groupMembership(unit)
-    local answered = false
-
-    if UnitInParty then
-        local ok, inParty = pcall(UnitInParty, unit)
-        if ok then
-            answered = true
-            if inParty then
-                return true
-            end
-        end
-    end
-
-    if UnitInRaid then
-        local ok, inRaid = pcall(UnitInRaid, unit)
-        if ok then
-            answered = true
-            if inRaid then
-                return true
-            end
-        end
-    end
-
-    -- Explicit comparison against the four party slots as a backstop, because
-    -- UnitInParty is not reliable for a nameplate's target token on every
-    -- client. Four extra predicate calls per plate is affordable; getting the
-    -- second puller's colour wrong is not.
-    for index = 1, 4 do
-        local same = unitsAreSame(unit, "party" .. index)
-        if same == true then
-            return true
-        end
-        if same ~= nil then
-            answered = true
-        end
-    end
-
-    if not answered then
-        return nil
-    end
-    return false
-end
-
--- An unresolvable target and no target at all present identically. Combat state
--- is the discriminator: a mob in combat necessarily has a target, so if we
--- cannot see one the client is withholding it (section 9.2).
--- Returns the classification and whether the attempt could have produced
--- evidence about the client withholding aggro data at all.
-local function classifyUnresolvedTarget(unitToken)
-    local ok, inCombat = pcall(UnitAffectingCombat, unitToken)
-    if not ok or inCombat == nil then
-        -- Combat state itself unreadable: says nothing either way.
-        return AGGRO.UNKNOWN, false
-    end
-    if inCombat then
-        -- Fighting, yet no target resolves. This IS the evidence.
-        return AGGRO.UNKNOWN, true
-    end
-    -- Not fighting, so no target is the correct answer rather than a missing one.
-    state.aggroResolvedEver = true
-    return AGGRO.ELSEWHERE, false
-end
+-- Every read must distinguish "no" from "could not tell": a value the client
+-- withheld is Unknown, never a guess. Unknown cedes the plate to Blizzard's colour,
+-- so the cost of not knowing is an uncoloured plate rather than a confidently
+-- wrong one.
 
 -- With yieldSelectedTarget set, the plate the player is attacking is ceded, which
 -- restores Blizzard's colour and stops us contesting it. The white target outline
 -- still identifies it; what is given up is our colour on the one plate where
--- Blizzard has its own claim on the property. It is decided before anything is
--- read, so a yielded plate asks the client nothing and is evidence of nothing.
-local function isSelectedTarget(unitToken)
-    return unitsAreSame(unitToken, "target") == true
+-- Blizzard has its own claim on the property. A withheld comparison also cedes:
+-- yielding claims nothing, so it is the safe answer to "could not tell".
+local function shouldYield(unitToken)
+    local kind, same = ClientRead.Call(UnitIsUnit, "boolean", unitToken, "target")
+    if kind == PLAIN then
+        return same == true
+    end
+    if kind == ABSENT then
+        return false
+    end
+    bump(state.counters, "comparisonReadsWithheld")
+    return true
 end
 
--- Returns the classification and whether the attempt bore on the question of
--- whether this client withholds aggro data.
-local function classifyAggro(unitToken)
-    local mobTarget = unitToken .. "target"
+-- The group's shape, read once per sweep. A raid, a party, or nobody; when the
+-- roster functions are absent or withheld, a party is assumed, which costs four
+-- reads of possibly empty tokens and claims nothing.
+local function allyTokens()
+    local raidKind, inRaid = ClientRead.Call(IsInRaid, "boolean")
+    if raidKind == PLAIN and inRaid then
+        local sizeKind, size = ClientRead.Call(GetNumGroupMembers, "number")
+        if sizeKind == PLAIN and size >= 1 then
+            return RAID_ALLIES, math.min(size, 40) + 1
+        end
+        return PARTY_ALLIES, #PARTY_ALLIES
+    end
+    local groupKind, inGroup = ClientRead.Call(IsInGroup, "boolean")
+    if groupKind == PLAIN and not inGroup then
+        return PARTY_ALLIES, 1
+    end
+    return PARTY_ALLIES, #PARTY_ALLIES
+end
 
-    local resolved, exists = pcall(UnitExists, mobTarget)
-    if not resolved then
-        return AGGRO.UNKNOWN, true
+-- One threat read, counted by result. 2 and 3 mean the unit is the mob's current
+-- target; nil means the unit is not on the mob's threat list at all.
+local function readThreat(unit, mobToken)
+    local kind, status = ClientRead.Call(UnitThreatSituation, "number", unit, mobToken)
+    local counters = state.counters
+    if kind == PLAIN then
+        bump(counters, "threatReadsPlain")
+    elseif kind == ABSENT then
+        bump(counters, "threatReadsAbsent")
+    else
+        bump(counters, "threatReadsWithheld")
     end
-    if not exists then
-        return classifyUnresolvedTarget(unitToken)
+    return kind, status
+end
+
+-- Who the monster on this plate is attacking, from threat, never from its target
+-- (GAPBugs01 section 3.6). A mob has one current target, so an ally found tanking
+-- settles it even when the player's own read was withheld. Reading stops at the
+-- first unit found tanking. Returns the classification and how many reads were
+-- withheld.
+local function classifyAggro(unitToken, allies, allyCount)
+    local withheld = 0
+    local kind, status = readThreat("player", unitToken)
+    if kind == PLAIN and status >= ns.TANKING_STATUS then
+        return AGGRO.ON_PLAYER, 0
+    end
+    if kind == WITHHELD then
+        withheld = withheld + 1
     end
 
-    -- A comparison we cannot make is Unknown, never a guess. Unknown restores
-    -- the original colour, so the cost of not knowing is an uncoloured plate
-    -- rather than a confidently wrong one.
-    local isPlayer = unitsAreSame(mobTarget, "player")
-    if isPlayer == nil then
-        return AGGRO.UNKNOWN, true
-    end
-    if isPlayer then
-        state.aggroResolvedEver = true
-        return AGGRO.ON_PLAYER, true
+    for index = 1, allyCount do
+        local allyKind, allyStatus = readThreat(allies[index], unitToken)
+        if allyKind == PLAIN and allyStatus >= ns.TANKING_STATUS then
+            return AGGRO.ON_GROUP_OR_PET, withheld
+        end
+        if allyKind == WITHHELD then
+            withheld = withheld + 1
+        end
     end
 
-    -- A nil here is benign rather than unknown: with no pet summoned the "pet"
-    -- token does not resolve, and that is a legitimate "no".
-    if unitsAreSame(mobTarget, "pet") == true then
-        state.aggroResolvedEver = true
-        return AGGRO.ON_GROUP_OR_PET, true
+    if withheld > 0 then
+        return AGGRO.UNKNOWN, withheld
     end
-
-    local inGroup = groupMembership(mobTarget)
-    if inGroup == nil then
-        return AGGRO.UNKNOWN, true
-    end
-
-    state.aggroResolvedEver = true
-    if inGroup then
-        return AGGRO.ON_GROUP_OR_PET, true
-    end
-    return AGGRO.ELSEWHERE, true
+    return AGGRO.ELSEWHERE, 0
 end
 
 -- Standing --------------------------------------------------------------------
@@ -306,34 +295,18 @@ end
 --
 -- None of the three reads carries a secret-return flag in this client's generated
 -- API documentation, and Blizzard's plates make the first two on every colour
--- update. Documentation is evidence, not proof, so a value is checked before it is
--- compared: testing a secret value is itself an error for insecure code. A nil is
--- accepted as "no", the direction that claims nothing.
-local function plainOrNil(value, expectedType)
-    if value == nil then
-        return true
-    end
-    local isSecret = _G.issecretvalue
-    if type(isSecret) == "function" then
-        local ok, secret = pcall(isSecret, value)
-        if not ok or secret then
-            return false
-        end
-    end
-    return type(value) == expectedType
-end
+-- update. Documentation is evidence, not proof, so each value goes through
+-- ClientRead before it is compared: testing a secret value is itself an error for
+-- insecure code. Absent (nil) is accepted as "no", the direction that claims
+-- nothing.
 
 -- Returns tapDenied, playerControlled, reaction, readable.
 local function readStanding(unitToken)
-    local tapOk, tapDenied = pcall(UnitIsTapDenied, unitToken)
-    local controlOk, controlled = pcall(UnitPlayerControlled, unitToken)
-    local reactionOk, reaction = pcall(UnitReaction, "player", unitToken)
-    if not (tapOk and controlOk and reactionOk) then
-        return nil, nil, nil, false
-    end
-    if not plainOrNil(tapDenied, "boolean")
-        or not plainOrNil(controlled, "boolean")
-        or not plainOrNil(reaction, "number") then
+    local tapKind, tapDenied = ClientRead.Call(UnitIsTapDenied, "boolean", unitToken)
+    local controlKind, controlled = ClientRead.Call(UnitPlayerControlled, "boolean", unitToken)
+    local reactionKind, reaction = ClientRead.Call(UnitReaction, "number", "player", unitToken)
+    if tapKind == WITHHELD or controlKind == WITHHELD or reactionKind == WITHHELD then
+        bump(state.counters, "standingReadsWithheld")
         return nil, nil, nil, false
     end
     return tapDenied == true, controlled == true, reaction, true
@@ -408,19 +381,37 @@ local function resolveColourVerdict(aggro, disposition)
     return VERDICT.ELSEWHERE
 end
 
-local function verdictFor(plate)
+-- The map-restriction state, as words for chat. Read on demand: it changes only
+-- with the map, and nothing about a verdict depends on it.
+local function restrictedMapNow()
+    if state.mapTypeKind ~= PLAIN then
+        return "unreadable"
+    end
+    local kind, active = ClientRead.Call(C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive,
+        "boolean", state.mapType)
+    if kind ~= PLAIN then
+        return "unreadable"
+    end
+    return active and "yes" or "no"
+end
+
+-- A withheld threat read is surfaced once, with whether this is a restricted map,
+-- because that is what someone reading it next needs to know (Phase 9 section 4).
+local function noteWithheldThreat()
+    ns.Log.Once("plates:threatwithheld", format(
+        "threat reads were withheld (restricted map: %s); those plates keep Blizzard's colours",
+        restrictedMapNow()))
+end
+
+local function verdictFor(plate, allies, allyCount)
     local unitToken = plate.unitToken
-    if state.yieldSelectedTarget and isSelectedTarget(unitToken) then
+    if state.yieldSelectedTarget and shouldYield(unitToken) then
         return VERDICT.CEDED
     end
 
-    -- Only evidence-bearing attempts are counted. Counting every plate meant a
-    -- field of idle mobs reached 200 in seconds and triggered a warning that the
-    -- client withholds aggro data -- about a feature already observed working in
-    -- live play. Standing reads are not aggro evidence.
-    local aggro, boreEvidence = classifyAggro(unitToken)
-    if boreEvidence then
-        state.aggroAttempts = state.aggroAttempts + 1
+    local aggro, withheld = classifyAggro(unitToken, allies, allyCount)
+    if withheld > 0 then
+        noteWithheldThreat()
     end
     return resolveColourVerdict(aggro, standingOf(unitToken))
 end
@@ -470,12 +461,21 @@ local markContested
 --
 -- Returns true when it actually had to write, which means someone else wrote
 -- first. That is the signal that this plate is contested.
+-- A bar whose colour the client withholds is neither written nor contested this
+-- frame: its colour came from a secret, and a per-frame write against a value we
+-- cannot read would be a fight with no way to tell who is winning.
 local function reassertColour(plate)
     local desired = plate.desiredColour
     if not desired or not plate.healthBar then
         return false
     end
-    local current = ns.StyleLedger.Reads(state.ledger, plate.healthBar, "BarColour")
+    local kind, current = ns.StyleLedger.Reads(state.ledger, plate.healthBar, "BarColour")
+    if kind ~= PLAIN then
+        if kind == WITHHELD and current == ClientRead.SECRET_VALUE then
+            bump(state.counters, "barColourReadsWithheld")
+        end
+        return false
+    end
     if coloursMatch(current, desired) then
         return false
     end
@@ -485,6 +485,12 @@ local function reassertColour(plate)
     end
     markContested(plate)
     return true
+end
+
+-- Counted on change, not per sweep, so the session record shows what happened
+-- rather than how often the sweep ran (Phase 9 section 4.3).
+local function noteVerdictChange(verdict)
+    bump(state.counters, "verdictChangedTo" .. verdict)
 end
 
 local function applyColourVerdict(plate, verdict)
@@ -498,6 +504,7 @@ local function applyColourVerdict(plate, verdict)
             plate.desiredColour = nil
             -- A ceded bar is Blizzard's again, so there is nothing left to contest.
             state.contested[plate] = nil
+            noteVerdictChange(verdict)
         end
         return
     end
@@ -514,7 +521,14 @@ local function applyColourVerdict(plate, verdict)
         return
     end
 
-    local ok = ns.StyleLedger.Apply(state.ledger, plate.healthBar, "BarColour", colour)
+    local ok, reason = ns.StyleLedger.Apply(state.ledger, plate.healthBar, "BarColour", colour)
+    if reason == "ORIGINAL_WITHHELD" then
+        -- Blizzard coloured this bar from a secret. Not evidence that the client
+        -- refuses recolouring: the plate keeps Blizzard's colour and is retried on
+        -- the next sweep.
+        bump(state.counters, "barColourReadsWithheld")
+        return
+    end
     if capability.barRecolourable == nil then
         capability.barRecolourable = ok and true or false
         if not ok then
@@ -525,6 +539,7 @@ local function applyColourVerdict(plate, verdict)
     if ok then
         plate.lastVerdict = verdict
         plate.desiredColour = colour
+        noteVerdictChange(verdict)
     end
 end
 
@@ -596,6 +611,9 @@ local function trackPlate(unitToken)
         state.byUnitFrame[unitFrame] = plate
     end
     state.plateCount = state.plateCount + 1
+    if state.plateCount > (state.counters.maxTrackedPlates or 0) then
+        state.counters.maxTrackedPlates = state.plateCount
+    end
 
     if plate.scope == SCOPE.UNREACHABLE then
         ns.Log.Once("plates:unreachable",
@@ -626,8 +644,8 @@ end
 local function sweepStalePlates()
     local doomed = nil
     for frame, plate in pairs(state.plates) do
-        local ok, exists = pcall(UnitExists, plate.unitToken)
-        if not ok or not exists then
+        local kind, exists = ClientRead.Call(UnitExists, "boolean", plate.unitToken)
+        if kind ~= PLAIN or not exists then
             doomed = doomed or {}
             doomed[#doomed + 1] = frame
         end
@@ -708,24 +726,72 @@ local function colouringActive()
     return state.colouringWanted and capability.barRecolourable ~= false
 end
 
+-- Records whether this sweep ran on an addon-restricted map (Phase 9 section 4.2).
+-- The enum value was resolved through ClientRead at enable, so an absent Enum
+-- cannot raise here; the answer never changes a verdict.
+local function sampleRestrictedMap()
+    local counters = state.counters
+    if state.mapTypeKind ~= PLAIN then
+        bump(counters, "restrictedMapUnreadable")
+        return
+    end
+    local kind, active = ClientRead.Call(C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive,
+        "boolean", state.mapType)
+    if kind ~= PLAIN then
+        bump(counters, "restrictedMapUnreadable")
+    elseif active then
+        bump(counters, "restrictedMapSamples")
+        counters.restrictedMapSeen = true
+    end
+end
+
+local function paintPlate(plate, allies, allyCount)
+    if not plate.styleApplied then
+        styleIfInScope(plate)
+    end
+    if colouringActive() then
+        applyColourVerdict(plate, verdictFor(plate, allies, allyCount))
+    else
+        reassertColour(plate)
+    end
+end
+
+-- After a fault, the plate is handed back to Blizzard: whatever we had applied is
+-- restored and nothing contests it. The next sweep tries it afresh.
+local function cedeFaultedPlate(plate)
+    if plate.healthBar and ns.StyleLedger.HasRecord(state.ledger, plate.healthBar, "BarColour") then
+        pcall(ns.StyleLedger.RestoreProperty, state.ledger, plate.healthBar, "BarColour")
+    end
+    plate.lastVerdict = VERDICT.CEDED
+    plate.desiredColour = nil
+    state.contested[plate] = nil
+end
+
+-- One plate's fault never stops the sweep (Phase 9 section 4.6). Before Phase 9 a
+-- single plate's error ended every sweep, and four re-assert paths kept the stale
+-- colours of the plates it never reached. The message goes to the diagnostics log
+-- rather than to the client's error handler: without BugGrabber, that handler
+-- opens Blizzard's error window from our execution, which is GAPBugs01 G1's trigger.
 local function sweep()
     if not state.enabled then
         return
     end
 
     state.sweepCount = state.sweepCount + 1
+    bump(state.counters, "sweeps")
 
     state.reassertPending = false
 
+    local allies, allyCount = allyTokens()
     for _, plate in pairs(state.plates) do
         if plate.scope == SCOPE.IN then
-            if not plate.styleApplied then
-                styleIfInScope(plate)
-            end
-            if colouringActive() then
-                applyColourVerdict(plate, verdictFor(plate))
-            else
-                reassertColour(plate)
+            local ok, fault = ns.Isolation.Call(paintPlate, plate, allies, allyCount)
+            if not ok then
+                bump(state.counters, "plateFaults")
+                cedeFaultedPlate(plate)
+                ns.Diagnostics.NoteFault(FEATURE_ID, fault)
+                ns.Log.OnceError("plates:fault",
+                    "a nameplate faulted and was handed back to Blizzard's colour; /pa diag shows the message")
             end
         end
     end
@@ -733,14 +799,8 @@ local function sweep()
     if state.sweepCount % STALE_SWEEP_EVERY == 0 then
         sweepStalePlates()
     end
-
-    -- Surface once if the client appears to withhold aggro data entirely. Every
-    -- counted attempt was a mob that WAS fighting and still yielded no readable
-    -- target, so 200 of them without a single resolution is real evidence rather
-    -- than a quiet afternoon.
-    if colouringActive() and not state.aggroResolvedEver and state.aggroAttempts > 200 then
-        ns.Log.Once("plates:noaggrodata",
-            "200 mobs in combat yielded no readable target; this client appears to withhold aggro data, so colouring conveys nothing")
+    if state.sweepCount % ns.RESTRICTION_SAMPLE_EVERY == 0 then
+        sampleRestrictedMap()
     end
 end
 
@@ -876,6 +936,17 @@ local SIGNALS = {
 
 -- Lifecycle -------------------------------------------------------------------
 
+-- The map-restriction enum, resolved once. Nothing is indexed outside ClientRead,
+-- so a client without Enum.AddOnRestrictionType cannot raise here
+-- (Phase 9 audit finding 4).
+local function resolveMapRestrictionType()
+    local typesKind, types = ClientRead.Field(_G.Enum, "AddOnRestrictionType", "table")
+    if typesKind ~= PLAIN then
+        return typesKind, types
+    end
+    return ClientRead.Field(types, "Map", "number")
+end
+
 local function enable(config)
     readSettings(config)
 
@@ -884,6 +955,13 @@ local function enable(config)
         return nil, "this client exposes no nameplate lookup API, so plates cannot be reached"
     end
     capability.plateLookup = true
+
+    state.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
+    state.mapTypeKind, state.mapType = resolveMapRestrictionType()
+    if not ClientRead.Available(UnitThreatSituation) then
+        ns.Log.Once("plates:nothreat",
+            "this client has no UnitThreatSituation, so who a monster is attacking cannot be read; plates keep Blizzard's colours except tapped ones")
+    end
 
     state.ledger = state.ledger or ns.StyleLedger.Create("nameplates")
 
@@ -918,12 +996,6 @@ local function enable(config)
             end
         end
     end
-
-    -- The withheld-aggro evidence window belongs to this activation. Carrying a
-    -- count across a disable would let attempts from a previous session decide a
-    -- question about the current one.
-    state.aggroAttempts = 0
-    state.aggroResolvedEver = false
 
     installReassertHook()
     startTicker()
@@ -1079,6 +1151,7 @@ ns.Nameplates = {
         if state.ledger then
             held, restored, gone, refused = ns.StyleLedger.Stats(state.ledger)
         end
+        local counters = state.counters
 
         return {
             tracked = state.plateCount,
@@ -1099,8 +1172,14 @@ ns.Nameplates = {
             end)(),
             contestedRunning = state.contestedRunning,
             yieldSelectedTarget = state.yieldSelectedTarget,
-            aggroResolvedEver = state.aggroResolvedEver,
-            aggroAttempts = state.aggroAttempts,
+            threatReadsPlain = counters.threatReadsPlain or 0,
+            threatReadsAbsent = counters.threatReadsAbsent or 0,
+            threatReadsWithheld = counters.threatReadsWithheld or 0,
+            comparisonReadsWithheld = counters.comparisonReadsWithheld or 0,
+            standingReadsWithheld = counters.standingReadsWithheld or 0,
+            barColourReadsWithheld = counters.barColourReadsWithheld or 0,
+            plateFaults = counters.plateFaults or 0,
+            restrictedMapNow = restrictedMapNow(),
             ledgerWidgets = held,
             ledgerRestored = restored,
             ledgerWidgetGone = gone,

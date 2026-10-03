@@ -30,16 +30,8 @@ local FALLBACK_EVENTS = {
 -- outside a window.
 local frame = CreateFrame("Frame")
 
-local function isPlain(value, expectedType)
-    local check = _G.issecretvalue
-    if type(check) == "function" then
-        local ok, secret = pcall(check, value)
-        if not ok or secret then
-            return false
-        end
-    end
-    return type(value) == expectedType
-end
+local ClientRead = ns.ClientRead
+local PLAIN = ClientRead.PLAIN
 
 -- Runs one write inside an all-events window. Returns the events delivered between
 -- register and unregister -- exactly those that arrived while the call ran --
@@ -68,21 +60,19 @@ function CallWindow.Capture(write)
     return names, ok, err
 end
 
+-- A listener is usually a Blizzard frame, and a frame's name can be secret, so both
+-- reads go through ClientRead (Phase 9 section 5.2).
 local function frameLabel(target)
     if type(target) ~= "table" then
         return tostring(target)
     end
-    if type(target.GetName) == "function" then
-        local ok, name = pcall(target.GetName, target)
-        if ok and isPlain(name, "string") and name ~= "" then
-            return name
-        end
+    local kind, name = ClientRead.Call(target.GetName, "string", target)
+    if kind == PLAIN and name ~= "" then
+        return name
     end
-    if type(target.GetDebugName) == "function" then
-        local ok, name = pcall(target.GetDebugName, target)
-        if ok and isPlain(name, "string") and name ~= "" then
-            return name
-        end
+    kind, name = ClientRead.Call(target.GetDebugName, "string", target)
+    if kind == PLAIN and name ~= "" then
+        return name
     end
     return "<unnamed>"
 end

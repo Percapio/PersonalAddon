@@ -258,13 +258,18 @@ function gateway.weaponSubclass(itemId)
     return subclassId
 end
 
+-- Blizzard's bag frame, whose Shown aspect can be secret: read through ClientRead
+-- (Phase 9 section 5.2). Withheld reads as not shown, which hides the window.
 function gateway.combinedBagShown()
     local bag = _G.ContainerFrameCombinedBags
     if not bag then
         return false
     end
-    local ok, shown = pcall(bag.IsShown, bag)
-    return ok and shown == true
+    local kind, shown = ns.ClientRead.Call(bag.IsShown, "boolean", bag)
+    if kind == ns.ClientRead.WITHHELD then
+        ns.Diagnostics.Bump(ns.Diagnostics.CountersFor(FEATURE_ID), "bagReadsWithheld")
+    end
+    return kind == ns.ClientRead.PLAIN and shown == true
 end
 
 -- Reads (section 5.3) -------------------------------------------------------------

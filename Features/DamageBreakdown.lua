@@ -11,6 +11,12 @@
 -- It is also the first feature in this addon that owns its widgets, because there
 -- is no Blizzard widget to restyle. That makes it FramePool's first real
 -- consumer, two phases after the pool was built.
+--
+-- Phase 9 (Architecture/20261002-Phase09.md section 5.1): the in-combat refresh is
+-- gone. The session source is SecretWhenInCombat, so during a fight it could never
+-- draw, and its comparisons would have raised on every tick. What remains reads
+-- through ClientRead, and a withheld read keeps the last render: the settle reads
+-- after combat retry it.
 
 local ADDON_NAME, ns = ...
 
@@ -18,6 +24,13 @@ local FEATURE_ID = "damageBreakdown"
 
 local format, pairs, pcall, type = string.format, pairs, pcall, type
 local sort, floor, max = table.sort, math.floor, math.max
+
+local ClientRead = ns.ClientRead
+local PLAIN, ABSENT, WITHHELD = ClientRead.PLAIN, ClientRead.ABSENT, ClientRead.WITHHELD
+local bump = ns.Diagnostics.Bump
+
+-- The reason readOwnBreakdown gives when the client withheld a figure.
+local READ_WITHHELD = "the client withheld a figure"
 
 local SESSION_NAMES = { Current = true, Overall = true }
 
@@ -29,8 +42,6 @@ local state = {
     tokens = {},
     enabled = false,
     inCombat = false,
-    refreshTicker = nil,
-    timerGeneration = 0,
     settleGeneration = 0,
     settlePending = 0,
     settleBaselineTotal = nil,
@@ -42,10 +53,11 @@ local state = {
     anchorIsPlayerFrame = false,
     lastRowCount = 0,
     truncatedRows = 0,
+    -- This UI load's diagnostics table, bound at enable (Phase 9 section 5.1).
+    counters = {},
     settings = {
         sessionType = "Current",
         maximumRows = 4,
-        inCombatRefreshSeconds = 0,
         showWhenEmpty = false,
         panelAlpha = 0.8,
         anchorOffsetX = 0,
@@ -72,7 +84,7 @@ local ICON_SIZE = 14
 
 local function meterApi()
     local api = C_DamageMeter
-    if type(api) ~= "table" or type(api.GetCombatSessionSourceFromType) ~= "function" then
+    if type(api) ~= "table" or not ClientRead.Available(api.GetCombatSessionSourceFromType) then
         return nil
     end
     return api
@@ -155,12 +167,45 @@ end
 
 -- Read ------------------------------------------------------------------------
 
+-- Sorts our own copies of the spells, never the client's tables, so every value
+-- compared here was already classified Plain.
 local function byTotalDescending(left, right)
-    return (left.totalAmount or 0) > (right.totalAmount or 0)
+    return left.totalAmount > right.totalAmount
+end
+
+-- The spells worth a row, as plain copies. Returns nil when any figure was
+-- withheld, so a half-read session never renders as if it were whole.
+local function rankedSpells(spells)
+    local ranked = {}
+    for index = 1, #spells do
+        local entryKind, spell = ClientRead.Field(spells, index, "table")
+        if entryKind == WITHHELD then
+            return nil
+        end
+        if entryKind == PLAIN then
+            local amountKind, amount = ClientRead.Field(spell, "totalAmount", "number")
+            local rateKind, rate = ClientRead.Field(spell, "amountPerSecond", "number")
+            local idKind, spellId = ClientRead.Field(spell, "spellID", "number")
+            if amountKind == WITHHELD or rateKind == WITHHELD or idKind == WITHHELD then
+                return nil
+            end
+            amount = (amountKind == PLAIN) and amount or 0
+            -- A spell that landed for nothing displaces a row that means something.
+            if amount > 0 then
+                ranked[#ranked + 1] = {
+                    spellID = spellId,
+                    totalAmount = amount,
+                    amountPerSecond = (rateKind == PLAIN) and rate or 0,
+                }
+            end
+        end
+    end
+    return ranked
 end
 
 -- Returns a breakdown table, or nil plus a reason. A nil session is NOT a
 -- failure: it means no combat yet, or the meter switched off, which is data.
+-- READ_WITHHELD means the client withheld a figure, which is transient.
 local function readOwnBreakdown()
     local api = meterApi()
     if not api then
@@ -184,32 +229,42 @@ local function readOwnBreakdown()
         return { rows = {}, totalAmount = 0, truncatedRows = 0, meterOff = true }
     end
 
-    local playerGuid = UnitGUID("player")
-    local ok, source = pcall(api.GetCombatSessionSourceFromType,
-        sessionType, meterType, playerGuid)
-    if not ok then
-        return nil, "the session source call was refused"
+    local guidKind, playerGuid = ClientRead.Call(UnitGUID, "string", "player")
+    if guidKind ~= PLAIN then
+        return nil, READ_WITHHELD
     end
-    if type(source) ~= "table" or type(source.combatSpells) ~= "table" then
+    local sourceKind, source = ClientRead.Call(api.GetCombatSessionSourceFromType, "table",
+        sessionType, meterType, playerGuid)
+    if sourceKind == ABSENT then
         return { rows = {}, totalAmount = 0, truncatedRows = 0 }
     end
+    if sourceKind ~= PLAIN then
+        if source == ClientRead.CALL_FAILED then
+            return nil, "the session source call was refused"
+        end
+        return nil, READ_WITHHELD
+    end
+    local spellsKind, spells = ClientRead.Field(source, "combatSpells", "table")
+    if spellsKind == ABSENT then
+        return { rows = {}, totalAmount = 0, truncatedRows = 0 }
+    end
+    local totalKind, total = ClientRead.Field(source, "totalAmount", "number")
+    if spellsKind ~= PLAIN or totalKind == WITHHELD then
+        return nil, READ_WITHHELD
+    end
+    total = (totalKind == PLAIN) and total or 0
 
     local durationSeconds = 0
     if api.GetSessionDurationSeconds then
-        local durationOk, seconds = pcall(api.GetSessionDurationSeconds, sessionType)
-        if durationOk and type(seconds) == "number" then
+        local durationKind, seconds = ClientRead.Call(api.GetSessionDurationSeconds, "number", sessionType)
+        if durationKind == PLAIN then
             durationSeconds = seconds
         end
     end
 
-    local total = source.totalAmount or 0
-    local ranked = {}
-    for index = 1, #source.combatSpells do
-        local spell = source.combatSpells[index]
-        -- A spell that landed for nothing displaces a row that means something.
-        if spell and (spell.totalAmount or 0) > 0 then
-            ranked[#ranked + 1] = spell
-        end
+    local ranked = rankedSpells(spells)
+    if not ranked then
+        return nil, READ_WITHHELD
     end
     sort(ranked, byTotalDescending)
 
@@ -228,8 +283,8 @@ local function readOwnBreakdown()
         rows[index] = {
             spellId = spell.spellID,
             iconTexture = icon,
-            amountPerSecond = spell.amountPerSecond or 0,
-            shareOfTotal = (total > 0) and ((spell.totalAmount or 0) / total) or 0,
+            amountPerSecond = spell.amountPerSecond,
+            shareOfTotal = (total > 0) and (spell.totalAmount / total) or 0,
         }
     end
 
@@ -422,6 +477,14 @@ local function refreshNow()
 
     local breakdown, reason = readOwnBreakdown()
     if not breakdown then
+        if reason == READ_WITHHELD then
+            -- The figures exist; the client will not show them yet. Keep what is on
+            -- screen: the settle reads after combat retry it.
+            bump(state.counters, "withheldReads")
+            ns.Log.Once("dps:withheld",
+                "the damage meter's figures were withheld; the panel keeps its last figures until the next read")
+            return false
+        end
         -- A refusal AFTER enabling is transient, not a capability failure: the
         -- panel empties and says so once, rather than faulting the feature.
         ns.Log.Once("dps:readrefused", format(
@@ -460,8 +523,11 @@ local function scheduleSettleReads()
             end
             state.settlePending = max(0, state.settlePending - 1)
 
-            local breakdown = readOwnBreakdown()
+            local breakdown, reason = readOwnBreakdown()
             if not breakdown then
+                if reason == READ_WITHHELD then
+                    bump(state.counters, "withheldReads")
+                end
                 return
             end
             renderBreakdown(breakdown)
@@ -479,52 +545,16 @@ local function scheduleSettleReads()
     end
 end
 
--- Refresh timer ---------------------------------------------------------------
-
-local function cancelRefreshTicker()
-    if state.refreshTicker and state.refreshTicker.Cancel then
-        state.refreshTicker:Cancel()
-    end
-    state.refreshTicker = nil
-    state.timerGeneration = state.timerGeneration + 1
-end
-
-local function startRefreshTicker()
-    cancelRefreshTicker()
-
-    local interval = state.settings.inCombatRefreshSeconds or 0
-    if interval <= 0 then
-        return
-    end
-
-    local generation = state.timerGeneration
-    local function fire()
-        if generation ~= state.timerGeneration or not state.enabled then
-            return
-        end
-        refreshNow()
-    end
-
-    if C_Timer and C_Timer.NewTicker then
-        state.refreshTicker = C_Timer.NewTicker(interval, fire)
-    end
-end
-
 -- Signals ---------------------------------------------------------------------
 
 local function onCombatStart()
     state.inCombat = true
     -- A new fight invalidates any settle read still pending for the last one.
     cancelSettleReads()
-    startRefreshTicker()
 end
 
 local function onCombatEnd()
     state.inCombat = false
-    -- Cancelled on every exit from combat, not only on disable: a poller that
-    -- outlives the fight it was created for keeps reading a session nobody is
-    -- looking at (Phase 1 section 6.1).
-    cancelRefreshTicker()
     -- Render at once so something appears, then correct it once the client has
     -- finished recording the fight.
     refreshNow()
@@ -551,7 +581,7 @@ local SIGNALS = {
     { event = "PLAYER_ENTERING_WORLD", handler = onEnteringWorld, required = false,
       lost = "the panel keeps whatever anchor it resolved at login; /pa dps reports which" },
     { event = "PLAYER_REGEN_DISABLED", handler = onCombatStart, required = false,
-      lost = "the in-combat refresh will never start" },
+      lost = "a settle read left over from one fight may redraw the panel during the next" },
     { event = "PLAYER_REGEN_ENABLED", handler = onCombatEnd, required = false,
       lost = "the panel will not update when a fight ends; use /pa dps by hand" },
 }
@@ -574,8 +604,6 @@ local function readSettings(config)
     end
 
     state.settings.maximumRows = settings.maximumRows or state.settings.maximumRows
-    state.settings.inCombatRefreshSeconds =
-        settings.inCombatRefreshSeconds or state.settings.inCombatRefreshSeconds
     state.settings.showWhenEmpty = (settings.showWhenEmpty == true)
     state.settings.panelAlpha = settings.panelAlpha or state.settings.panelAlpha
     state.settings.anchorOffsetX = settings.anchorOffsetX or state.settings.anchorOffsetX
@@ -596,6 +624,7 @@ local function enable(config)
 
     ensurePanel()
     anchorPanel()
+    state.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
 
     local tokens = state.tokens
     for index = 1, #SIGNALS do
@@ -618,9 +647,6 @@ local function enable(config)
     -- means PLAYER_REGEN_DISABLED already happened and will not be seen.
     local inCombatOk, inCombat = pcall(UnitAffectingCombat, "player")
     state.inCombat = (inCombatOk and inCombat == true) or false
-    if state.inCombat then
-        startRefreshTicker()
-    end
 
     refreshNow()
     return true
@@ -630,7 +656,6 @@ end
 -- have created the panel or the pool.
 local function disable()
     state.enabled = false
-    cancelRefreshTicker()
     cancelSettleReads()
 
     if state.rowPool then
@@ -653,15 +678,6 @@ end
 local function onConfigChanged(config, changedKey)
     readSettings(config)
 
-    if changedKey == "inCombatRefreshSeconds" then
-        if state.inCombat then
-            startRefreshTicker()
-        else
-            cancelRefreshTicker()
-        end
-        return ns.CONFIG_RESULT.APPLIED
-    end
-
     if changedKey == "anchorOffsetX" or changedKey == "anchorOffsetY" then
         anchorPanel()
         return ns.CONFIG_RESULT.APPLIED
@@ -675,10 +691,11 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Damage breakdown",
     description = "Your own damage by spell, above the player frame, read from the built-in meter.",
+    -- inCombatRefreshSeconds went in Phase 9. ConfigStore prunes a saved key the
+    -- feature no longer declares, so no migration step is needed.
     settings = {
         sessionType = "Current",
         maximumRows = 4,
-        inCombatRefreshSeconds = 0,
         showWhenEmpty = false,
         panelAlpha = 0.8,
         anchorOffsetX = 0,
@@ -710,12 +727,6 @@ ns.Registry.Register(FEATURE_ID, {
             kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset",
             minimum = -300, maximum = 300, step = 1,
         },
-        -- Not curated: redrawing during a fight competes for frame time in the
-        -- one period it matters, and 0 is the right answer for nearly everyone.
-        inCombatRefreshSeconds = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "In-combat refresh",
-            minimum = 0, maximum = 10, curated = false,
-        },
         showWhenEmpty = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show when empty", curated = false,
         },
@@ -746,7 +757,7 @@ ns.DamageBreakdown = {
             totalAmount = state.lastTotalAmount,
             durationSeconds = state.lastDurationSeconds,
             settlePending = state.settlePending,
-            refreshTickerRunning = state.refreshTicker ~= nil,
+            withheldReads = state.counters.withheldReads or 0,
             poolConstructed = constructed,
             poolLive = live,
             poolFree = free,

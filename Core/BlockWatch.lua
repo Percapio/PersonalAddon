@@ -17,6 +17,14 @@
 --
 -- A refusal is never suppressed. It is always recorded and counted; what is
 -- limited is how often it prints, once per path per session.
+--
+-- Revision 3 (Architecture/20261002-Phase09.md section 6):
+--   * a storm guard. On 2026-10-02 one session raised 6,144 refusals in 13 minutes
+--     and ended in a script-limit kill and a disconnect; this handler ran inside
+--     every one of those refused calls. During a storm it now only counts.
+--   * the Gamepad defect (GAPBugs01 G1) is recognised by its sole caller rather
+--     than by two fixed paths, and its explanation no longer blames Options.
+--   * the same defect blamed on another addon gets the one /reload hint too.
 
 local ADDON_NAME, ns = ...
 
@@ -54,43 +62,39 @@ local FIRST_EVER, SEEN_BEFORE = "FirstEver", "SeenBefore"
 
 local OUR_PATH_PREFIX = ADDON_NAME .. "/"
 
--- Traced paths (section 4.5) ---------------------------------------------------
---
--- Keyed by function AND call site. A traced function reached by a path nobody has
--- traced is Untraced: labelling it with the old explanation is how a real
--- regression gets mistaken for a known one.
+local ClientRead = ns.ClientRead
+local READ_PLAIN, READ_WITHHELD = ClientRead.PLAIN, ClientRead.WITHHELD
 
-local TRACED_EXPLANATION = "closing Options after this addon's settings code ran "
-    .. "left the gamepad binding state tainted. Until a reload, later menu actions "
-    .. "and controller presses can be refused -- on 2026-09-26, action, cancel and "
-    .. "targeting presses were. /reload clears it"
+-- The known defect (Phase 9 section 6.3) -------------------------------------------
+--
+-- Revision 2 matched two fixed path signatures and blamed closing Options.
+-- GAPBugs01 showed the refusal reproduces with no addons at all and reaches the
+-- call by more routes than two: the delayed interact-icon refresh, whose stack ends
+-- at the refused frame, printed as an untraced red line. In the 2026-10-02 export
+-- SetPreferredGamepadInteractTarget has exactly one caller in the whole UI,
+-- MainActionBarFrame.lua:255. So a refusal whose first frame is that file is the
+-- defect, by whatever route the taint arrived. A first frame anywhere else means a
+-- patch added a second caller: that refusal stays Untraced and prints red, which is
+-- the intended alarm. Re-check the premise after each client patch.
+
+local G1_EXPLANATION = "a Blizzard Gamepad UI defect that reproduces with no addons loaded. "
+    .. "Addon or /run code that opened or closed a window, or an addon page drawn in "
+    .. "Options, left its focus and binding state tainted, so controller actions are "
+    .. "refused in whichever addon's name that state carries. /reload clears it"
+local G1_HINT_KEY = "blockwatch:g1"
 
 local ACTION_BARS = "Blizzard_GamepadActionBars/MainActionBarFrame.lua"
-local BINDING_MANAGER = "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua"
 local INTERACT_TARGET = "SetPreferredGamepadInteractTarget()"
 
-local TRACED_PATHS = {
-    {
-        functionName = INTERACT_TARGET,
-        signature = {
-            { file = ACTION_BARS, fn = "UpdateInteractIcons" },
-            { file = ACTION_BARS },
-            { file = BINDING_MANAGER },
-            { file = BINDING_MANAGER, fn = "RemoveSet" },
-        },
-        explanation = TRACED_EXPLANATION,
-    },
-    {
-        functionName = INTERACT_TARGET,
-        signature = {
-            { file = ACTION_BARS, fn = "UpdateInteractIcons" },
-            { file = ACTION_BARS },
-            { file = BINDING_MANAGER },
-            { file = BINDING_MANAGER, fn = "AddBindingSet" },
-        },
-        explanation = TRACED_EXPLANATION,
-    },
-}
+-- Returns the explanation for a known defect, or nil for Untraced. An empty
+-- signature is always Untraced.
+local function classifyRefusal(functionName, callSite)
+    local first = callSite[1]
+    if functionName == INTERACT_TARGET and first and first.file == ACTION_BARS then
+        return G1_EXPLANATION
+    end
+    return nil
+end
 
 -- State ------------------------------------------------------------------------
 
@@ -102,11 +106,28 @@ local function newBlockLog()
     return { formatVersion = LOG_FORMAT_VERSION, records = {} }
 end
 
+-- A ring of the last STORM_REFUSALS refusal times, and what a storm has counted.
+local function newStorm()
+    return {
+        ring = {},
+        ringNext = 1,
+        ringCount = 0,
+        storming = false,
+        since = nil,
+        refusals = 0,
+        byFunction = {},
+        functionKeys = 0,
+    }
+end
+
 local watch = {
     tokens = {},
     blockLog = nil,
     attemptLabel = nil,
     memo = newMemo(),
+    storm = newStorm(),
+    -- Bound at enable to this UI load's diagnostics table (Phase 9 section 6.6).
+    counters = {},
 }
 
 -- Set by a probe around a deliberate attempt, so a refusal that follows can be
@@ -128,22 +149,14 @@ end
 
 -- Where the read starts does not matter: the parser skips this addon's frames.
 local function readLiveStack(topFrames, bottomFrames)
-    local reader = _G.debugstack
-    if type(reader) ~= "function" then
-        return { state = UNAVAILABLE }
+    local kind, text = ClientRead.Call(_G.debugstack, "string", 1, topFrames, bottomFrames)
+    if kind == READ_PLAIN then
+        return captured(text)
     end
-    local ok, text = pcall(reader, 1, topFrames, bottomFrames)
-    if not ok then
-        return { state = UNAVAILABLE }
-    end
-    local isSecret = _G.issecretvalue
-    if type(isSecret) == "function" and isSecret(text) then
+    if kind == READ_WITHHELD and text == ClientRead.SECRET_VALUE then
         return { state = WITHHELD }
     end
-    if type(text) ~= "string" then
-        return { state = UNAVAILABLE }
-    end
-    return captured(text)
+    return { state = UNAVAILABLE }
 end
 
 local LINE_OURS, LINE_LUA, LINE_CLIENT, LINE_TAIL, LINE_OTHER = 1, 2, 3, 4, 5
@@ -267,21 +280,6 @@ local function pathKeyOf(functionName, callSite)
         parts[#parts + 1] = renderFrame(callSite[index])
     end
     return concat(parts, ">")
-end
-
--- Returns the traced explanation, or nil for Untraced. An empty signature
--- matches nothing.
-local function classifyPath(functionName, callSite, tracedPaths)
-    if #callSite == 0 then
-        return nil
-    end
-    for index = 1, #tracedPaths do
-        local traced = tracedPaths[index]
-        if traced.functionName == functionName and sameSignature(traced.signature, callSite) then
-            return traced.explanation
-        end
-    end
-    return nil
 end
 
 -- A repeat of text this session has already parsed costs a lookup, not a parse.
@@ -460,15 +458,19 @@ local function clientBuild()
     return tostring(version or "unknown")
 end
 
+-- Blizzard's panels, so their Shown aspect can be secret: read through ClientRead
+-- (Phase 9 section 5.2), and a withheld answer reads as not shown.
 local function shownPanels(watchList)
     local shown = {}
     for index = 1, #watchList do
         local name = watchList[index]
         local frame = _G[name]
-        if type(frame) == "table" and type(frame.IsShown) == "function" then
-            local ok, isShown = pcall(frame.IsShown, frame)
-            if ok and isShown then
+        if type(frame) == "table" then
+            local kind, isShown = ClientRead.Call(frame.IsShown, "boolean", frame)
+            if kind == READ_PLAIN and isShown then
                 shown[#shown + 1] = name
+            elseif kind == READ_WITHHELD and isShown == ClientRead.SECRET_VALUE then
+                ns.Diagnostics.Bump(watch.counters, "panelReadsWithheld")
             end
         end
     end
@@ -478,6 +480,10 @@ end
 local liveProbe = {
     now = function()
         return time()
+    end,
+    -- Frame time, for the storm window: time() has one-second resolution.
+    clock = function()
+        return GetTime()
     end,
     build = clientBuild,
     inCombat = function()
@@ -489,17 +495,16 @@ local liveProbe = {
 
 -- A repeat of a known path costs one short read and a lookup; only a path not
 -- yet in the log pays for the full read. Returns nil when another addon was
--- blamed, otherwise the record, its traced explanation (nil when Untraced) and
--- whether it was FirstEver or SeenBefore.
-local function recordRefusal(kind, blamedAddon, functionName, attempt, probe,
-                             tracedPaths, memo, blockLog)
+-- blamed, otherwise the record, its known-defect explanation (nil when
+-- Untraced) and whether it was FirstEver or SeenBefore.
+local function recordRefusal(kind, blamedAddon, functionName, attempt, probe, memo, blockLog)
     if blamedAddon ~= ADDON_NAME then
         return nil
     end
 
     local shortRead = probe.readStack(SIGNATURE_READ_FRAMES, 0)
     local callSite = signatureViaMemo(memo, shortRead, functionName)
-    local explanation = classifyPath(functionName, callSite, tracedPaths)
+    local explanation = classifyRefusal(functionName, callSite)
 
     local existing = findRecord(blockLog, functionName, callSite)
     if existing then
@@ -539,18 +544,27 @@ local function formatSeen(record)
     return format(" First seen %s, build %s.", when, neutralize(record.clientBuild))
 end
 
--- Prints once per path per session; repeats are counted and print nothing.
+-- The known defect prints once per UI load, whichever addon it names and by
+-- whichever path it arrived: one key for all of them.
+local function hintKnownDefect(blamedAddon)
+    local blame = (blamedAddon == ADDON_NAME) and ""
+        or format("blamed on %s: ", neutralize(blamedAddon))
+    if ns.Log.Once(G1_HINT_KEY, format("%s refused, %s%s.", INTERACT_TARGET, blame, G1_EXPLANATION)) then
+        watch.counters.knownDefectHintShown = true
+    end
+end
+
+-- Untraced paths print once per path per session; repeats are counted and print
+-- nothing.
 local function surface(disposition)
     local record = disposition.record
-    local key = "blockwatch:" .. pathKeyOf(record.functionName, record.callSite)
-    local seen = (disposition.occurrence == SEEN_BEFORE) and formatSeen(record) or ""
-
     if disposition.explanation then
-        ns.Log.Once(key, format("%s refused (%s) on a traced path: %s.%s",
-            neutralize(record.functionName), record.kind, disposition.explanation, seen))
+        hintKnownDefect(ADDON_NAME)
         return
     end
 
+    local key = "blockwatch:" .. pathKeyOf(record.functionName, record.callSite)
+    local seen = (disposition.occurrence == SEEN_BEFORE) and formatSeen(record) or ""
     local via = record.callSite[1] and neutralize(renderFrame(record.callSite[1])) or "no path frames"
     local panels = (#record.shownPanels > 0) and concat(record.shownPanels, ", ") or "none"
     ns.Log.OnceError(key, format(
@@ -559,14 +573,98 @@ local function surface(disposition)
         via, panels, seen))
 end
 
-local function onRefusal(kind, addonName, functionName)
-    if addonName ~= ADDON_NAME then
-        return
+-- The storm guard (Phase 9 section 6.2) ----------------------------------------------
+
+-- Pushes one refusal time onto the ring. True when this refusal makes the ring
+-- full and its oldest entry is within the window of the newest. Never true before
+-- the ring holds STORM_REFUSALS entries (Phase 9 audit finding 6).
+local function stormPush(storm, now)
+    local ring = storm.ring
+    ring[storm.ringNext] = now
+    storm.ringNext = storm.ringNext % ns.STORM_REFUSALS + 1
+    if storm.ringCount < ns.STORM_REFUSALS then
+        storm.ringCount = storm.ringCount + 1
     end
-    local disposition = recordRefusal(kind, addonName, tostring(functionName or "unnamed()"),
-        tostring(watch.attemptLabel or UNKNOWN_ATTEMPT), liveProbe, TRACED_PATHS,
-        watch.memo, ensureBound())
-    if disposition then
+    if storm.ringCount < ns.STORM_REFUSALS then
+        return false
+    end
+    -- After the advance, ringNext points at the oldest entry.
+    return now - ring[storm.ringNext] <= ns.STORM_WINDOW_SECONDS
+end
+
+-- Counts a refusal made during a storm by its function, bounded: names beyond the
+-- capacity fold into "other", so a storm hides no function, only its stacks.
+local function stormCount(storm, functionName)
+    storm.refusals = storm.refusals + 1
+    local key = functionName
+    if storm.byFunction[key] == nil and key ~= "other" then
+        if storm.functionKeys >= ns.STORM_FUNCTION_CAPACITY then
+            key = "other"
+        else
+            storm.functionKeys = storm.functionKeys + 1
+        end
+    end
+    storm.byFunction[key] = (storm.byFunction[key] or 0) + 1
+end
+
+local OUTCOME_STORMING = "Storming"
+local OUTCOME_STORM_ENTERED = "StormEntered"
+local OUTCOME_OTHER_KNOWN = "OtherAddonKnownDefect"
+local OUTCOME_IGNORED = "Ignored"
+local OUTCOME_RECORDED = "Recorded"
+
+-- Decides what one refusal means, touching only the state passed in, so the
+-- self-test can drive it with scratch state and a sample probe. The storm check
+-- comes first and reads nothing: during a storm a refusal costs one clock read
+-- and one count.
+local function judgeRefusal(context, kind, blamedAddon, functionName)
+    local storm = context.storm
+    if storm.storming then
+        stormCount(storm, functionName)
+        return OUTCOME_STORMING
+    end
+    local now = context.probe.clock()
+    if stormPush(storm, now) then
+        storm.storming = true
+        storm.since = now
+        stormCount(storm, functionName)
+        return OUTCOME_STORM_ENTERED
+    end
+    if blamedAddon ~= ADDON_NAME then
+        if functionName == INTERACT_TARGET then
+            return OUTCOME_OTHER_KNOWN
+        end
+        return OUTCOME_IGNORED
+    end
+    return OUTCOME_RECORDED, recordRefusal(kind, blamedAddon, functionName, context.attempt,
+        context.probe, context.memo, context.blockLog)
+end
+
+local function onRefusal(kind, addonName, functionName)
+    local blamed = tostring(addonName or "<name>")
+    local name = tostring(functionName or "unnamed()")
+    local outcome, disposition = judgeRefusal({
+        storm = watch.storm,
+        probe = liveProbe,
+        memo = watch.memo,
+        blockLog = ensureBound(),
+        attempt = tostring(watch.attemptLabel or UNKNOWN_ATTEMPT),
+    }, kind, blamed, name)
+
+    local counters = watch.counters
+    if outcome == OUTCOME_STORMING then
+        ns.Diagnostics.Bump(counters, "refusalsDuringStorm")
+    elseif outcome == OUTCOME_STORM_ENTERED then
+        ns.Diagnostics.Bump(counters, "stormsEntered")
+        ns.Diagnostics.Bump(counters, "refusalsDuringStorm")
+        ns.Log.OnceError("blockwatch:storm", format(
+            "%d refusals in %d s: the Gamepad UI is refusing actions in a loop (a Blizzard defect, GAPBugs01 G1). /reload clears it. Until then this addon only counts them.",
+            ns.STORM_REFUSALS, ns.STORM_WINDOW_SECONDS))
+    elseif outcome == OUTCOME_OTHER_KNOWN then
+        ns.Diagnostics.Bump(counters, "refusalsOthersKnownDefect")
+        hintKnownDefect(blamed)
+    elseif outcome == OUTCOME_RECORDED and disposition then
+        ns.Diagnostics.Bump(counters, "refusalsOurs")
         surface(disposition)
     end
 end
@@ -606,13 +704,38 @@ local SAMPLE_A_LINES = {
 }
 local SAMPLE_A = concat(SAMPLE_A_LINES, "\n")
 
-local function sampleProbe(text)
+-- The delayed interact-icon refresh (GAPBugs01 section 2.2, path B): the refused
+-- frame is followed directly by the sole caller, inside an anonymous closure.
+local SAMPLE_DELAYED = concat({
+    SAMPLE_A_LINES[1], SAMPLE_A_LINES[2], SAMPLE_A_LINES[3], SAMPLE_A_LINES[4], SAMPLE_A_LINES[5],
+    "[C]: in function 'SetPreferredGamepadInteractTarget'",
+    "[Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua]:255: in function <...ns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:237>",
+    "[C]: ?",
+}, "\n")
+
+-- clock is optional; the probe counts its stack reads so a test can prove a storm
+-- reads nothing.
+local function sampleProbe(text, clock)
+    local probe = { stackReads = 0 }
+    probe.now = function() return 0 end
+    probe.clock = clock or function() return 0 end
+    probe.build = function() return "selftest" end
+    probe.inCombat = function() return false end
+    probe.shownPanels = function() return {} end
+    probe.readStack = function()
+        probe.stackReads = probe.stackReads + 1
+        return captured(text)
+    end
+    return probe
+end
+
+local function scratchContext(probe)
     return {
-        now = function() return 0 end,
-        build = function() return "selftest" end,
-        inCombat = function() return false end,
-        shownPanels = function() return {} end,
-        readStack = function() return captured(text) end,
+        storm = newStorm(),
+        probe = probe,
+        memo = newMemo(),
+        blockLog = newBlockLog(),
+        attempt = UNKNOWN_ATTEMPT,
     }
 end
 
@@ -626,29 +749,32 @@ local function edited(text, pattern, replacement)
     return result
 end
 
-local function signatureMatchesTraced(signature, tracedIndex)
-    if not sameSignature(signature, TRACED_PATHS[tracedIndex].signature) then
+-- The signature a sample yields must start at the sole caller and be classified
+-- as the known defect.
+local function expectKnownDefect(text)
+    local signature = callSiteOf(captured(text), INTERACT_TARGET)
+    if not signature[1] or signature[1].file ~= ACTION_BARS then
         return false, format("signature was %s", pathKeyOf("", signature))
     end
-    if not classifyPath(INTERACT_TARGET, signature, TRACED_PATHS) then
-        return false, "the traced signature was not classified as Traced"
+    if not classifyRefusal(INTERACT_TARGET, signature) then
+        return false, "the sole caller's path was not classified as the known defect"
     end
     return true
 end
 
 local SELF_TESTS = {
-    { caseName = "T1 traced path, RemoveSet", run = function()
-        return signatureMatchesTraced(callSiteOf(captured(SAMPLE_A), INTERACT_TARGET), 1)
+    { caseName = "T1 known defect, RemoveSet", run = function()
+        return expectKnownDefect(SAMPLE_A)
     end },
-    { caseName = "T2 traced path, AddBindingSet", run = function()
-        local text = edited(SAMPLE_A, "'RemoveSet'", "'AddBindingSet'")
-        return signatureMatchesTraced(callSiteOf(captured(text), INTERACT_TARGET), 2)
+    { caseName = "T2 known defect, AddBindingSet", run = function()
+        return expectKnownDefect(edited(SAMPLE_A, "'RemoveSet'", "'AddBindingSet'"))
     end },
-    { caseName = "T3 a changed frame is Untraced", run = function()
-        local text = edited(SAMPLE_A, "InputBindingStack/InputBindingManager%.lua%]:42",
-            "InputBindingStack/OtherManager.lua]:42")
-        if classifyPath(INTERACT_TARGET, callSiteOf(captured(text), INTERACT_TARGET), TRACED_PATHS) then
-            return false, "a path with a different third frame was classified as Traced"
+    { caseName = "T3 a changed first frame is Untraced", run = function()
+        local text = edited(SAMPLE_A,
+            "Blizzard_GamepadActionBars/MainActionBarFrame%.lua%]:255",
+            "Blizzard_GamepadActionBars/OtherCaller.lua]:255")
+        if classifyRefusal(INTERACT_TARGET, callSiteOf(captured(text), INTERACT_TARGET)) then
+            return false, "a second caller was classified as the known defect"
         end
         return true
     end },
@@ -657,21 +783,20 @@ local SELF_TESTS = {
         if #signature ~= 0 then
             return false, "a withheld stack produced frames"
         end
-        if classifyPath(INTERACT_TARGET, signature, TRACED_PATHS) then
-            return false, "an empty signature was classified as Traced"
+        if classifyRefusal(INTERACT_TARGET, signature) then
+            return false, "an empty signature was classified as the known defect"
         end
         return true
     end },
     { caseName = "T5 elision markers", run = function()
-        local text = gsub(SAMPLE_A, "([^\n]+)", "...%1")
-        return signatureMatchesTraced(callSiteOf(captured(text), INTERACT_TARGET), 1)
+        return expectKnownDefect((gsub(SAMPLE_A, "([^\n]+)", "...%1")))
     end },
     { caseName = "T6 capacity and eviction", run = function()
         local scratch, memo = newBlockLog(), newMemo()
         local probe = sampleProbe(SAMPLE_A)
         for index = 1, BLOCK_LOG_CAPACITY + 1 do
             recordRefusal(KIND_FORBIDDEN, ADDON_NAME, "SelfTest" .. index .. "()", UNKNOWN_ATTEMPT,
-                probe, TRACED_PATHS, memo, scratch)
+                probe, memo, scratch)
         end
         if #scratch.records ~= BLOCK_LOG_CAPACITY then
             return false, format("%d records kept", #scratch.records)
@@ -685,9 +810,9 @@ local SELF_TESTS = {
         local scratch, memo = newBlockLog(), newMemo()
         local probe = sampleProbe(SAMPLE_A)
         local first = recordRefusal(KIND_FORBIDDEN, ADDON_NAME, INTERACT_TARGET, UNKNOWN_ATTEMPT,
-            probe, TRACED_PATHS, memo, scratch)
+            probe, memo, scratch)
         local second = recordRefusal(KIND_FORBIDDEN, ADDON_NAME, INTERACT_TARGET, UNKNOWN_ATTEMPT,
-            probe, TRACED_PATHS, memo, scratch)
+            probe, memo, scratch)
         if not first or first.occurrence ~= FIRST_EVER or not second or second.occurrence ~= SEEN_BEFORE then
             return false, "occurrences were not FirstEver then SeenBefore"
         end
@@ -714,9 +839,8 @@ local SELF_TESTS = {
         return true
     end },
     { caseName = "T10 a namespaced refused frame", run = function()
-        local text = edited(SAMPLE_A, "in function 'SetPreferredGamepadInteractTarget'",
-            "in function 'C_Test.SetPreferredGamepadInteractTarget'")
-        return signatureMatchesTraced(callSiteOf(captured(text), INTERACT_TARGET), 1)
+        return expectKnownDefect(edited(SAMPLE_A, "in function 'SetPreferredGamepadInteractTarget'",
+            "in function 'C_Test.SetPreferredGamepadInteractTarget'"))
     end },
     { caseName = "T11 only handler and client frames", run = function()
         local text = concat({ SAMPLE_A_LINES[1], SAMPLE_A_LINES[2], SAMPLE_A_LINES[3],
@@ -741,6 +865,59 @@ local SELF_TESTS = {
             if bounded.entries > PATH_MEMO_CAPACITY then
                 return false, format("the memo held %d entries", bounded.entries)
             end
+        end
+        return true
+    end },
+    { caseName = "T13 a changed later frame is still the known defect", run = function()
+        return expectKnownDefect(edited(SAMPLE_A, "InputBindingStack/InputBindingManager%.lua%]:42",
+            "InputBindingStack/OtherManager.lua]:42"))
+    end },
+    { caseName = "T14 the delayed refresh path", run = function()
+        return expectKnownDefect(SAMPLE_DELAYED)
+    end },
+    { caseName = "T15 a storm counts and reads nothing", run = function()
+        local now = 0
+        local probe = sampleProbe(SAMPLE_A, function() return now end)
+        local context = scratchContext(probe)
+        for index = 1, ns.STORM_REFUSALS - 1 do
+            now = index * 0.1
+            local outcome = judgeRefusal(context, KIND_FORBIDDEN, ADDON_NAME, INTERACT_TARGET)
+            if outcome ~= OUTCOME_RECORDED then
+                return false, format("refusal %d was %s before the ring was full", index, outcome)
+            end
+        end
+        local readsBefore = probe.stackReads
+        now = ns.STORM_REFUSALS * 0.1
+        local tripped = judgeRefusal(context, KIND_FORBIDDEN, ADDON_NAME, INTERACT_TARGET)
+        now = now + 0.1
+        local after = judgeRefusal(context, KIND_FORBIDDEN, ADDON_NAME, INTERACT_TARGET)
+        if tripped ~= OUTCOME_STORM_ENTERED or after ~= OUTCOME_STORMING then
+            return false, format("outcomes were %s then %s", tostring(tripped), tostring(after))
+        end
+        if probe.stackReads ~= readsBefore then
+            return false, format("the storm read the stack %d time(s)", probe.stackReads - readsBefore)
+        end
+        if context.storm.refusals ~= 2 or context.storm.byFunction[INTERACT_TARGET] ~= 2 then
+            return false, format("the storm counted %d", context.storm.refusals)
+        end
+        return true
+    end },
+    { caseName = "T16 another addon's known defect: a hint, no record", run = function()
+        local context = scratchContext(sampleProbe(SAMPLE_A))
+        local outcome = judgeRefusal(context, KIND_FORBIDDEN, "BugSack", INTERACT_TARGET)
+        if outcome ~= OUTCOME_OTHER_KNOWN then
+            return false, "outcome was " .. tostring(outcome)
+        end
+        if #context.blockLog.records ~= 0 or context.probe.stackReads ~= 0 then
+            return false, "another addon's refusal was recorded or read"
+        end
+        return true
+    end },
+    { caseName = "T17 another addon's other refusal is ignored", run = function()
+        local context = scratchContext(sampleProbe(SAMPLE_A))
+        local outcome = judgeRefusal(context, KIND_BLOCKED, "SomeAddon", "CastSpellByName()")
+        if outcome ~= OUTCOME_IGNORED or #context.blockLog.records ~= 0 then
+            return false, "outcome was " .. tostring(outcome)
         end
         return true
     end },
@@ -797,6 +974,25 @@ function BlockWatch.SelfTest()
     return runSelfTest()
 end
 
+-- What this UI load's storm guard has seen, for /pa blocked. byFunction is a copy,
+-- sorted by count, so the caller cannot disturb the live counts.
+function BlockWatch.StormSummary()
+    local storm = watch.storm
+    local byFunction = {}
+    for name, count in pairs(storm.byFunction) do
+        byFunction[#byFunction + 1] = { name = name, count = count }
+    end
+    table.sort(byFunction, function(left, right) return left.count > right.count end)
+    return {
+        storming = storm.storming,
+        since = storm.since,
+        refusals = storm.refusals,
+        byFunction = byFunction,
+        threshold = ns.STORM_REFUSALS,
+        windowSeconds = ns.STORM_WINDOW_SECONDS,
+    }
+end
+
 -- One /pa blocked line for one record, safe for chat.
 function BlockWatch.Describe(index, record)
     local frames = {}
@@ -804,7 +1000,7 @@ function BlockWatch.Describe(index, record)
         frames[#frames + 1] = renderFrame(record.callSite[position])
     end
     local via = (#frames > 0) and concat(frames, " < ") or "no path frames"
-    local status = classifyPath(record.functionName, record.callSite, TRACED_PATHS) and "Traced" or "Untraced"
+    local status = classifyRefusal(record.functionName, record.callSite) and "KnownDefect" or "Untraced"
     return neutralize(format("%d. %dx %s [%s] %s attempt=%s via %s",
         index, record.count, record.functionName, record.kind, status, record.attempt, via))
 end
@@ -848,6 +1044,7 @@ local HANDLERS = {
 
 local function enable()
     ensureBound()
+    watch.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
 
     local subscribed = 0
     for _, eventName in ipairs({ "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN" }) do

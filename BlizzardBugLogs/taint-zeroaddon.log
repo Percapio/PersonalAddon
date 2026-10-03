@@ -1,0 +1,300 @@
+10/2 20:45:59.197  Execution tainted by *** ForceTaint_Strong *** while reading upvalue MICRO_BUTTONS_DISABLED (<upval: 0000017ea32971b8>) - Interface/AddOns/Blizzard_MicroMenu/Mainline/MainMenuBarMicroButtons.lua:198 UpdateMicroButtons()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_MicroMenu/Mainline/MainMenuBarMicroButtons.lua:198 UpdateMicroButtons()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:733
+10/2 20:45:59.197      CharacterFrame:Show()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:335 Frame:ShowUIPanel()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+10/2 20:45:59.197      Frame:SetAttribute()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:900 ShowUIPanel()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:25 ToggleCharacter()
+10/2 20:45:59.197      ToggleCharacter("PaperDollFrame"):1
+10/2 20:45:59.197      RunScript()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/SlashCommands.lua:1235 ?()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:267 ChatFrame1EditBox:ParseText()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:292 ChatFrame1EditBox:SendText()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:417 ChatFrame1EditBox:SendMessage()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:446
+10/2 20:45:59.197  RunScript()
+10/2 20:45:59.197  An attempt to compare a secret value was blocked because of taint from *** ForceTaint_Strong *** - Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:110 StatusBar:UpdateTextStringWithValues()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:110 StatusBar:UpdateTextStringWithValues()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:89 StatusBar:UpdateTextString()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:261 StatusBar:ShowStatusBarText()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:745
+10/2 20:45:59.197      CharacterFrame:Show()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:498 Frame:SetUIPanel()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:335 Frame:ShowUIPanel()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:129
+10/2 20:45:59.197      Frame:SetAttribute()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:900 ShowUIPanel()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:25 ToggleCharacter()
+10/2 20:45:59.197      ToggleCharacter("PaperDollFrame"):1
+10/2 20:45:59.197      RunScript()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/SlashCommands.lua:1235 ?()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:267 ChatFrame1EditBox:ParseText()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:292 ChatFrame1EditBox:SendText()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:417 ChatFrame1EditBox:SendMessage()
+10/2 20:45:59.197      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:446
+10/2 20:46:14.509  Execution tainted by *** ForceTaint_Strong *** while reading field lockShow (<table: 0000017e96fe6540>) - Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:273 StatusBar:HideStatusBarText()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:273 StatusBar:HideStatusBarText()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:790
+10/2 20:46:14.509      CharacterFrame:Hide()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:480 Frame:SetUIPanel()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:589 Frame:HideUIPanelImplementation()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:530 Frame:HideUIPanel()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:133
+10/2 20:46:14.509      Frame:SetAttribute()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:933 HideUIPanel()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:14 ToggleCharacter()
+10/2 20:46:14.509      ToggleCharacter("PaperDollFrame"):1
+10/2 20:46:14.509      RunScript()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/SlashCommands.lua:1235 ?()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:267 ChatFrame1EditBox:ParseText()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:292 ChatFrame1EditBox:SendText()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:417 ChatFrame1EditBox:SendMessage()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:446
+10/2 20:46:14.509  RunScript()
+10/2 20:46:14.509  An attempt to compare a secret value was blocked because of taint from *** ForceTaint_Strong *** - Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:110 StatusBar:UpdateTextStringWithValues()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:110 StatusBar:UpdateTextStringWithValues()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:89 StatusBar:UpdateTextString()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_TextStatusBar/TextStatusBar.lua:280 StatusBar:HideStatusBarText()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:790
+10/2 20:46:14.509      CharacterFrame:Hide()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:480 Frame:SetUIPanel()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:589 Frame:HideUIPanelImplementation()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:530 Frame:HideUIPanel()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:133
+10/2 20:46:14.509      Frame:SetAttribute()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:933 HideUIPanel()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_UIPanels_Game/Camelot/CharacterFrame.lua:14 ToggleCharacter()
+10/2 20:46:14.509      ToggleCharacter("PaperDollFrame"):1
+10/2 20:46:14.509      RunScript()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/SlashCommands.lua:1235 ?()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:267 ChatFrame1EditBox:ParseText()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:292 ChatFrame1EditBox:SendText()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:417 ChatFrame1EditBox:SendMessage()
+10/2 20:46:14.509      Interface/AddOns/Blizzard_ChatFrameBase/Shared/ChatFrameEditBox.lua:446
+10/2 20:47:49.670  Execution tainted by *** ForceTaint_Strong *** while reading field gamepadShown (<table: 0000018049bde040>) - Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:124 SetGamepadIconShown()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:88 UpdateGamepadUI()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:113 UpdateVisiblePopups()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:223
+10/2 20:47:49.670      securecallfunction()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.670      secureexecuterange()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:616 StaticPopup_OnShow()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:725
+10/2 20:47:49.670      StaticPopup1:Show()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:91 HandleAddonActionForbidden()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:43 handler()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+10/2 20:47:49.670      SetPreferredGamepadInteractTarget()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:254 DeactivateBindingGroup()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:339 RefreshBindingGroup()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:376
+10/2 20:47:49.670      securecallfunction()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.670      secureexecuterange()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:1092 RefreshFocus()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:669 SetUIFocusState()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:682
+10/2 20:47:49.670      securecallfunction()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.670      secureexecuterange()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/GlobalCallbackRegistry.lua:11
+10/2 20:47:49.670  Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:637 SetUIFocusState()
+10/2 20:47:49.670  An action was blocked because of taint from *** ForceTaint_Strong *** - SetPreferredGamepadInteractTarget()
+10/2 20:47:49.670      SetPreferredGamepadInteractTarget()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:190 RemoveSet()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:254 DeactivateBindingGroup()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:339 RefreshBindingGroup()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:376
+10/2 20:47:49.670      securecallfunction()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.670      secureexecuterange()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:1092 RefreshFocus()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:669 SetUIFocusState()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:682
+10/2 20:47:49.670      securecallfunction()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.670      secureexecuterange()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.670      Interface/AddOns/Blizzard_SharedXMLBase/GlobalCallbackRegistry.lua:11
+10/2 20:47:49.687  Execution tainted by *** ForceTaint_Strong *** while reading field focusedFrame (<table: 0000017f5b32a7f0>) - Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:371 FocusFirstFrameShown()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:371 FocusFirstFrameShown()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSmartNavigation/SmartNavigation.lua:292
+10/2 20:47:49.687      StaticPopup1:Show()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:91 HandleAddonActionForbidden()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:43 handler()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+10/2 20:47:49.687      SetPreferredGamepadInteractTarget()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:164 AddBindingSet()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:247 ActivateBindingGroup()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:369 RefreshBindingGroup()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:376
+10/2 20:47:49.687      securecallfunction()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.687      secureexecuterange()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:1092 RefreshFocus()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:669 SetUIFocusState()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:682
+10/2 20:47:49.687      securecallfunction()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.687      secureexecuterange()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/GlobalCallbackRegistry.lua:11
+10/2 20:47:49.687  Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:637 SetUIFocusState()
+10/2 20:47:49.687  An action was blocked because of taint from *** ForceTaint_Strong *** - SetPreferredGamepadInteractTarget()
+10/2 20:47:49.687      SetPreferredGamepadInteractTarget()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255 GamepadMainActionBarFrame:UpdateInteractIcons()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:66
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:42 CheckCoreBindingActive()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua:164 AddBindingSet()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua:247 ActivateBindingGroup()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:369 RefreshBindingGroup()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua:376
+10/2 20:47:49.687      securecallfunction()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.687      secureexecuterange()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:1092 RefreshFocus()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:669 SetUIFocusState()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameControlsManager.lua:682
+10/2 20:47:49.687      securecallfunction()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:47:49.687      secureexecuterange()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:47:49.687      Interface/AddOns/Blizzard_SharedXMLBase/GlobalCallbackRegistry.lua:11
+10/2 20:48:47.510  Execution tainted by *** ForceTaint_Strong *** while reading field gamepadShown (<table: 0000018049bde040>) - Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:124 SetGamepadIconShown()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:88 UpdateGamepadUI()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:113 UpdateVisiblePopups()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:223
+10/2 20:48:47.510      securecallfunction()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:48:47.510      secureexecuterange()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:616 StaticPopup_OnShow()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:725
+10/2 20:48:47.510      StaticPopup1:Show()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:91 HandleAddonActionForbidden()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:43 handler()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+10/2 20:48:47.510      SetPreferredGamepadInteractTarget()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:47.510  (for generator)()
+10/2 20:48:47.510  An action was blocked because of taint from *** ForceTaint_Strong *** - SetPreferredGamepadInteractTarget()
+10/2 20:48:47.510      SetPreferredGamepadInteractTarget()
+10/2 20:48:47.510      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:47.534  Execution tainted by *** ForceTaint_Strong *** while reading field gamepadShown (<table: 0000018049bde040>) - Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:124 SetGamepadIconShown()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:88 UpdateGamepadUI()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:113 UpdateVisiblePopups()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:223
+10/2 20:48:47.534      securecallfunction()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:48:47.534      secureexecuterange()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:616 StaticPopup_OnShow()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:725
+10/2 20:48:47.534      StaticPopup1:Show()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:91 HandleAddonActionForbidden()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:43 handler()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+10/2 20:48:47.534      SetPreferredGamepadInteractTarget()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:47.534  (for generator)()
+10/2 20:48:47.534  An action was blocked because of taint from *** ForceTaint_Strong *** - SetPreferredGamepadInteractTarget()
+10/2 20:48:47.534      SetPreferredGamepadInteractTarget()
+10/2 20:48:47.534      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:48.604  Execution tainted by *** ForceTaint_Strong *** while reading field gamepadShown (<table: 0000018049bde040>) - Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:124 SetGamepadIconShown()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:88 UpdateGamepadUI()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:113 UpdateVisiblePopups()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:223
+10/2 20:48:48.604      securecallfunction()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:48:48.604      secureexecuterange()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:616 StaticPopup_OnShow()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:725
+10/2 20:48:48.604      StaticPopup1:Show()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:91 HandleAddonActionForbidden()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:43 handler()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+10/2 20:48:48.604      SetPreferredGamepadInteractTarget()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:48.604  (for generator)()
+10/2 20:48:48.604  An action was blocked because of taint from *** ForceTaint_Strong *** - SetPreferredGamepadInteractTarget()
+10/2 20:48:48.604      SetPreferredGamepadInteractTarget()
+10/2 20:48:48.604      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:48.628  Execution tainted by *** ForceTaint_Strong *** while reading field gamepadShown (<table: 0000018049bde040>) - Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:124 SetGamepadIconShown()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:88 UpdateGamepadUI()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:113 UpdateVisiblePopups()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:223
+10/2 20:48:48.628      securecallfunction()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:48:48.628      secureexecuterange()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:616 StaticPopup_OnShow()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:725
+10/2 20:48:48.628      StaticPopup1:Show()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:91 HandleAddonActionForbidden()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:43 handler()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+10/2 20:48:48.628      SetPreferredGamepadInteractTarget()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:48.628  (for generator)()
+10/2 20:48:48.628  An action was blocked because of taint from *** ForceTaint_Strong *** - SetPreferredGamepadInteractTarget()
+10/2 20:48:48.628      SetPreferredGamepadInteractTarget()
+10/2 20:48:48.628      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:52.582  Execution tainted by *** ForceTaint_Strong *** while reading field gamepadShown (<table: 0000018049bde040>) - Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:88 UpdateGamepadIconAnchor()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_GamepadSharedUtility/FrameReformUtility.lua:124 SetGamepadIconShown()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:88 UpdateGamepadUI()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:113 UpdateVisiblePopups()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_StaticPopup/StaticPopupGamepad.lua:223
+10/2 20:48:52.582      securecallfunction()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:210
+10/2 20:48:52.582      secureexecuterange()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_SharedXMLBase/CallbackRegistry.lua:213 TriggerEvent()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:616 StaticPopup_OnShow()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_StaticPopup_Game/GameDialog.lua:725
+10/2 20:48:52.582      StaticPopup1:Show()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_StaticPopup/StaticPopup.lua:423 StaticPopup_Show()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_Game/Shared/EventImplementation.lua:91 HandleAddonActionForbidden()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:43 handler()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_Game/Shared/EventRouting.lua:7
+10/2 20:48:52.582      SetPreferredGamepadInteractTarget()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
+10/2 20:48:52.582  (for generator)()
+10/2 20:48:52.582  An action was blocked because of taint from *** ForceTaint_Strong *** - SetPreferredGamepadInteractTarget()
+10/2 20:48:52.582      SetPreferredGamepadInteractTarget()
+10/2 20:48:52.582      Interface/AddOns/Blizzard_GamepadActionBars/MainActionBarFrame.lua:255
