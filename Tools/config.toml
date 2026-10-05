@@ -1,0 +1,23 @@
+# Defaults for the tools under Tools/ (Architecture/20261002-Phase10.md section 2.2).
+# Machine-specific overrides go in Tools/config.local.toml, which git ignores; any
+# key here can be overridden there.
+
+# The client this addon targets, and the folders its TOC path tags resolve to
+# (Phase 10 section 3.2). game_types lists every game-type value a TOC can name to
+# mean this client: camelot belongs to the mainline family. The running client
+# loads [Family]\QuestMapFrame.lua, which is tagged [AllowLoadGameType mainline].
+game_type = "camelot"
+game_types = ["camelot", "mainline"]
+text_locale = "enUS"
+family_folder = "Mainline"
+game_folder = "Camelot"
+
+[store]
+# The baseline store: the last accepted UI export (46 MB) and its manifest.
+# Kept outside the repo (Phase 10 section 6.3).
+path = "C:/tmp/PersonalAddonBaseline"
+
+[report]
+diff_lines_per_file = 300
+diff_lines_per_report = 2000
+docs_changes_per_kind = 50

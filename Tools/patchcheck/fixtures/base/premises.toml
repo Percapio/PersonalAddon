@@ -1,0 +1,43 @@
+# The fixture's register (Phase 10 section 10.1). One premise of each check kind.
+
+[[premise]]
+id = "SOLE-CALLER"
+statement = "SetPreferredGamepadInteractTarget has exactly one caller"
+source = "fixture"
+consequence = "re-check classify_refusal"
+check = { kind = "Callers", name = "SetPreferredGamepadInteractTarget", files = ["Blizzard_GamepadActionBars/MainActionBarFrame.lua"], count = 1 }
+
+[[premise]]
+id = "THREAT-READABLE"
+statement = "UnitThreatSituation is not secret by default"
+source = "fixture"
+consequence = "nameplate aggro cedes"
+check = { kind = "FlagAbsent", entry = "UnitThreatSituation", flag = "SecretReturns" }
+
+[[premise]]
+id = "LOOT-TEXT-READABLE"
+statement = "Loot chat is outside chat lockdown"
+source = "fixture"
+consequence = "toasts go silent in instances"
+check = { kind = "FlagAbsent", entry = "event CHAT_MSG_LOOT", flag = "SecretInChatMessagingLockdown" }
+
+[[premise]]
+id = "COLOUR"
+statement = "The colour update is unchanged"
+source = "fixture"
+consequence = "re-check the colour priority"
+check = { kind = "Watch", files = ["Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"] }
+
+[[premise]]
+id = "MANABAR"
+statement = "PlayerFrame.manabar is set by UnitFrame_Initialize"
+source = "fixture"
+consequence = "the five-second-rule line finds no bar"
+check = { kind = "Pattern", file = "Blizzard_UnitFrame/Mainline/UnitFrame.lua", regex = 'self\.manabar\s*=\s*manabar', expect = "Present" }
+
+[[premise]]
+id = "INITIALIZER"
+statement = "UnitFrame_Initialize is defined"
+source = "fixture"
+consequence = "the mana bar is never assigned"
+check = { kind = "Defined", name = "UnitFrame_Initialize" }

@@ -111,10 +111,6 @@ local state = {
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
     -- enable binds it, so nothing here ever indexes nil.
     counters = {},
-    -- The client's enum value for the map restriction, resolved once at enable
-    -- through ClientRead (Phase 9 audit finding 4).
-    mapTypeKind = WITHHELD,
-    mapType = nil,
 }
 
 -- Capability ------------------------------------------------------------------
@@ -382,17 +378,16 @@ local function resolveColourVerdict(aggro, disposition)
 end
 
 -- The map-restriction state, as words for chat. Read on demand: it changes only
--- with the map, and nothing about a verdict depends on it.
+-- with the map, and nothing about a verdict depends on it. The read itself lives in
+-- core since Phase 10 (section 7.1).
+local MAP_WORDS = {
+    [ns.MapRestriction.RESTRICTED] = "yes",
+    [ns.MapRestriction.UNRESTRICTED] = "no",
+    [ns.MapRestriction.UNREADABLE] = "unreadable",
+}
+
 local function restrictedMapNow()
-    if state.mapTypeKind ~= PLAIN then
-        return "unreadable"
-    end
-    local kind, active = ClientRead.Call(C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive,
-        "boolean", state.mapType)
-    if kind ~= PLAIN then
-        return "unreadable"
-    end
-    return active and "yes" or "no"
+    return MAP_WORDS[ns.MapRestriction.Read()]
 end
 
 -- A withheld threat read is surfaced once, with whether this is a restricted map,
@@ -727,19 +722,14 @@ local function colouringActive()
 end
 
 -- Records whether this sweep ran on an addon-restricted map (Phase 9 section 4.2).
--- The enum value was resolved through ClientRead at enable, so an absent Enum
--- cannot raise here; the answer never changes a verdict.
+-- MapRestriction resolves the enum through ClientRead, so an absent Enum cannot
+-- raise here; the answer never changes a verdict.
 local function sampleRestrictedMap()
     local counters = state.counters
-    if state.mapTypeKind ~= PLAIN then
+    local reading = ns.MapRestriction.Read()
+    if reading == ns.MapRestriction.UNREADABLE then
         bump(counters, "restrictedMapUnreadable")
-        return
-    end
-    local kind, active = ClientRead.Call(C_RestrictedActions and C_RestrictedActions.IsAddOnRestrictionActive,
-        "boolean", state.mapType)
-    if kind ~= PLAIN then
-        bump(counters, "restrictedMapUnreadable")
-    elseif active then
+    elseif reading == ns.MapRestriction.RESTRICTED then
         bump(counters, "restrictedMapSamples")
         counters.restrictedMapSeen = true
     end
@@ -936,17 +926,6 @@ local SIGNALS = {
 
 -- Lifecycle -------------------------------------------------------------------
 
--- The map-restriction enum, resolved once. Nothing is indexed outside ClientRead,
--- so a client without Enum.AddOnRestrictionType cannot raise here
--- (Phase 9 audit finding 4).
-local function resolveMapRestrictionType()
-    local typesKind, types = ClientRead.Field(_G.Enum, "AddOnRestrictionType", "table")
-    if typesKind ~= PLAIN then
-        return typesKind, types
-    end
-    return ClientRead.Field(types, "Map", "number")
-end
-
 local function enable(config)
     readSettings(config)
 
@@ -957,7 +936,6 @@ local function enable(config)
     capability.plateLookup = true
 
     state.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
-    state.mapTypeKind, state.mapType = resolveMapRestrictionType()
     if not ClientRead.Available(UnitThreatSituation) then
         ns.Log.Once("plates:nothreat",
             "this client has no UnitThreatSituation, so who a monster is attacking cannot be read; plates keep Blizzard's colours except tapped ones")

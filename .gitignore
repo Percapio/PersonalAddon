@@ -17,6 +17,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Tools (Architecture/20261002-Phase10.md section 2)
+__pycache__/
+Tools/config.local.toml
+
 # Addon specific / Build
 *.bak
 *.old

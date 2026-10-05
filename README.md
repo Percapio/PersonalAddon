@@ -83,14 +83,15 @@ for the same event.
 
 **Known issue: the Gamepad UI and refused actions.** Any code that is not Blizzard's (an
 addon, or `/run`) opening or closing a window, or closing Options with the controller after
-an addon's page was drawn, can leave the Gamepad UI's focus and binding state tainted.
-Later controller actions are then refused, most often updating the interact icon, in the
-name of whichever addon's taint that state carries: it has been PersonalAddon, BugSack,
-Questie, Chatify, SnapPrice and Auctionator, and with no addons at all, `/run`. This is a
-Blizzard defect, still present on build 1.60.1.70205. **`/reload` clears it.** Keep
-BugGrabber installed: without it, Blizzard's own warning dialog takes part, and one session
-flooded until it disconnected. PersonalAddon now counts such a flood quietly and says
-`/reload`. Details: [Architecture/20261002-GAPBugs01.md](Architecture/20261002-GAPBugs01.md).
+an addon's page was drawn, can leave the Gamepad UI's focus, binding and cursor state
+tainted. Later controller actions are then refused, most often updating the interact icon,
+though a jump or a Game Menu button can be refused too. The game names whichever addon's
+taint that state carries: it has been PersonalAddon, BugSack, Questie, Chatify, SnapPrice
+and Auctionator, and with no addons at all, `/run`. This is a Blizzard defect, still present
+on build 1.60.1.70205. **`/reload` clears it.** Keep BugGrabber installed: without it,
+Blizzard's own warning dialog takes part, and one session flooded until it disconnected.
+PersonalAddon now counts such a flood quietly and says `/reload`. Details:
+[Architecture/20261002-GAPBugs01.md](Architecture/20261002-GAPBugs01.md).
 
 ## What the game already does
 
@@ -118,7 +119,7 @@ Attempted and dropped, with the reason, so nobody spends the time twice:
 | Resizing nameplates | Both available methods are accepted and change nothing on screen |
 | Minimal player frames | Dropped by choice: it would mean moving Blizzard's frames, and the five-second-rule line anchors to the mana bar |
 | Quest tracker sorted by level | Reordering means removing and re-adding watches, and the game runs the tracker's update inside that call, carrying this addon's taint into the tracker. See [Phase 7 §6.4](Architecture/20260926-Phase07.md) |
-| Blizzard's own loot toasts | Its boss banner does not exist on this client, and its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon |
+| Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon |
 
 ## Planned
 
@@ -189,6 +190,10 @@ by number, so the numbers stay fixed.
     the value. Treat `Withheld` as "could not tell", never as "no". The generated docs
     flag which functions can return secrets (`SecretWhen*`, `SecretReturnsForAspect`),
     and the harness's secret-read lint fails any read that bypasses `ClientRead`.
+11. **A design that relies on a fact about Blizzard's code records it.** Add the fact to
+    the patch check's register, `Tools/patchcheck/premises.toml`, in the same change.
+    After a client patch, run the patch check before relying on any design
+    ([Tools/README.md](Tools/README.md)).
 
 Known exceptions, kept on purpose:
 
@@ -213,6 +218,19 @@ To trace how taint reached a refusal:
 4. `/console taintLog 0`. Never use level 4: it logged 32,000 lines in ten seconds and
    helped one session flood until it disconnected. Copy `taint.log` before logging in
    again, because the client rewrites it.
+
+## Development
+
+Nothing under `Tools/` loads in game; the client loads only the files the TOC lists.
+
+- `Tools/harness/`: runs the addon offline in a real Lua 5.1 against stubbed client
+  APIs. `python Tools/harness/run.py`.
+- `Tools/lint/`: the secret-read lint (rule 10). The harness runs it first.
+- `Tools/patchcheck/`: after a client patch, checks every fact our designs rely on
+  about Blizzard's code against the new UI export (rule 11).
+  `python Tools/patchcheck/patch_check.py status` says whether a check is due.
+
+Setup, and the procedure after a client patch: [Tools/README.md](Tools/README.md).
 
 ## Credits
 

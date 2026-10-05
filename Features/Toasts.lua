@@ -59,24 +59,17 @@ local MESSAGE = {
     UNPARSED = "Unparsed",
 }
 
-local function newCounts()
-    return {
-        posted = 0,
-        shown = 0,
-        queued = 0,
-        coalesced = 0,
-        dropped = 0,
-        unavailable = 0,
-        secretTexts = 0,
-        unparsed = 0,
-        unresolved = 0,
-        notShown = 0,
-        notOurs = 0,
-        inboxDropped = 0,
-        stackChecked = 0,
-        deliveredInsideCall = 0,
-    }
-end
+-- Every count Toasts keeps. Since Phase 10 (section 7.2) they live in this UI
+-- load's PersonalAddonDiagnostics record, created on first use by Bump, so a
+-- /reload no longer loses them; Inspect reports an absent one as 0.
+local COUNT_NAMES = {
+    "posted", "shown", "queued", "coalesced", "dropped", "unavailable",
+    "secretTexts", "unparsed", "unresolved", "notShown", "notOurs", "inboxDropped",
+    "stackChecked", "deliveredInsideCall",
+    "lootMessagesOnRestrictedMap", "shownOnRestrictedMap",
+}
+
+local bump = ns.Diagnostics.Bump
 
 local state = {
     enabled = false,
@@ -90,7 +83,8 @@ local state = {
     inboxScheduled = false,
     inboxGeneration = 0,
     tokens = {},
-    counts = newCounts(),
+    -- A detached table until enable binds this UI load's diagnostics table.
+    counts = {},
     settings = {
         showLootedItems = true,
         showQuestItems = true,
@@ -362,35 +356,35 @@ end
 -- Returns an outcome, plus a reason when the outcome is Unavailable.
 local function post(request)
     if not state.enabled or not state.pool then
-        state.counts.unavailable = state.counts.unavailable + 1
+        bump(state.counts, "unavailable")
         return OUTCOME.UNAVAILABLE, UNAVAILABLE.DISABLED
     end
     if type(request) ~= "table" or not (request.kind == KIND.LOOTED_ITEM
         or request.kind == KIND.LOOTED_MONEY or request.kind == KIND.JUNK_SOLD) then
-        state.counts.unavailable = state.counts.unavailable + 1
+        bump(state.counts, "unavailable")
         return OUTCOME.UNAVAILABLE, UNAVAILABLE.NOT_READY
     end
-    state.counts.posted = state.counts.posted + 1
+    bump(state.counts, "posted")
 
     if request.kind == KIND.LOOTED_MONEY and coalesceMoney(request.amount) then
-        state.counts.coalesced = state.counts.coalesced + 1
+        bump(state.counts, "coalesced")
         return OUTCOME.COALESCED
     end
 
     if #state.visible < state.settings.maximumVisible and display(request) then
-        state.counts.shown = state.counts.shown + 1
+        bump(state.counts, "shown")
         return OUTCOME.SHOWN
     end
 
     if #state.queue >= ns.TOAST_QUEUE_CAPACITY then
-        state.counts.dropped = state.counts.dropped + 1
+        bump(state.counts, "dropped")
         ns.Log.Once("toasts:dropped", format(
             "more than %d toasts were waiting, so later ones are dropped; /pa toasts counts them",
             ns.TOAST_QUEUE_CAPACITY))
         return OUTCOME.DROPPED
     end
     state.queue[#state.queue + 1] = request
-    state.counts.queued = state.counts.queued + 1
+    bump(state.counts, "queued")
     return OUTCOME.QUEUED
 end
 
@@ -602,7 +596,11 @@ end
 
 -- Capture ---------------------------------------------------------------------------
 
-local function processMessage(text)
+local TOAST_MADE = { [OUTCOME.SHOWN] = true, [OUTCOME.QUEUED] = true, [OUTCOME.COALESCED] = true }
+
+-- Returns whether the message made a toast: shown now, queued, or merged into one
+-- on screen.
+local function handleMessage(text)
     local message = parseLootMessage(text, state.patterns)
     local verdict, request
     if message.kind == MESSAGE.ITEM then
@@ -611,23 +609,42 @@ local function processMessage(text)
     elseif message.kind == MESSAGE.MONEY then
         verdict, request = judgeLootedMoney(message.amount, state.settings)
     elseif message.kind == MESSAGE.UNPARSED then
-        state.counts.unparsed = state.counts.unparsed + 1
+        bump(state.counts, "unparsed")
         ns.Log.Once("toasts:unparsed", format(
             "a loot message could not be read, so it made no toast: %s",
             ns.EscapeGuard.Neutralize(text)))
-        return
+        return false
     else
-        state.counts.notOurs = state.counts.notOurs + 1
-        return
+        bump(state.counts, "notOurs")
+        return false
     end
 
     if verdict == "Toast" then
-        post(request)
+        return TOAST_MADE[post(request)] == true
     elseif verdict == "Unresolved" then
-        state.counts.unresolved = state.counts.unresolved + 1
+        bump(state.counts, "unresolved")
     else
-        state.counts.notShown = state.counts.notShown + 1
+        bump(state.counts, "notShown")
     end
+    return false
+end
+
+-- Phase 10 section 7.2: the evidence criterion 12 lacked. Whether a processed loot or
+-- money message came on a restricted map, and whether it made a toast. Read here, a
+-- frame after the event (rule 5), once per message; "could not tell" counts in
+-- neither counter (rule 10).
+local function noteRestrictedMapOutcome(shown)
+    if ns.MapRestriction.Read() ~= ns.MapRestriction.RESTRICTED then
+        return
+    end
+    bump(state.counts, "lootMessagesOnRestrictedMap")
+    if shown then
+        bump(state.counts, "shownOnRestrictedMap")
+    end
+end
+
+local function processMessage(text)
+    noteRestrictedMapOutcome(handleMessage(text))
 end
 
 local function flushInbox(generation)
@@ -653,10 +670,10 @@ end
 -- produces them. The first deliveries of each session read the stack; a Lua frame
 -- from outside this addon means the event arrived inside someone's call.
 local function checkDeliveryStack()
-    if state.counts.stackChecked >= ns.STACK_CHECK_DELIVERIES then
+    if (state.counts.stackChecked or 0) >= ns.STACK_CHECK_DELIVERIES then
         return
     end
-    state.counts.stackChecked = state.counts.stackChecked + 1
+    bump(state.counts, "stackChecked")
     local reader = _G.debugstack
     if type(reader) ~= "function" then
         return
@@ -668,7 +685,7 @@ local function checkDeliveryStack()
     for line in text:gmatch("[^\n]+") do
         local addon = line:match("Interface[/\\]AddOns[/\\]([^/\\%]\"]+)")
         if addon and addon ~= ADDON_NAME then
-            state.counts.deliveredInsideCall = state.counts.deliveredInsideCall + 1
+            bump(state.counts, "deliveredInsideCall")
             ns.Log.OnceError("toasts:insidecall", format(
                 "a loot message arrived inside another call (%s); Phase 8 section 4.4 has these events wrong, please report it",
                 ns.EscapeGuard.Neutralize(line)))
@@ -686,7 +703,7 @@ local function onLootMessage(text)
         return
     end
     if isSecret(text) then
-        state.counts.secretTexts = state.counts.secretTexts + 1
+        bump(state.counts, "secretTexts")
         ns.Log.Once("toasts:secret",
             "the client withheld the text of a loot message, so it made no toast")
         return
@@ -695,7 +712,7 @@ local function onLootMessage(text)
         return
     end
     if #state.inbox >= ns.LOOT_INBOX_CAPACITY then
-        state.counts.inboxDropped = state.counts.inboxDropped + 1
+        bump(state.counts, "inboxDropped")
         ns.Log.Once("toasts:inboxfull", format(
             "more than %d loot messages arrived in one frame; the rest made no toast",
             ns.LOOT_INBOX_CAPACITY))
@@ -762,6 +779,7 @@ local LOOT_EVENTS = { "CHAT_MSG_LOOT", "CHAT_MSG_MONEY" }
 
 local function enable(config)
     readSettings(config)
+    state.counts = ns.Diagnostics.CountersFor(FEATURE_ID)
     ensureContainer()
     anchorContainer()
     state.container:Show()
@@ -894,6 +912,9 @@ ns.Toasts = {
 
     Inspect = function()
         local counts = {}
+        for index = 1, #COUNT_NAMES do
+            counts[COUNT_NAMES[index]] = 0
+        end
         for key, value in pairs(state.counts) do
             counts[key] = value
         end

@@ -79,7 +79,7 @@ local READ_PLAIN, READ_WITHHELD = ClientRead.PLAIN, ClientRead.WITHHELD
 
 local G1_EXPLANATION = "a Blizzard Gamepad UI defect that reproduces with no addons loaded. "
     .. "Addon or /run code that opened or closed a window, or an addon page drawn in "
-    .. "Options, left its focus and binding state tainted, so controller actions are "
+    .. "Options, left its focus, binding and cursor state tainted, so controller actions are "
     .. "refused in whichever addon's name that state carries. /reload clears it"
 local G1_HINT_KEY = "blockwatch:g1"
 
@@ -924,11 +924,13 @@ local SELF_TESTS = {
 }
 
 -- Touches neither the persisted log nor the session's memo, and prints nothing:
--- the caller reports.
-local function runSelfTest()
-    local report = { passed = 0, total = #SELF_TESTS, failed = {} }
-    for index = 1, #SELF_TESTS do
-        local case = SELF_TESTS[index]
+-- the caller reports. cases defaults to the self-tests above; the harness passes its
+-- own to check the recording.
+local function runSelfTest(cases)
+    cases = cases or SELF_TESTS
+    local report = { passed = 0, total = #cases, failed = {} }
+    for index = 1, #cases do
+        local case = cases[index]
         local ok, passed, reason = pcall(case.run)
         if ok and passed then
             report.passed = report.passed + 1
@@ -970,8 +972,21 @@ function BlockWatch.Clear()
     return removed
 end
 
-function BlockWatch.SelfTest()
-    return runSelfTest()
+-- Runs the self-tests and keeps the result in this UI load's diagnostics record, so
+-- an in-game run can be read from disk afterwards (Phase 10 section 7.3): the run
+-- count, this run's passed and total, and a fault note per failed case.
+function BlockWatch.SelfTest(cases)
+    local report = runSelfTest(cases)
+    local counters = ns.Diagnostics.CountersFor(FEATURE_ID)
+    ns.Diagnostics.Bump(counters, "selftestRuns")
+    counters.selftestPassed = report.passed
+    counters.selftestTotal = report.total
+    for index = 1, #report.failed do
+        local failure = report.failed[index]
+        ns.Diagnostics.NoteFault(FEATURE_ID, format("selftest %s: %s", tostring(failure.caseName),
+            tostring(failure.reason)))
+    end
+    return report
 end
 
 -- What this UI load's storm guard has seen, for /pa blocked. byFunction is a copy,

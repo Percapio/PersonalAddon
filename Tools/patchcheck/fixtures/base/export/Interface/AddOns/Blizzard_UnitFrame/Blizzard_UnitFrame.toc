@@ -1,0 +1,5 @@
+## Title: Blizzard_UnitFrame
+
+Shared\CompactUnitFrame.lua
+[Family]\UnitFrame.lua
+Vanilla\UnitFrameClassic.lua		[AllowLoadGameType classic]

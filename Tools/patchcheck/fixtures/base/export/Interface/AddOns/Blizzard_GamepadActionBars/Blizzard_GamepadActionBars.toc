@@ -1,0 +1,4 @@
+## Title: Blizzard_GamepadActionBars
+## AllowLoadGameType: camelot
+
+MainActionBarFrame.lua

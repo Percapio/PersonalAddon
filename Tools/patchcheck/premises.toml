@@ -1,0 +1,135 @@
+# The premise register (Architecture/20261002-Phase10.md section 4).
+#
+# Each entry is one fact a design relies on about Blizzard's code: where a design
+# says so (source), what to re-read when it stops holding (consequence), and how
+# to check it. Paths are relative to the export's Interface/AddOns, with forward
+# slashes. README rule 11: a design that relies on such a fact adds it here, in the
+# same change.
+#
+# Check kinds:
+#   Callers    name, files, count   the call sites of name lie exactly in files
+#   Defined    name                 a loaded file defines name at file scope
+#   Pattern    file, regex, expect  the regex is Present or Absent in the file
+#   FlagAbsent entry, flag          the documented entry does not carry flag
+#   Watch      files                every file is unchanged since the baseline
+#
+# Hook targets, bag events and every documented function and event the addon uses
+# are not listed: the derived surface (section 5) finds them in the code each run.
+
+[[premise]]
+id = "G1-SOLE-CALLER"
+statement = "SetPreferredGamepadInteractTarget has exactly one caller"
+source = "Phase 9 section 6.3"
+consequence = "BlockWatch labels refusals by the wrong rule. Re-check classify_refusal (Core/BlockWatch.lua)"
+check = { kind = "Callers", name = "SetPreferredGamepadInteractTarget", files = ["Blizzard_GamepadActionBars/MainActionBarFrame.lua"], count = 1 }
+
+[[premise]]
+id = "G1-PATH"
+statement = "G1's mechanism, as GAPBugs01 sections 2 and 2.9 describe it"
+source = "GAPBugs01 sections 1.4 and 2.9"
+consequence = "Re-read GAPBugs01 section 2 against the diff. If Blizzard fixed G1, retire BlockWatch's hint and the README's known issue"
+check = { kind = "Watch", files = [
+    "Blizzard_GamepadActionBars/MainActionBarFrame.lua",
+    "Blizzard_GamepadActionBars/PageUnit.lua",
+    "Blizzard_GamepadSharedUtility/FrameControlsManager.lua",
+    "Blizzard_GamepadSharedUtility/FrameReformUtility.lua",
+    "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua",
+    "Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua",
+    "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua",
+    "Blizzard_GamepadSmartNavigation/SmartNavigation.lua",
+    "Blizzard_GamepadSmartNavigation/Utility.lua",
+    "Blizzard_StaticPopup/StaticPopupGamepad.lua",
+    "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua",
+    "Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua",
+] }
+
+[[premise]]
+id = "PLATE-HEALTHBAR"
+statement = "Nameplate frames alias healthBar to HealthBarsContainer.healthBar"
+source = "GAPBugs01 section 1.4; Phase 7"
+consequence = "Nameplate colours find no bar (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua", regex = 'self\.healthBar\s*=\s*self\.HealthBarsContainer\.healthBar', expect = "Present" }
+
+[[premise]]
+id = "PLATE-COLOUR"
+statement = "Blizzard's colour update paints tapped grey ahead of threat red, and every colour write passes the hooked functions"
+source = "Phase 7 section 5.4; Phase 9 section 4.4"
+consequence = "Re-check the colour priority and the restyle contest (Features/Nameplates.lua, Core/StyleLedger.lua)"
+check = { kind = "Watch", files = ["Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"] }
+
+[[premise]]
+id = "THREAT-READABLE"
+statement = "UnitThreatSituation is secret only for restricted pairings, never by default"
+source = "GAPBugs01 sections 3 and 5 S3"
+consequence = "Nameplate aggro cedes everywhere"
+check = { kind = "FlagAbsent", entry = "UnitThreatSituation", flag = "SecretReturns" }
+
+[[premise]]
+id = "LOOT-TEXT-READABLE"
+statement = "Loot chat is outside chat lockdown"
+source = "Phase 8 section 3; Phase 8 criterion 12"
+consequence = "Item toasts go silent in instances (Features/Toasts.lua)"
+check = { kind = "FlagAbsent", entry = "event CHAT_MSG_LOOT", flag = "SecretInChatMessagingLockdown" }
+
+[[premise]]
+id = "MONEY-TEXT-READABLE"
+statement = "Money chat is outside chat lockdown"
+source = "Phase 8 section 3; Phase 8 criterion 12"
+consequence = "Money toasts go silent in instances (Features/Toasts.lua)"
+check = { kind = "FlagAbsent", entry = "event CHAT_MSG_MONEY", flag = "SecretInChatMessagingLockdown" }
+
+[[premise]]
+id = "BANK-LISTENER"
+statement = "BankPanel listens to ITEM_LOCK_CHANGED only while shown"
+source = "GAPBugs01 section 4"
+consequence = "Tidy bags holds back when it need not, or sorts when it must not (Features/AutoSortBags.lua)"
+check = { kind = "Watch", files = ["Blizzard_UIPanels_Game/Mainline/BankFrameTemplates.lua", "Blizzard_UIPanels_Game/Camelot/BankFrame.lua"] }
+
+[[premise]]
+id = "LOOT-ALERTS"
+statement = "Blizzard's loot alerts come only from server toast events and roll wins"
+source = "Phase 8 section 6.1"
+consequence = "Our toasts duplicate Blizzard's (Features/Toasts.lua)"
+check = { kind = "Watch", files = ["Blizzard_FrameXML/Mainline/AlertFrames.lua"] }
+
+[[premise]]
+id = "SETTINGS-DATA"
+statement = "Registering settings stores initializer data in Blizzard's tables, one of README rule 2's exceptions"
+source = "GAPBugs01 R4"
+consequence = "The exception's wording in the README"
+check = { kind = "Watch", files = ["Blizzard_Settings_Shared/Blizzard_Settings.lua"] }
+
+[[premise]]
+id = "CHAT-FADE"
+statement = "Our chat lines reach the shared fade list, README rule 2's other exception"
+source = "GAPBugs01 R4"
+consequence = "The exception's wording in the README"
+check = { kind = "Watch", files = ["Blizzard_SharedXMLBase/FrameUtil.lua"] }
+
+[[premise]]
+id = "FORBIDDEN-DIALOG"
+statement = "Blizzard's forbidden-action dialog opens inside the refused call"
+source = "GAPBugs01 section 2.4"
+consequence = "BlockWatch's storm reasoning (Phase 9 section 6.2)"
+check = { kind = "Watch", files = ["Blizzard_Game/Shared/EventImplementation.lua"] }
+
+[[premise]]
+id = "CHARPANE-SECRET"
+statement = "The defect reported in GAPBugs01 section 2.8"
+source = "GAPBugs01 section 2.8"
+consequence = "Check whether Blizzard fixed it"
+check = { kind = "Watch", files = ["Blizzard_TextStatusBar/TextStatusBar.lua"] }
+
+[[premise]]
+id = "PLAYER-MANABAR"
+statement = "PlayerFrame.manabar is the player's mana bar, set by UnitFrame_Initialize"
+source = "README rule 2's exceptions (the five-second-rule line); Features/FiveSecondRule.lua resolveManaBar"
+consequence = "The five-second-rule line finds no bar"
+check = { kind = "Pattern", file = "Blizzard_UnitFrame/Mainline/UnitFrame.lua", regex = 'self\.manabar\s*=\s*manabar', expect = "Present" }
+
+[[premise]]
+id = "PLAYER-FRAME"
+statement = "The player frame's layout the five-second-rule line is drawn against"
+source = "README rule 2's exceptions (the five-second-rule line)"
+consequence = "Re-check the line's anchoring and size reads (Features/FiveSecondRule.lua)"
+check = { kind = "Watch", files = ["Blizzard_UnitFrame/Mainline/PlayerFrame.lua", "Blizzard_UnitFrame/Camelot/PlayerFrame.lua"] }

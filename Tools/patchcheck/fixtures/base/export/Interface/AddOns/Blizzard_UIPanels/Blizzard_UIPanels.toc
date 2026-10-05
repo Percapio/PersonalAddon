@@ -1,0 +1,4 @@
+## Title: Blizzard_UIPanels
+
+Bags.lua
+Bags.xml

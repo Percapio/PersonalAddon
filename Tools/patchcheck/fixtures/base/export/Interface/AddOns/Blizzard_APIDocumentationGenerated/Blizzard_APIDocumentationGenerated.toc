@@ -1,0 +1,5 @@
+## Title: Blizzard_APIDocumentationGenerated
+## LoadOnDemand: 1
+
+UnitDocumentation.lua
+ChatInfoDocumentation.lua

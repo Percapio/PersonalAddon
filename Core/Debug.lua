@@ -327,6 +327,8 @@ local function commandToasts(subcommand)
         counts.secretTexts, counts.inboxDropped))
     ns.Log.Info(format("  deliveredInsideCall=%d of %d checked (section 6.5 expects 0)",
         counts.deliveredInsideCall, counts.stackChecked))
+    ns.Log.Info(format("  restricted map: messages=%d shown=%d (Phase 10 section 7.2)",
+        counts.lootMessagesOnRestrictedMap, counts.shownOnRestrictedMap))
 end
 
 -- Phase 8 section 7.1: why the last bag close did or did not sort.

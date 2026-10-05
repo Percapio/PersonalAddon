@@ -1,0 +1,12 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Frame name="ContainerFrameCombinedBags" parent="UIParent">
+		<Frames>
+			<Button name="$parentCloseButton"/>
+		</Frames>
+		<Scripts>
+			<OnShow>
+				Bags_OnShow(self);
+			</OnShow>
+		</Scripts>
+	</Frame>
+</Ui>

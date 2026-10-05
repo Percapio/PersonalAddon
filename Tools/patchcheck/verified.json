@@ -1,0 +1,1599 @@
+{
+ "acceptedAt": 1791063413.3159156,
+ "acceptedBy": "Adopted",
+ "client": {
+  "binaryModifiedAt": 1790998988.070222,
+  "build": "1.60.1.70205"
+ },
+ "exportDigest": "2a5463e1b1dbe8eb4c9f2402948b9e0bcdf674580f535e94d2a2f394eb6dd8d6",
+ "exportedAt": 1790999063.6515615,
+ "report": null,
+ "surfaceDefinitions": {
+  "C_CVar.GetCVar": [
+   "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
+  ],
+  "C_CVar.SetCVar": [
+   "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
+  ],
+  "C_Container.GetContainerItemInfo": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "C_Container.GetContainerNumSlots": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "C_Container.SortBags": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "C_CurrencyInfo.GetCoinTextureString": [
+   "Blizzard_APIDocumentationGenerated/CurrencyInfoDocumentation.lua"
+  ],
+  "C_DamageMeter.GetCombatSessionSourceFromType": [
+   "Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua"
+  ],
+  "C_DamageMeter.GetSessionDurationSeconds": [
+   "Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua"
+  ],
+  "C_DamageMeter.IsDamageMeterAvailable": [
+   "Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua"
+  ],
+  "C_Item.GetItemInfoInstant": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
+  "C_Item.GetItemQualityByID": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
+  "C_Item.GetItemQualityColor": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
+  "C_MerchantFrame.GetNumJunkItems": [
+   "Blizzard_APIDocumentationGenerated/MerchantFrameDocumentation.lua"
+  ],
+  "C_MerchantFrame.IsSellAllJunkEnabled": [
+   "Blizzard_APIDocumentationGenerated/MerchantFrameDocumentation.lua"
+  ],
+  "C_MerchantFrame.SellAllJunkItems": [
+   "Blizzard_APIDocumentationGenerated/MerchantFrameDocumentation.lua"
+  ],
+  "C_NamePlate.GetNamePlateForUnit": [
+   "Blizzard_APIDocumentationGenerated/NamePlateDocumentation.lua"
+  ],
+  "C_PaperDollInfo.GetInventorySlotInfoForInvSlot": [
+   "Blizzard_APIDocumentationGenerated/PaperDollInfoDocumentation.lua"
+  ],
+  "C_PlayerInteractionManager.IsInteractingWithNpcOfType": [
+   "Blizzard_APIDocumentationGenerated/PlayerInteractionManagerDocumentation.lua"
+  ],
+  "C_RestrictedActions.IsAddOnRestrictionActive": [
+   "Blizzard_APIDocumentationGenerated/RestrictedActionsDocumentation.lua"
+  ],
+  "C_SkillInfo.GetSkillLineInfoByID": [
+   "Blizzard_APIDocumentationGenerated/SkillInfoDocumentation.lua"
+  ],
+  "C_Spell.GetSpellInfo": [
+   "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
+  ],
+  "C_Spell.GetSpellPowerCost": [
+   "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
+  ],
+  "C_Spell.GetSpellTexture": [
+   "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
+  ],
+  "C_Timer.After": [
+   "Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua"
+  ],
+  "C_Timer.NewTicker": [
+   "Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua"
+  ],
+  "C_Timer.NewTimer": [
+   "Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua"
+  ],
+  "CursorHasItem": [
+   "Blizzard_APIDocumentationGenerated/GameCursorDocumentation.lua"
+  ],
+  "FrameAPIModelSceneFrameActorBase:Hide": [
+   "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
+  ],
+  "FrameAPIModelSceneFrameActorBase:IsShown": [
+   "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
+  ],
+  "FrameAPIModelSceneFrameActorBase:SetAlpha": [
+   "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
+  ],
+  "FrameAPIModelSceneFrameActorBase:Show": [
+   "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
+  ],
+  "FrameAPITooltip:SetText": [
+   "Blizzard_APIDocumentationGenerated/FrameAPITooltipDocumentation.lua"
+  ],
+  "GetBuildInfo": [
+   "Blizzard_APIDocumentationGenerated/BuildDocumentation.lua"
+  ],
+  "GetMoney": [
+   "Blizzard_APIDocumentationGenerated/PlayerScriptDocumentation.lua"
+  ],
+  "GetTime": [
+   "Blizzard_APIDocumentationGenerated/SystemTimeDocumentation.lua"
+  ],
+  "LuaDurationClockObjectAPI:GetTime": [
+   "Blizzard_APIDocumentationGenerated/LuaDurationClockAPIDocumentation.lua"
+  ],
+  "SimpleAnimAPI:SetScript": [
+   "Blizzard_APIDocumentationGenerated/SimpleAnimAPIDocumentation.lua"
+  ],
+  "SimpleAnimGroupAPI:SetScript": [
+   "Blizzard_APIDocumentationGenerated/SimpleAnimGroupAPIDocumentation.lua"
+  ],
+  "SimpleButtonAPI:SetText": [
+   "Blizzard_APIDocumentationGenerated/SimpleButtonAPIDocumentation.lua"
+  ],
+  "SimpleEditBoxAPI:SetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
+  ],
+  "SimpleEditBoxAPI:SetText": [
+   "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
+  ],
+  "SimpleEditBoxAPI:SetTextColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
+  ],
+  "SimpleFontAPI:SetAlpha": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
+  "SimpleFontAPI:SetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
+  "SimpleFontAPI:SetTextColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:SetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:SetText": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:SetTextColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:SetWordWrap": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:CreateFontString": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:CreateTexture": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:Hide": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:IsShown": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:RegisterAllEvents": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:RegisterEvent": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:SetAlpha": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:SetClampedToScreen": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:SetFrameStrata": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:Show": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:UnregisterAllEvents": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:UnregisterEvent": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameScriptObjectAPI:GetName": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameScriptObjectAPIDocumentation.lua"
+  ],
+  "SimpleHTMLAPI:SetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
+  ],
+  "SimpleHTMLAPI:SetText": [
+   "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
+  ],
+  "SimpleHTMLAPI:SetTextColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
+  ],
+  "SimpleLineAPI:ClearAllPoints": [
+   "Blizzard_APIDocumentationGenerated/SimpleLineAPIDocumentation.lua"
+  ],
+  "SimpleMessageFrameAPI:AddMessage": [
+   "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
+  ],
+  "SimpleMessageFrameAPI:SetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
+  ],
+  "SimpleMessageFrameAPI:SetTextColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
+  ],
+  "SimpleObjectAPI:GetDebugName": [
+   "Blizzard_APIDocumentationGenerated/SimpleObjectAPIDocumentation.lua"
+  ],
+  "SimpleRegionAPI:SetAlpha": [
+   "Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua"
+  ],
+  "SimpleRegionAPI:SetVertexColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionAPI:EnableMouse": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionAPI:GetHeight": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionAPI:GetWidth": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionAPI:Hide": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionAPI:IsShown": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionAPI:SetScript": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionAPI:Show": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionResizingAPI:ClearAllPoints": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionResizingAPI:SetAllPoints": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionResizingAPI:SetHeight": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionResizingAPI:SetPoint": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
+  ],
+  "SimpleScriptRegionResizingAPI:SetWidth": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
+  ],
+  "SimpleStatusBarAPI:GetStatusBarColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
+  ],
+  "SimpleStatusBarAPI:SetStatusBarColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
+  ],
+  "SimpleTextureBaseAPI:SetColorTexture": [
+   "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
+  ],
+  "SimpleTextureBaseAPI:SetTexCoord": [
+   "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
+  ],
+  "SimpleTextureBaseAPI:SetTexture": [
+   "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
+  ],
+  "UnitAffectingCombat": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitCanAttack": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitExists": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitGUID": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitIsTapDenied": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitIsUnit": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitPlayerControlled": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitPowerType": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitReaction": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitThreatSituation": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "canaccesstable": [
+   "Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
+  ],
+  "canaccessvalue": [
+   "Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
+  ],
+  "event ADDON_ACTION_BLOCKED": [
+   "Blizzard_APIDocumentationGenerated/RestrictedActionsDocumentation.lua"
+  ],
+  "event ADDON_ACTION_FORBIDDEN": [
+   "Blizzard_APIDocumentationGenerated/RestrictedActionsDocumentation.lua"
+  ],
+  "event ADDON_LOADED": [
+   "Blizzard_APIDocumentationGenerated/AddOnsDocumentation.lua"
+  ],
+  "event BAG_CONTAINER_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event BAG_NEW_ITEMS_UPDATED": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event BAG_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event BAG_UPDATE_DELAYED": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event CHAT_MSG_LOOT": [
+   "Blizzard_APIDocumentationGenerated/ChatInfoDocumentation.lua"
+  ],
+  "event CHAT_MSG_MONEY": [
+   "Blizzard_APIDocumentationGenerated/ChatInfoDocumentation.lua"
+  ],
+  "event COMBAT_LOG_EVENT_UNFILTERED": [
+   "Blizzard_APIDocumentationGenerated/CombatLogDocumentation.lua"
+  ],
+  "event INVENTORY_SEARCH_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event ITEM_LOCKED": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event ITEM_LOCK_CHANGED": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event ITEM_UNLOCKED": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event MERCHANT_SHOW": [
+   "Blizzard_APIDocumentationGenerated/MerchantFrameDocumentation.lua"
+  ],
+  "event MERCHANT_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/MerchantFrameDocumentation.lua"
+  ],
+  "event NAME_PLATE_UNIT_ADDED": [
+   "Blizzard_APIDocumentationGenerated/NamePlateManagerDocumentation.lua"
+  ],
+  "event NAME_PLATE_UNIT_REMOVED": [
+   "Blizzard_APIDocumentationGenerated/NamePlateManagerDocumentation.lua"
+  ],
+  "event PLAYER_ENTERING_WORLD": [
+   "Blizzard_APIDocumentationGenerated/SystemDocumentation.lua"
+  ],
+  "event PLAYER_LOGIN": [
+   "Blizzard_APIDocumentationGenerated/SystemDocumentation.lua"
+  ],
+  "event PLAYER_MONEY": [
+   "Blizzard_APIDocumentationGenerated/CurrencyInfoDocumentation.lua"
+  ],
+  "event PLAYER_REGEN_DISABLED": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "event PLAYER_REGEN_ENABLED": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "event UNIT_DISPLAYPOWER": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "event UNIT_FACTION": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "event UNIT_INVENTORY_CHANGED": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "event UNIT_SPELLCAST_SUCCEEDED": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "issecrettable": [
+   "Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
+  ],
+  "issecretvalue": [
+   "Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
+  ],
+  "lua AddonList": [
+   "Blizzard_AddOnList/AddonList.xml"
+  ],
+  "lua BackdropTemplate": [
+   "Blizzard_SharedXML/Backdrop.xml"
+  ],
+  "lua ChatFrame1": [
+   "Blizzard_ChatFrameBase/Mainline/FloatingChatFrame.xml"
+  ],
+  "lua CommunitiesFrame": [
+   "Blizzard_Communities/CommunitiesFrame.xml"
+  ],
+  "lua CompactUnitFrame_SetUnit": [
+   "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"
+  ],
+  "lua CompactUnitFrame_UpdateAll": [
+   "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"
+  ],
+  "lua CompactUnitFrame_UpdateHealth": [
+   "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"
+  ],
+  "lua CompactUnitFrame_UpdateHealthColor": [
+   "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"
+  ],
+  "lua ContainerFrameCombinedBags": [
+   "Blizzard_UIPanels_Game/Mainline/ContainerFrame.xml"
+  ],
+  "lua DEFAULT_CHAT_FRAME": [
+   "Blizzard_ChatFrameBase/Shared/ChatFrameUtil.lua"
+  ],
+  "lua DialogBorderTemplate": [
+   "Blizzard_SharedXML/Shared/Dialog/DialogTemplates.xml"
+  ],
+  "lua EditModeManagerFrame": [
+   "Blizzard_EditMode/Shared/EditModeManager.xml"
+  ],
+  "lua EventRegistry": [
+   "Blizzard_SharedXMLBase/GlobalCallbackRegistry.lua"
+  ],
+  "lua GameFontHighlightLarge": [
+   "Blizzard_Fonts_Shared/Shared/FontStyles.xml"
+  ],
+  "lua GameFontHighlightSmall": [
+   "Blizzard_Fonts_Shared/Shared/FontStyles.xml"
+  ],
+  "lua GameFontNormal": [
+   "Blizzard_Fonts_Shared/Shared/FontStyles.xml"
+  ],
+  "lua GameFontNormalSmall": [
+   "Blizzard_Fonts_Shared/Shared/FontStyles.xml"
+  ],
+  "lua GameMenuFrame": [
+   "Blizzard_GameMenu/Shared/GameMenuFrame.xml"
+  ],
+  "lua GetCVar": [
+   "Blizzard_SharedXMLBase/CvarUtil.lua"
+  ],
+  "lua GuildControlUI": [
+   "Blizzard_GuildControlUI/Blizzard_GuildControlUI.xml"
+  ],
+  "lua INVSLOT_MAINHAND": [
+   "Blizzard_FrameXMLBase/Constants.lua"
+  ],
+  "lua INVSLOT_OFFHAND": [
+   "Blizzard_FrameXMLBase/Constants.lua"
+  ],
+  "lua INVSLOT_RANGED": [
+   "Blizzard_FrameXMLBase/Constants.lua"
+  ],
+  "lua InsetFrameTemplate3": [
+   "Blizzard_UIPanelTemplates/Mainline/UIPanelTemplates.xml"
+  ],
+  "lua LAST_ACTIVE_CHAT_EDIT_BOX": [
+   "Blizzard_ChatFrameBase/Shared/ChatFrameUtil.lua"
+  ],
+  "lua NUM_BAG_SLOTS": [
+   "Blizzard_FrameXMLBase/Constants.lua"
+  ],
+  "lua NumberFontNormal": [
+   "Blizzard_Fonts_Shared/Shared/FontStyles.xml"
+  ],
+  "lua PlayerFrame": [
+   "Blizzard_UnitFrame/Mainline/PlayerFrame.xml"
+  ],
+  "lua ReloadUI": [
+   "Blizzard_SharedXML/InterfaceUtil.lua"
+  ],
+  "lua SELECTED_CHAT_FRAME": [
+   "Blizzard_ChatFrameBase/Mainline/FloatingChatFrame.lua"
+  ],
+  "lua SetCVar": [
+   "Blizzard_SharedXMLBase/CvarUtil.lua"
+  ],
+  "lua Settings": [
+   "Blizzard_Settings_Shared/Blizzard_Settings.lua"
+  ],
+  "lua SettingsPanel": [
+   "Blizzard_Settings_Shared/Blizzard_SettingsPanel.xml"
+  ],
+  "lua SpellFlyout": [
+   "Blizzard_ActionBar/Shared/SpellFlyout.xml"
+  ],
+  "lua TooltipBorderedFrameTemplate": [
+   "Blizzard_SharedXML/SharedTooltipTemplates.xml"
+  ],
+  "lua print": [
+   "Blizzard_PrintHandler/Blizzard_PrintHandler.lua"
+  ],
+  "registry ContainerFrame.CloseBag": [
+   "Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua"
+  ],
+  "registry ContainerFrame.OpenBag": [
+   "Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua"
+  ]
+ },
+ "usedFlags": {
+  "C_CVar.GetCVar": {
+   "Arguments.name.Nilable": "false",
+   "Arguments.name.Type": "\"cstring\"",
+   "Returns.value.Nilable": "true",
+   "Returns.value.Type": "\"string\"",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "C_CVar.SetCVar": {
+   "Arguments.name.Nilable": "false",
+   "Arguments.name.Type": "\"cstring\"",
+   "Arguments.value.Nilable": "true",
+   "Arguments.value.Type": "\"cstring\"",
+   "RequiresNonReadOnlyCVar": "true",
+   "RequiresNonSecureCVar": "true",
+   "RequiresValidAndPublicCVar": "true",
+   "Returns.success.Nilable": "false",
+   "Returns.success.Type": "\"bool\"",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "C_Container.GetContainerItemInfo": {
+   "Arguments.containerIndex.Nilable": "false",
+   "Arguments.containerIndex.Type": "\"BagIndex\"",
+   "Arguments.slotIndex.Nilable": "false",
+   "Arguments.slotIndex.Type": "\"luaIndex\"",
+   "MayReturnNothing": "true",
+   "Returns.containerInfo.Nilable": "false",
+   "Returns.containerInfo.Type": "\"ContainerItemInfo\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Container.GetContainerNumSlots": {
+   "Arguments.containerIndex.Nilable": "false",
+   "Arguments.containerIndex.Type": "\"BagIndex\"",
+   "Returns.numSlots.Nilable": "false",
+   "Returns.numSlots.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Container.SortBags": {},
+  "C_CurrencyInfo.GetCoinTextureString": {
+   "Arguments.amount.Nilable": "false",
+   "Arguments.amount.Type": "\"WOWMONEY\"",
+   "Arguments.fontHeight.Default": "14",
+   "Arguments.fontHeight.Nilable": "false",
+   "Arguments.fontHeight.Type": "\"number\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_DamageMeter.GetCombatSessionSourceFromType": {
+   "Arguments.sessionType.Nilable": "false",
+   "Arguments.sessionType.Type": "\"DamageMeterSessionType\"",
+   "Arguments.sourceCreatureID.Nilable": "true",
+   "Arguments.sourceCreatureID.Type": "\"number\"",
+   "Arguments.sourceGUID.Nilable": "true",
+   "Arguments.sourceGUID.Type": "\"WOWGUID\"",
+   "Arguments.type.Nilable": "false",
+   "Arguments.type.Type": "\"DamageMeterType\"",
+   "Returns.sessionSource.Nilable": "false",
+   "Returns.sessionSource.Type": "\"DamageMeterCombatSessionSource\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenInCombat": "true"
+  },
+  "C_DamageMeter.GetSessionDurationSeconds": {
+   "Arguments.sessionType.Nilable": "false",
+   "Arguments.sessionType.Type": "\"DamageMeterSessionType\"",
+   "Returns.durationSeconds.Nilable": "true",
+   "Returns.durationSeconds.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_DamageMeter.IsDamageMeterAvailable": {
+   "Returns.failureReason.Nilable": "false",
+   "Returns.failureReason.Type": "\"string\"",
+   "Returns.isAvailable.Nilable": "false",
+   "Returns.isAvailable.Type": "\"bool\""
+  },
+  "C_Item.GetItemInfoInstant": {
+   "Arguments.itemInfo.Nilable": "false",
+   "Arguments.itemInfo.Type": "\"ItemInfo\"",
+   "MayReturnNothing": "true",
+   "Returns.classID.Nilable": "false",
+   "Returns.classID.Type": "\"number\"",
+   "Returns.icon.Nilable": "false",
+   "Returns.icon.Type": "\"fileID\"",
+   "Returns.itemEquipLoc.Nilable": "false",
+   "Returns.itemEquipLoc.Type": "\"cstring\"",
+   "Returns.itemID.Nilable": "false",
+   "Returns.itemID.Type": "\"number\"",
+   "Returns.itemSubType.Nilable": "false",
+   "Returns.itemSubType.Type": "\"cstring\"",
+   "Returns.itemType.Nilable": "false",
+   "Returns.itemType.Type": "\"cstring\"",
+   "Returns.subClassID.Nilable": "false",
+   "Returns.subClassID.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Item.GetItemQualityByID": {
+   "Arguments.itemInfo.Nilable": "false",
+   "Arguments.itemInfo.Type": "\"ItemInfo\"",
+   "Returns.itemQuality.Nilable": "true",
+   "Returns.itemQuality.Type": "\"ItemQuality\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Item.GetItemQualityColor": {
+   "Arguments.quality.Nilable": "false",
+   "Arguments.quality.Type": "\"ItemQuality\"",
+   "Returns.colorRGBB.Nilable": "false",
+   "Returns.colorRGBB.Type": "\"number\"",
+   "Returns.colorRGBG.Nilable": "false",
+   "Returns.colorRGBG.Type": "\"number\"",
+   "Returns.colorRGBR.Nilable": "false",
+   "Returns.colorRGBR.Type": "\"number\"",
+   "Returns.qualityString.Nilable": "false",
+   "Returns.qualityString.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_MerchantFrame.GetNumJunkItems": {
+   "Returns.numJunkItems.Nilable": "false",
+   "Returns.numJunkItems.Type": "\"number\""
+  },
+  "C_MerchantFrame.IsSellAllJunkEnabled": {
+   "Returns.enabled.Nilable": "false",
+   "Returns.enabled.Type": "\"bool\""
+  },
+  "C_MerchantFrame.SellAllJunkItems": {},
+  "C_NamePlate.GetNamePlateForUnit": {
+   "Arguments.includeForbidden.Default": "false",
+   "Arguments.includeForbidden.Nilable": "false",
+   "Arguments.includeForbidden.Type": "\"bool\"",
+   "Arguments.unitToken.Nilable": "false",
+   "Arguments.unitToken.Type": "\"UnitTokenNamePlate\"",
+   "Returns.nameplate.Nilable": "false",
+   "Returns.nameplate.Type": "\"NamePlateFrame\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_PaperDollInfo.GetInventorySlotInfoForInvSlot": {
+   "Arguments.invSlotValue.Nilable": "false",
+   "Arguments.invSlotValue.Type": "\"number\"",
+   "MayReturnNothing": "true",
+   "Returns.checkRelic.Nilable": "false",
+   "Returns.checkRelic.Type": "\"bool\"",
+   "Returns.invSlot.Nilable": "false",
+   "Returns.invSlot.Type": "\"number\"",
+   "Returns.slotName.Nilable": "false",
+   "Returns.slotName.Type": "\"cstring\"",
+   "Returns.slotTexture.Nilable": "false",
+   "Returns.slotTexture.Type": "\"fileID\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_PlayerInteractionManager.IsInteractingWithNpcOfType": {
+   "Arguments.type.Nilable": "false",
+   "Arguments.type.Type": "\"PlayerInteractionType\"",
+   "Returns.interacting.Nilable": "false",
+   "Returns.interacting.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_RestrictedActions.IsAddOnRestrictionActive": {
+   "Arguments.type.Nilable": "false",
+   "Arguments.type.Type": "\"AddOnRestrictionType\"",
+   "Returns.active.Nilable": "false",
+   "Returns.active.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_SkillInfo.GetSkillLineInfoByID": {
+   "Arguments.ID.Nilable": "false",
+   "Arguments.ID.Type": "\"number\"",
+   "Returns.skillLineAttributes.Nilable": "true",
+   "Returns.skillLineAttributes.Type": "\"SkillLineAttributes\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Spell.GetSpellInfo": {
+   "Arguments.spellIdentifier.Nilable": "false",
+   "Arguments.spellIdentifier.Type": "\"SpellIdentifier\"",
+   "MayReturnNothing": "true",
+   "Returns.spellInfo.Nilable": "false",
+   "Returns.spellInfo.Type": "\"SpellInfo\"",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "C_Spell.GetSpellPowerCost": {
+   "Arguments.spellIdentifier.Nilable": "false",
+   "Arguments.spellIdentifier.Type": "\"SpellIdentifier\"",
+   "MayReturnNothing": "true",
+   "Returns.powerCosts.InnerType": "\"SpellPowerCostInfo\"",
+   "Returns.powerCosts.Nilable": "false",
+   "Returns.powerCosts.Type": "\"table\"",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "C_Spell.GetSpellTexture": {
+   "Arguments.spellIdentifier.Nilable": "false",
+   "Arguments.spellIdentifier.Type": "\"SpellIdentifier\"",
+   "MayReturnNothing": "true",
+   "Returns.conditionalIconID.Nilable": "true",
+   "Returns.conditionalIconID.Type": "\"fileID\"",
+   "Returns.iconID.Nilable": "false",
+   "Returns.iconID.Type": "\"fileID\"",
+   "Returns.originalIconID.Nilable": "false",
+   "Returns.originalIconID.Type": "\"fileID\"",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "C_Timer.After": {
+   "Arguments.callback.Nilable": "false",
+   "Arguments.callback.Type": "\"TimerCallback\"",
+   "Arguments.seconds.Nilable": "false",
+   "Arguments.seconds.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Timer.NewTicker": {
+   "Arguments.callback.Nilable": "false",
+   "Arguments.callback.Type": "\"TickerCallback\"",
+   "Arguments.iterations.Nilable": "true",
+   "Arguments.iterations.Type": "\"number\"",
+   "Arguments.seconds.Nilable": "false",
+   "Arguments.seconds.Type": "\"number\"",
+   "Returns.cbObject.Nilable": "false",
+   "Returns.cbObject.Type": "\"TickerCallback\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Timer.NewTimer": {
+   "Arguments.callback.Nilable": "false",
+   "Arguments.callback.Type": "\"TickerCallback\"",
+   "Arguments.seconds.Nilable": "false",
+   "Arguments.seconds.Type": "\"number\"",
+   "Returns.cbObject.Nilable": "false",
+   "Returns.cbObject.Type": "\"TickerCallback\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "CursorHasItem": {
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\""
+  },
+  "FrameAPIModelSceneFrameActorBase:Hide": {},
+  "FrameAPIModelSceneFrameActorBase:IsShown": {
+   "Returns.isShown.Nilable": "false",
+   "Returns.isShown.Type": "\"bool\""
+  },
+  "FrameAPIModelSceneFrameActorBase:SetAlpha": {
+   "Arguments.alpha.Nilable": "false",
+   "Arguments.alpha.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Alpha }"
+  },
+  "FrameAPIModelSceneFrameActorBase:Show": {},
+  "FrameAPITooltip:SetText": {
+   "Arguments.alpha.ConditionalSecret": "true",
+   "Arguments.alpha.Default": "1",
+   "Arguments.alpha.Nilable": "false",
+   "Arguments.alpha.Type": "\"number\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "Arguments.text.ConditionalSecret": "true",
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "Arguments.wrap.ConditionalSecret": "true",
+   "Arguments.wrap.Default": "false",
+   "Arguments.wrap.Nilable": "false",
+   "Arguments.wrap.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
+  },
+  "GetBuildInfo": {
+   "Returns.buildDate.Nilable": "false",
+   "Returns.buildDate.Type": "\"cstring\"",
+   "Returns.buildInfo.Nilable": "false",
+   "Returns.buildInfo.Type": "\"string\"",
+   "Returns.buildNumber.Nilable": "false",
+   "Returns.buildNumber.Type": "\"cstring\"",
+   "Returns.buildVersion.Nilable": "false",
+   "Returns.buildVersion.Type": "\"cstring\"",
+   "Returns.interfaceVersion.Nilable": "false",
+   "Returns.interfaceVersion.Type": "\"number\"",
+   "Returns.localizedVersion.Nilable": "false",
+   "Returns.localizedVersion.Type": "\"cstring\""
+  },
+  "GetMoney": {
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"number\""
+  },
+  "GetTime": {
+   "Returns.time.Nilable": "false",
+   "Returns.time.Type": "\"number\""
+  },
+  "LuaDurationClockObjectAPI:GetTime": {
+   "Returns.time.Nilable": "false",
+   "Returns.time.Type": "\"FrameTime\""
+  },
+  "SimpleAnimAPI:SetScript": {
+   "Arguments.script.Nilable": "true",
+   "Arguments.script.Type": "\"LuaFunctionReference\"",
+   "Arguments.scriptTypeName.Nilable": "false",
+   "Arguments.scriptTypeName.Type": "\"ScriptTypeName\"",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.ScriptBindings } }",
+   "RequiresAssignableScript": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleAnimGroupAPI:SetScript": {
+   "Arguments.script.Nilable": "true",
+   "Arguments.script.Type": "\"LuaFunctionReference\"",
+   "Arguments.scriptTypeName.Nilable": "false",
+   "Arguments.scriptTypeName.Type": "\"ScriptTypeName\"",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.ScriptBindings } }",
+   "RequiresAssignableScript": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleButtonAPI:SetText": {
+   "Arguments.text.Default": "\"\"",
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
+  },
+  "SimpleEditBoxAPI:SetJustifyH": {
+   "Arguments.justifyH.Nilable": "false",
+   "Arguments.justifyH.Type": "\"JustifyHorizontal\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleEditBoxAPI:SetText": {
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
+  },
+  "SimpleEditBoxAPI:SetTextColor": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontAPI:SetAlpha": {
+   "Arguments.alpha.Nilable": "false",
+   "Arguments.alpha.Type": "\"SingleColorValue\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontAPI:SetJustifyH": {
+   "Arguments.justifyH.Nilable": "false",
+   "Arguments.justifyH.Type": "\"JustifyHorizontal\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontAPI:SetTextColor": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontStringAPI:SetJustifyH": {
+   "Arguments.justifyH.Nilable": "false",
+   "Arguments.justifyH.Type": "\"JustifyHorizontal\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontStringAPI:SetText": {
+   "Arguments.text.Default": "\"\"",
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
+  },
+  "SimpleFontStringAPI:SetTextColor": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
+  },
+  "SimpleFontStringAPI:SetWordWrap": {
+   "Arguments.wrap.Nilable": "false",
+   "Arguments.wrap.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFrameAPI:CreateFontString": {
+   "Arguments.drawLayer.Nilable": "true",
+   "Arguments.drawLayer.Type": "\"DrawLayer\"",
+   "Arguments.name.Nilable": "true",
+   "Arguments.name.Type": "\"cstring\"",
+   "Arguments.templateName.Nilable": "true",
+   "Arguments.templateName.Type": "\"cstring\"",
+   "Returns.line.Nilable": "false",
+   "Returns.line.Type": "\"SimpleFontString\"",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "SimpleFrameAPI:CreateTexture": {
+   "Arguments.drawLayer.Nilable": "true",
+   "Arguments.drawLayer.Type": "\"DrawLayer\"",
+   "Arguments.name.Nilable": "true",
+   "Arguments.name.Type": "\"cstring\"",
+   "Arguments.subLevel.Nilable": "true",
+   "Arguments.subLevel.Type": "\"number\"",
+   "Arguments.templateName.Nilable": "true",
+   "Arguments.templateName.Type": "\"cstring\"",
+   "Returns.texture.Nilable": "false",
+   "Returns.texture.Type": "\"SimpleTexture\"",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "SimpleFrameAPI:Hide": {
+   "IsProtectedFunction": "true"
+  },
+  "SimpleFrameAPI:IsShown": {
+   "Returns.isShown.Nilable": "false",
+   "Returns.isShown.Type": "\"bool\"",
+   "SecretReturnsForAspect": "{ Enum.SecretAspect.Shown }"
+  },
+  "SimpleFrameAPI:RegisterAllEvents": {
+   "AddsForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }"
+  },
+  "SimpleFrameAPI:RegisterEvent": {
+   "AddsForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }",
+   "Arguments.eventName.Nilable": "false",
+   "Arguments.eventName.Type": "\"cstring\"",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }",
+   "Returns.registered.Nilable": "false",
+   "Returns.registered.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFrameAPI:SetAlpha": {
+   "Arguments.alpha.Nilable": "false",
+   "Arguments.alpha.Type": "\"SingleColorValue\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Alpha }"
+  },
+  "SimpleFrameAPI:SetClampedToScreen": {
+   "Arguments.clampedToScreen.Nilable": "false",
+   "Arguments.clampedToScreen.Type": "\"bool\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "SimpleFrameAPI:SetFrameStrata": {
+   "Arguments.strata.Nilable": "false",
+   "Arguments.strata.Type": "\"FrameStrata\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "SimpleFrameAPI:Show": {
+   "IsProtectedFunction": "true"
+  },
+  "SimpleFrameAPI:UnregisterAllEvents": {
+   "AddsForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }"
+  },
+  "SimpleFrameAPI:UnregisterEvent": {
+   "AddsForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }",
+   "Arguments.eventName.Nilable": "false",
+   "Arguments.eventName.Type": "\"cstring\"",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.EventRegistrations } }",
+   "Returns.registered.Nilable": "false",
+   "Returns.registered.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFrameScriptObjectAPI:GetName": {
+   "Returns.name.Nilable": "false",
+   "Returns.name.Type": "\"cstring\"",
+   "SecretReturnsForAspect": "{ Enum.SecretAspect.ObjectName }"
+  },
+  "SimpleHTMLAPI:SetJustifyH": {
+   "Arguments.justifyH.Nilable": "false",
+   "Arguments.justifyH.Type": "\"JustifyHorizontal\"",
+   "Arguments.textType.Nilable": "false",
+   "Arguments.textType.Type": "\"HTMLTextType\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleHTMLAPI:SetText": {
+   "Arguments.ignoreMarkup.Default": "false",
+   "Arguments.ignoreMarkup.Nilable": "false",
+   "Arguments.ignoreMarkup.Type": "\"bool\"",
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
+  },
+  "SimpleHTMLAPI:SetTextColor": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "Arguments.textType.Nilable": "false",
+   "Arguments.textType.Type": "\"HTMLTextType\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleLineAPI:ClearAllPoints": {
+   "IsProtectedFunction": "true"
+  },
+  "SimpleMessageFrameAPI:AddMessage": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "Arguments.messageID.Nilable": "true",
+   "Arguments.messageID.Type": "\"number\"",
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleMessageFrameAPI:SetJustifyH": {
+   "Arguments.justifyH.Nilable": "false",
+   "Arguments.justifyH.Type": "\"JustifyHorizontal\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleMessageFrameAPI:SetTextColor": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleObjectAPI:GetDebugName": {
+   "Arguments.preferParentKey.Default": "false",
+   "Arguments.preferParentKey.Nilable": "false",
+   "Arguments.preferParentKey.Type": "\"bool\"",
+   "ConstSecretAccessor": "true",
+   "Returns.debugName.Nilable": "false",
+   "Returns.debugName.Type": "\"string\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleRegionAPI:SetAlpha": {
+   "Arguments.alpha.Nilable": "false",
+   "Arguments.alpha.Type": "\"SingleColorValue\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Alpha }"
+  },
+  "SimpleRegionAPI:SetVertexColor": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
+  },
+  "SimpleScriptRegionAPI:EnableMouse": {
+   "Arguments.enable.Default": "false",
+   "Arguments.enable.Nilable": "false",
+   "Arguments.enable.Type": "\"bool\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "SimpleScriptRegionAPI:GetHeight": {
+   "Arguments.ignoreRect.Default": "false",
+   "Arguments.ignoreRect.Nilable": "false",
+   "Arguments.ignoreRect.Type": "\"bool\"",
+   "ConstSecretAccessor": "true",
+   "Returns.height.Nilable": "false",
+   "Returns.height.Type": "\"uiUnit\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenAnchoringSecret": "true"
+  },
+  "SimpleScriptRegionAPI:GetWidth": {
+   "Arguments.ignoreRect.Default": "false",
+   "Arguments.ignoreRect.Nilable": "false",
+   "Arguments.ignoreRect.Type": "\"bool\"",
+   "ConstSecretAccessor": "true",
+   "Returns.width.Nilable": "false",
+   "Returns.width.Type": "\"uiUnit\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenAnchoringSecret": "true"
+  },
+  "SimpleScriptRegionAPI:Hide": {},
+  "SimpleScriptRegionAPI:IsShown": {
+   "Returns.isShown.Nilable": "false",
+   "Returns.isShown.Type": "\"bool\"",
+   "SecretReturnsForAspect": "{ Enum.SecretAspect.Shown }"
+  },
+  "SimpleScriptRegionAPI:SetScript": {
+   "Arguments.script.Nilable": "true",
+   "Arguments.script.Type": "\"LuaFunctionReference\"",
+   "Arguments.scriptTypeName.Nilable": "false",
+   "Arguments.scriptTypeName.Type": "\"ScriptTypeName\"",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.ScriptBindings } }",
+   "RequiresAssignableScript": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleScriptRegionAPI:Show": {},
+  "SimpleScriptRegionResizingAPI:ClearAllPoints": {
+   "IsProtectedFunction": "true"
+  },
+  "SimpleScriptRegionResizingAPI:SetAllPoints": {
+   "Arguments.doResize.Default": "true",
+   "Arguments.doResize.Nilable": "false",
+   "Arguments.doResize.Type": "\"bool\"",
+   "Arguments.relativeTo.Nilable": "false",
+   "Arguments.relativeTo.Type": "\"ScriptRegion\"",
+   "CheckAllowInheritForbiddenLayoutAspects": "true",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleScriptRegionResizingAPI:SetHeight": {
+   "Arguments.height.Nilable": "false",
+   "Arguments.height.Type": "\"uiUnit\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleScriptRegionResizingAPI:SetPoint": {
+   "Arguments.offsetX.Nilable": "false",
+   "Arguments.offsetX.Type": "\"uiUnit\"",
+   "Arguments.offsetY.Nilable": "false",
+   "Arguments.offsetY.Type": "\"uiUnit\"",
+   "Arguments.point.Nilable": "false",
+   "Arguments.point.Type": "\"FramePoint\"",
+   "Arguments.relativePoint.Nilable": "false",
+   "Arguments.relativePoint.Type": "\"FramePoint\"",
+   "Arguments.relativeTo.Nilable": "false",
+   "Arguments.relativeTo.Type": "\"ScriptRegion\"",
+   "CheckAllowInheritForbiddenLayoutAspects": "true",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleScriptRegionResizingAPI:SetWidth": {
+   "Arguments.width.Nilable": "false",
+   "Arguments.width.Type": "\"uiUnit\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleStatusBarAPI:GetStatusBarColor": {
+   "Returns.colorA.Nilable": "false",
+   "Returns.colorA.Type": "\"number\"",
+   "Returns.colorB.Nilable": "false",
+   "Returns.colorB.Type": "\"number\"",
+   "Returns.colorG.Nilable": "false",
+   "Returns.colorG.Type": "\"number\"",
+   "Returns.colorR.Nilable": "false",
+   "Returns.colorR.Type": "\"number\"",
+   "SecretReturnsForAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
+  },
+  "SimpleStatusBarAPI:SetStatusBarColor": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
+  },
+  "SimpleTextureBaseAPI:SetColorTexture": {
+   "Arguments.a.Nilable": "true",
+   "Arguments.a.Type": "\"SingleColorValue\"",
+   "Arguments.colorB.Nilable": "false",
+   "Arguments.colorB.Type": "\"number\"",
+   "Arguments.colorG.Nilable": "false",
+   "Arguments.colorG.Type": "\"number\"",
+   "Arguments.colorR.Nilable": "false",
+   "Arguments.colorR.Type": "\"number\"",
+   "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.SetTexture } }",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "SimpleTextureBaseAPI:SetTexCoord": {
+   "Arguments.bottom.Nilable": "false",
+   "Arguments.bottom.Type": "\"number\"",
+   "Arguments.left.Nilable": "false",
+   "Arguments.left.Type": "\"number\"",
+   "Arguments.right.Nilable": "false",
+   "Arguments.right.Type": "\"number\"",
+   "Arguments.top.Nilable": "false",
+   "Arguments.top.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.TexCoords }"
+  },
+  "SimpleTextureBaseAPI:SetTexture": {
+   "Arguments.filterMode.Nilable": "true",
+   "Arguments.filterMode.Type": "\"cstring\"",
+   "Arguments.textureAsset.Nilable": "true",
+   "Arguments.textureAsset.Type": "\"cstring\"",
+   "Arguments.wrapModeHorizontal.Nilable": "true",
+   "Arguments.wrapModeHorizontal.Type": "\"cstring\"",
+   "Arguments.wrapModeVertical.Nilable": "true",
+   "Arguments.wrapModeVertical.Type": "\"cstring\"",
+   "Returns.success.Nilable": "false",
+   "Returns.success.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "UnitAffectingCombat": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitCanAttack": {
+   "Arguments.target.Nilable": "false",
+   "Arguments.target.Type": "\"UnitToken\"",
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitExists": {
+   "Arguments.unit.Nilable": "true",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitGUID": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitTokenPvPRestrictedForAddOns\"",
+   "Returns.result.Nilable": "true",
+   "Returns.result.Type": "\"WOWGUID\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenUnitIdentityRestricted": "true"
+  },
+  "UnitIsTapDenied": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitIsUnit": {
+   "Arguments.unit1.Nilable": "false",
+   "Arguments.unit1.Type": "\"UnitToken\"",
+   "Arguments.unit2.Nilable": "false",
+   "Arguments.unit2.Type": "\"UnitToken\"",
+   "RequiresComparableUnitTokens": "true",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenUnitComparisonRestricted": "true"
+  },
+  "UnitPlayerControlled": {
+   "Arguments.unit.Nilable": "true",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitPowerType": {
+   "Arguments.index.Default": "0",
+   "Arguments.index.Nilable": "false",
+   "Arguments.index.Type": "\"number\"",
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitTokenPvPRestrictedForAddOns\"",
+   "MayReturnNothing": "true",
+   "Returns.powerType.Nilable": "false",
+   "Returns.powerType.Type": "\"PowerType\"",
+   "Returns.powerTypeToken.Nilable": "false",
+   "Returns.powerTypeToken.Type": "\"string\"",
+   "Returns.rgbX.Nilable": "false",
+   "Returns.rgbX.Type": "\"number\"",
+   "Returns.rgbY.Nilable": "false",
+   "Returns.rgbY.Type": "\"number\"",
+   "Returns.rgbZ.Nilable": "false",
+   "Returns.rgbZ.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitReaction": {
+   "Arguments.target.Nilable": "false",
+   "Arguments.target.Type": "\"UnitToken\"",
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "true",
+   "Returns.result.Type": "\"luaIndex\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitThreatSituation": {
+   "Arguments.mobGUID.Nilable": "true",
+   "Arguments.mobGUID.Type": "\"UnitToken\"",
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "true",
+   "Returns.result.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenUnitThreatStateRestricted": "true"
+  },
+  "canaccesstable": {
+   "Arguments.table.Nilable": "false",
+   "Arguments.table.Type": "\"LuaValueReference\"",
+   "Returns.canAccessTable.Nilable": "false",
+   "Returns.canAccessTable.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecureHooksAllowed": "false"
+  },
+  "canaccessvalue": {
+   "Arguments.value.Nilable": "false",
+   "Arguments.value.Type": "\"LuaValueReference\"",
+   "Returns.canAccessValue.Nilable": "false",
+   "Returns.canAccessValue.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecureHooksAllowed": "false"
+  },
+  "event ADDON_ACTION_BLOCKED": {
+   "Payload.function.Nilable": "false",
+   "Payload.function.Type": "\"cstring\"",
+   "Payload.isTainted.Nilable": "false",
+   "Payload.isTainted.Type": "\"cstring\"",
+   "SynchronousEvent": "true"
+  },
+  "event ADDON_ACTION_FORBIDDEN": {
+   "Payload.function.Nilable": "false",
+   "Payload.function.Type": "\"cstring\"",
+   "Payload.isTainted.Nilable": "false",
+   "Payload.isTainted.Type": "\"cstring\"",
+   "SynchronousEvent": "true"
+  },
+  "event ADDON_LOADED": {
+   "Payload.addOnName.Nilable": "false",
+   "Payload.addOnName.Type": "\"cstring\"",
+   "Payload.containsBindings.Nilable": "false",
+   "Payload.containsBindings.Type": "\"bool\"",
+   "SynchronousEvent": "true"
+  },
+  "event BAG_CONTAINER_UPDATE": {
+   "SynchronousEvent": "true"
+  },
+  "event BAG_NEW_ITEMS_UPDATED": {
+   "SynchronousEvent": "true"
+  },
+  "event BAG_UPDATE": {
+   "Payload.bagID.Nilable": "false",
+   "Payload.bagID.Type": "\"BagIndex\"",
+   "SynchronousEvent": "true"
+  },
+  "event BAG_UPDATE_DELAYED": {
+   "UniqueEvent": "true"
+  },
+  "event CHAT_MSG_LOOT": {
+   "Payload.bnSenderID.Nilable": "false",
+   "Payload.bnSenderID.Type": "\"number\"",
+   "Payload.channelBaseName.NeverSecret": "true",
+   "Payload.channelBaseName.Nilable": "false",
+   "Payload.channelBaseName.Type": "\"cstring\"",
+   "Payload.channelIndex.NeverSecret": "true",
+   "Payload.channelIndex.Nilable": "false",
+   "Payload.channelIndex.Type": "\"number\"",
+   "Payload.channelName.NeverSecret": "true",
+   "Payload.channelName.Nilable": "false",
+   "Payload.channelName.Type": "\"cstring\"",
+   "Payload.discordInfo.Nilable": "false",
+   "Payload.discordInfo.Type": "\"DiscordChatInfo\"",
+   "Payload.guid.Nilable": "false",
+   "Payload.guid.Type": "\"WOWGUID\"",
+   "Payload.hideSenderInLetterbox.NeverSecret": "true",
+   "Payload.hideSenderInLetterbox.Nilable": "false",
+   "Payload.hideSenderInLetterbox.Type": "\"bool\"",
+   "Payload.isMobile.NeverSecret": "true",
+   "Payload.isMobile.Nilable": "false",
+   "Payload.isMobile.Type": "\"bool\"",
+   "Payload.isSubtitle.NeverSecret": "true",
+   "Payload.isSubtitle.Nilable": "false",
+   "Payload.isSubtitle.Type": "\"bool\"",
+   "Payload.languageID.NeverSecret": "true",
+   "Payload.languageID.Nilable": "false",
+   "Payload.languageID.Type": "\"number\"",
+   "Payload.languageName.NeverSecret": "true",
+   "Payload.languageName.Nilable": "false",
+   "Payload.languageName.Type": "\"cstring\"",
+   "Payload.lineID.NeverSecret": "true",
+   "Payload.lineID.Nilable": "false",
+   "Payload.lineID.Type": "\"number\"",
+   "Payload.playerName.Nilable": "false",
+   "Payload.playerName.Type": "\"cstring\"",
+   "Payload.playerName2.Nilable": "false",
+   "Payload.playerName2.Type": "\"cstring\"",
+   "Payload.specialFlags.NeverSecret": "true",
+   "Payload.specialFlags.Nilable": "false",
+   "Payload.specialFlags.Type": "\"cstring\"",
+   "Payload.suppressRaidIcons.NeverSecret": "true",
+   "Payload.suppressRaidIcons.Nilable": "false",
+   "Payload.suppressRaidIcons.Type": "\"bool\"",
+   "Payload.text.Nilable": "false",
+   "Payload.text.Type": "\"cstring\"",
+   "Payload.zoneChannelID.NeverSecret": "true",
+   "Payload.zoneChannelID.Nilable": "false",
+   "Payload.zoneChannelID.Type": "\"number\"",
+   "SynchronousEvent": "true"
+  },
+  "event CHAT_MSG_MONEY": {
+   "Payload.bnSenderID.Nilable": "false",
+   "Payload.bnSenderID.Type": "\"number\"",
+   "Payload.channelBaseName.NeverSecret": "true",
+   "Payload.channelBaseName.Nilable": "false",
+   "Payload.channelBaseName.Type": "\"cstring\"",
+   "Payload.channelIndex.NeverSecret": "true",
+   "Payload.channelIndex.Nilable": "false",
+   "Payload.channelIndex.Type": "\"number\"",
+   "Payload.channelName.NeverSecret": "true",
+   "Payload.channelName.Nilable": "false",
+   "Payload.channelName.Type": "\"cstring\"",
+   "Payload.discordInfo.Nilable": "false",
+   "Payload.discordInfo.Type": "\"DiscordChatInfo\"",
+   "Payload.guid.Nilable": "false",
+   "Payload.guid.Type": "\"WOWGUID\"",
+   "Payload.hideSenderInLetterbox.NeverSecret": "true",
+   "Payload.hideSenderInLetterbox.Nilable": "false",
+   "Payload.hideSenderInLetterbox.Type": "\"bool\"",
+   "Payload.isMobile.NeverSecret": "true",
+   "Payload.isMobile.Nilable": "false",
+   "Payload.isMobile.Type": "\"bool\"",
+   "Payload.isSubtitle.NeverSecret": "true",
+   "Payload.isSubtitle.Nilable": "false",
+   "Payload.isSubtitle.Type": "\"bool\"",
+   "Payload.languageID.NeverSecret": "true",
+   "Payload.languageID.Nilable": "false",
+   "Payload.languageID.Type": "\"number\"",
+   "Payload.languageName.NeverSecret": "true",
+   "Payload.languageName.Nilable": "false",
+   "Payload.languageName.Type": "\"cstring\"",
+   "Payload.lineID.NeverSecret": "true",
+   "Payload.lineID.Nilable": "false",
+   "Payload.lineID.Type": "\"number\"",
+   "Payload.playerName.Nilable": "false",
+   "Payload.playerName.Type": "\"cstring\"",
+   "Payload.playerName2.Nilable": "false",
+   "Payload.playerName2.Type": "\"cstring\"",
+   "Payload.specialFlags.NeverSecret": "true",
+   "Payload.specialFlags.Nilable": "false",
+   "Payload.specialFlags.Type": "\"cstring\"",
+   "Payload.suppressRaidIcons.NeverSecret": "true",
+   "Payload.suppressRaidIcons.Nilable": "false",
+   "Payload.suppressRaidIcons.Type": "\"bool\"",
+   "Payload.text.Nilable": "false",
+   "Payload.text.Type": "\"cstring\"",
+   "Payload.zoneChannelID.NeverSecret": "true",
+   "Payload.zoneChannelID.Nilable": "false",
+   "Payload.zoneChannelID.Type": "\"number\"",
+   "SynchronousEvent": "true"
+  },
+  "event COMBAT_LOG_EVENT_UNFILTERED": {
+   "CallbackEvent": "true",
+   "HasRestrictions": "true",
+   "SynchronousEvent": "true"
+  },
+  "event INVENTORY_SEARCH_UPDATE": {
+   "SynchronousEvent": "true"
+  },
+  "event ITEM_LOCKED": {
+   "Payload.bagOrSlotIndex.Nilable": "false",
+   "Payload.bagOrSlotIndex.Type": "\"BagIndex\"",
+   "Payload.slotIndex.Nilable": "true",
+   "Payload.slotIndex.Type": "\"luaIndex\"",
+   "SynchronousEvent": "true"
+  },
+  "event ITEM_LOCK_CHANGED": {
+   "Payload.bagOrSlotIndex.Nilable": "false",
+   "Payload.bagOrSlotIndex.Type": "\"BagIndex\"",
+   "Payload.slotIndex.Nilable": "true",
+   "Payload.slotIndex.Type": "\"luaIndex\"",
+   "SynchronousEvent": "true"
+  },
+  "event ITEM_UNLOCKED": {
+   "Payload.bagOrSlotIndex.Nilable": "false",
+   "Payload.bagOrSlotIndex.Type": "\"BagIndex\"",
+   "Payload.slotIndex.Nilable": "true",
+   "Payload.slotIndex.Type": "\"luaIndex\"",
+   "SynchronousEvent": "true"
+  },
+  "event MERCHANT_SHOW": {
+   "SynchronousEvent": "true"
+  },
+  "event MERCHANT_UPDATE": {
+   "SynchronousEvent": "true"
+  },
+  "event NAME_PLATE_UNIT_ADDED": {
+   "Payload.unitToken.Nilable": "false",
+   "Payload.unitToken.Type": "\"UnitTokenType\"",
+   "SynchronousEvent": "true"
+  },
+  "event NAME_PLATE_UNIT_REMOVED": {
+   "Payload.unitToken.Nilable": "false",
+   "Payload.unitToken.Type": "\"UnitTokenType\"",
+   "SynchronousEvent": "true"
+  },
+  "event PLAYER_ENTERING_WORLD": {
+   "Payload.isInitialLogin.Nilable": "false",
+   "Payload.isInitialLogin.Type": "\"bool\"",
+   "Payload.isReloadingUi.Nilable": "false",
+   "Payload.isReloadingUi.Type": "\"bool\"",
+   "SynchronousEvent": "true"
+  },
+  "event PLAYER_LOGIN": {
+   "SynchronousEvent": "true"
+  },
+  "event PLAYER_MONEY": {
+   "SynchronousEvent": "true"
+  },
+  "event PLAYER_REGEN_DISABLED": {
+   "SynchronousEvent": "true"
+  },
+  "event PLAYER_REGEN_ENABLED": {
+   "SynchronousEvent": "true"
+  },
+  "event UNIT_DISPLAYPOWER": {
+   "Payload.unitTarget.Nilable": "false",
+   "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
+   "SynchronousEvent": "true"
+  },
+  "event UNIT_FACTION": {
+   "Payload.unitTarget.Nilable": "false",
+   "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
+   "SynchronousEvent": "true"
+  },
+  "event UNIT_INVENTORY_CHANGED": {
+   "Payload.unitTarget.Nilable": "false",
+   "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
+   "SynchronousEvent": "true"
+  },
+  "event UNIT_SPELLCAST_SUCCEEDED": {
+   "Payload.castBarID.NeverSecret": "true",
+   "Payload.castBarID.Nilable": "true",
+   "Payload.castBarID.Type": "\"UnitCastBarID\"",
+   "Payload.castGUID.Nilable": "false",
+   "Payload.castGUID.Type": "\"WOWGUID\"",
+   "Payload.spellID.Nilable": "false",
+   "Payload.spellID.Type": "\"number\"",
+   "Payload.unitTarget.Nilable": "false",
+   "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
+   "SecretWhenUnitSpellCastRestricted": "true",
+   "SynchronousEvent": "true"
+  },
+  "issecrettable": {
+   "Arguments.table.Nilable": "false",
+   "Arguments.table.Type": "\"LuaValueReference\"",
+   "Returns.isSecretOrContentsSecret.Nilable": "false",
+   "Returns.isSecretOrContentsSecret.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecureHooksAllowed": "false"
+  },
+  "issecretvalue": {
+   "Arguments.value.Nilable": "false",
+   "Arguments.value.Type": "\"LuaValueReference\"",
+   "Returns.isSecret.Nilable": "false",
+   "Returns.isSecret.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecureHooksAllowed": "false"
+  }
+ },
+ "watchedHashes": {
+  "Blizzard_FrameXML/Mainline/AlertFrames.lua": "cbb1013acd8beed871e50009fc659654b8ba3f03600aff74a5729c6919b2a43f",
+  "Blizzard_Game/Shared/EventImplementation.lua": "9314fccf86511c4dc21f48d4aa9cc37134c7b503eb66946db591593b062bafc7",
+  "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "3f4ab9b67e1aeddf5be57d70ee6e4c0770cf7c333af07dd27d4c9e3c6d3a5046",
+  "Blizzard_GamepadActionBars/PageUnit.lua": "36bc08a18e67aa4b97ed6548a39fde353ecab2aa3c7782d2da813f1a00c8fb72",
+  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "ab5245cd786860b879f5f832b04c37deeb47d7131db016c7f52ce1d95f249072",
+  "Blizzard_GamepadSharedUtility/FrameReformUtility.lua": "fb1c41ddc47fa6f2d9cc49c429d77ee024f75fb369820295d4385fce54c8a72e",
+  "Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua": "ef5beda0110e7213d86de6aebe3f838f4624bac36e3a6047f78b5954fbf36dbe",
+  "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua": "27318d5b42f396b5f246cfde2fe2225d5bbfa39d61e4544eb3cd34ae29c26897",
+  "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "d314e6b29f184aebc82247382acd1c3ddc6d8bb8ebeb218ab0f1c75bc7d4d669",
+  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "5d5f113e45fd8d1d01bc4632a97895c230e88afca9cc03156dcfa96a0c771298",
+  "Blizzard_GamepadSmartNavigation/Utility.lua": "fee22413d6ff69ba861bae59c2f43818a09bfaea52c88f3133e7c05f4a986011",
+  "Blizzard_Settings_Shared/Blizzard_Settings.lua": "76ab19d14675e4e3dcf4fb1b02af35898e253e254da3cfce0ef655eab475e293",
+  "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua": "27f6db7d502104ad26d2893519fd810b4769616398a0ebb3fb08632f7745f4a7",
+  "Blizzard_SharedXMLBase/FrameUtil.lua": "61de9061104e83dbd7e704ca129e9784143bade0437b2acbd337a604656bfdd1",
+  "Blizzard_StaticPopup/StaticPopupGamepad.lua": "eb4a1abd9b3d2471d4ffe36bf259eb443a47f7bd26c305ef66386139f1c60a27",
+  "Blizzard_TextStatusBar/TextStatusBar.lua": "8139222b91d434534d86d5b1ddb2c75c9ea4d43780a6e97e6c098c127836d462",
+  "Blizzard_UIPanels_Game/Camelot/BankFrame.lua": "04ebda782f99dc7c2204a91676326dec4894c9d10628c3e6714c62744e4aa7cb",
+  "Blizzard_UIPanels_Game/Mainline/BankFrameTemplates.lua": "a879abe67d136c8da7cc3071a476c73568fe640c899ba3368a7b63749879733c",
+  "Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua": "dab48c237737ec71e1a40b024c851ace6c4d4c51f7671ae94683597f0ca2c310",
+  "Blizzard_UnitFrame/Camelot/PlayerFrame.lua": "fa850df2506d3bdd47e1c3a610e89cb87dab87a7d007c9102632352f25e6b9c9",
+  "Blizzard_UnitFrame/Mainline/PlayerFrame.lua": "fac14c351cc62729e655780dda394cf6344b298a09ab2b7b1cd3d9afe44ec5a1",
+  "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua": "c0b035a25fe54eb86baf136f1b06b1e615f1aa5577ae45ed049d00ded3b5ec1d"
+ }
+}
