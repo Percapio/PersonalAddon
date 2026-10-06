@@ -27,16 +27,28 @@ PersonalAddon**, or with `/pa` commands (below).
   | Colour | Meaning |
   |---|---|
   | Red | It is attacking you, even if another player tagged it |
+  | Orange | You are about to pull it: your threat is above the tank's |
   | Grey | Tagged by a player outside your group, so you get no credit |
   | Green | It is attacking a party member or your pet |
   | Yellow | Neutral |
   | White | Hostile and attacking neither |
 
-  Grey and yellow match the game's own colours by default. All five can be changed.
-  Colours come from the game's threat data, so they also work in dungeons and raids.
+  Red and orange come first because they are about your safety: grey never hides a mob
+  that is hitting you or that you are about to pull. Grey and yellow match the game's own
+  colours by default. All six can be changed. Colours come from the game's threat data,
+  so they also work in dungeons and raids.
+- **Threat panel.** In combat, the mobs fighting you or your group are listed in the
+  damage breakdown's place above the player frame:
+  - their health as a bar, in the nameplate colours;
+  - your threat on each, highest first;
+  - your target marked, with level and elite tags.
+
+  It needs enemy nameplates on, and it hides when the fight ends.
 - **Damage breakdown.** A small panel above the player frame lists your damage by spell,
   with icon, DPS and share of your total. It reads the game's own damage meter, so its
-  numbers match it exactly. Choose the current fight or the whole session.
+  numbers match it exactly. Choose the current fight or the whole session. By default it
+  hides during combat, when it can only show the last fight, and its place goes to the
+  threat panel.
 
 **Bags and loot**
 
@@ -69,7 +81,7 @@ PersonalAddon**, or with `/pa` commands (below).
 | `/pa skills` | What the skills panel shows, row by row |
 | `/pa toasts`, `/pa toasts test` | Toast counts; show one of each toast |
 | `/pa bags`, `/pa vend` | The last sort or sale, and why any was skipped |
-| `/pa dps`, `/pa plates`, `/pa fsr` | State of the damage breakdown, nameplates and five-second rule |
+| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | State of the damage breakdown, threat panel, nameplates and five-second rule |
 | `/pa blocked` | Actions the game refused with PersonalAddon named |
 | `/pa diag` | Counters and fault notes from the last five sessions |
 | `/pa diag clear` | Drop all but the current session's record |
@@ -120,6 +132,7 @@ Attempted and dropped, with the reason, so nobody spends the time twice:
 | Minimal player frames | Dropped by choice: it would mean moving Blizzard's frames, and the five-second-rule line anchors to the mana bar |
 | Quest tracker sorted by level | Reordering means removing and re-adding watches, and the game runs the tracker's update inside that call, carrying this addon's taint into the tracker. See [Phase 7 §6.4](Architecture/20260926-Phase07.md) |
 | Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon |
+| Raid markers on the threat panel | The client always hides them |
 
 ## Planned
 

@@ -41,3 +41,10 @@ statement = "UnitFrame_Initialize is defined"
 source = "fixture"
 consequence = "the mana bar is never assigned"
 check = { kind = "Defined", name = "UnitFrame_Initialize" }
+
+[[premise]]
+id = "ARGUMENTS-UNTAINTED"
+statement = "UnitThreatSituation takes hidden arguments only from untainted code"
+source = "fixture"
+consequence = "re-check what the threat reads pass"
+check = { kind = "FlagEquals", entry = "UnitThreatSituation", flag = "SecretArguments", value = '"AllowedWhenUntainted"' }

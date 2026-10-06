@@ -222,9 +222,11 @@ local function commandPlates()
         view.coloured, view.sweeps))
     -- Phase 7 exit criteria 5 and 7 read these two lines.
     local verdicts = view.verdicts or {}
-    ns.Log.Info(format("  verdicts: onPlayer=%d tapDenied=%d onGroupOrPet=%d neutral=%d elsewhere=%d ceded=%d",
+    -- aboutToPull (Phase 11, R7) goes last, so the Phase 7 part of the line reads as before.
+    ns.Log.Info(format("  verdicts: onPlayer=%d tapDenied=%d onGroupOrPet=%d neutral=%d elsewhere=%d ceded=%d aboutToPull=%d",
         verdicts.OnPlayer or 0, verdicts.TapDenied or 0, verdicts.OnGroupOrPet or 0,
-        verdicts.Neutral or 0, verdicts.Elsewhere or 0, verdicts.Ceded or 0))
+        verdicts.Neutral or 0, verdicts.Elsewhere or 0, verdicts.Ceded or 0,
+        verdicts.AboutToPull or 0))
     ns.Log.Info(format("  contested=%d driver=%s yieldSelectedTarget=%s",
         view.contested or 0, tostring(view.contestedRunning),
         tostring(view.yieldSelectedTarget)))
@@ -264,6 +266,31 @@ local function commandDps()
         view.settlePending))
     ns.Log.Info(format("  withheldReads=%d pool=%d live / %d free / %d cap",
         view.withheldReads, view.poolLive, view.poolFree, view.poolCapacity))
+end
+
+-- Phase 11 section 5.9: the threat panel's state, its rows and its counters.
+local function commandThreat()
+    if not ns.ThreatPanel then
+        ns.Log.Error("the threat panel did not load")
+        return
+    end
+    local view = ns.ThreatPanel.Inspect()
+    ns.Log.Info(format("enabled=%s inCombat=%s rows=%d/%d truncated=%d timer=%s (%ss) sweeps=%d panel=%s anchor=%s",
+        tostring(view.enabled), tostring(view.inCombat), view.rowsDrawn, view.maximumRows,
+        view.rowsTruncated, view.sweeping and "running" or "stopped", tostring(view.updateInterval),
+        view.sweeps, view.panelShown and "shown" or "hidden",
+        view.anchorIsPlayerFrame and "PlayerFrame" or "screen"))
+    for index = 1, #view.rows do
+        local row = view.rows[index]
+        ns.Log.Info(format("  %d. %s %s %s%s", index, tostring(row.token), tostring(row.verdict),
+            row.threat, row.isTarget and " (your target)" or ""))
+    end
+    local names, counters, parts = ns.ThreatPanel.COUNTER_NAMES, view.counters or {}, {}
+    for index = 1, #names do
+        parts[#parts + 1] = format("%s=%d", names[index], counters[names[index]] or 0)
+    end
+    ns.Log.Info("  counters: " .. table.concat(parts, " ", 1, 9))
+    ns.Log.Info("  counters: " .. table.concat(parts, " ", 10))
 end
 
 -- Phase 8 section 5: what the skills window would show now, and how it resolved.
@@ -681,6 +708,7 @@ local function commandHelp()
     ns.Log.Info("/pa pool                exercise both frame pool drop policies")
     ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
+    ns.Log.Info("/pa threat              the threat panel's rows, timer and counters")
     ns.Log.Info("/pa skills              what the skills window shows, and how each row resolved")
     ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each toast")
     ns.Log.Info("/pa bags                tidy bags: sorts, skips, and who listens")
@@ -727,6 +755,8 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
+    elseif command == "threat" then
+        commandThreat()
     elseif command == "skills" then
         commandSkills()
     elseif command == "toasts" then

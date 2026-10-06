@@ -21,7 +21,7 @@ local ADDON_NAME, ns = ...
 local ClientRead = {}
 ns.ClientRead = ClientRead
 
-local type, pcall = type, pcall
+local type, pcall, select = type, pcall, select
 
 local PLAIN, ABSENT, WITHHELD = "Plain", "Absent", "Withheld"
 local UNAVAILABLE, CALL_FAILED = "Unavailable", "CallFailed"
@@ -127,6 +127,70 @@ function ClientRead.CallMany(clientFunction, count, expectedType, ...)
         return WITHHELD, reason
     end
     return PLAIN, first, second, third, fourth
+end
+
+-- Takes pcall's returns and keeps the status and the index-th value after it, so
+-- one return of a multi-value call is picked without building a table. A value
+-- past the last return is nil. Nothing here looks at the value.
+local function statusAndNth(index, ok, ...)
+    if not ok then
+        return false, nil
+    end
+    return true, (select(index, ...))
+end
+
+-- Calls a client function and classifies only its index-th return, for calls
+-- whose returns differ in type (UnitDetailedThreatSituation: boolean, number,
+-- number, number, number). Phase 11 section 4.2.
+function ClientRead.CallNth(clientFunction, index, expectedType, ...)
+    if type(clientFunction) ~= "function" then
+        return WITHHELD, UNAVAILABLE
+    end
+    local ok, value = statusAndNth(index, pcall(clientFunction, ...))
+    if not ok then
+        return WITHHELD, CALL_FAILED
+    end
+    return classify(value, expectedType)
+end
+
+-- Pass's outcomes: Shown, then whether the value handed over was hidden; Absent;
+-- or Unavailable, then the reason.
+local SHOWN, SETTER_FAILED = "Shown", "SetterFailed"
+ClientRead.SHOWN = SHOWN
+ClientRead.SETTER_FAILED = SETTER_FAILED
+
+-- Calls a client function and hands its index-th return, untouched, to a widget
+-- method: setter(receiver, value), or setter(receiver, leading, value) when leading
+-- is given. The value is never compared, tested or computed on; only its
+-- accessibility is asked, so that a readable nil can be told from a hidden value.
+-- For widget methods whose docs accept hidden arguments (SecretArguments =
+-- "AllowedWhenTainted"), which the patch check guards. Phase 11 section 4.2.
+--
+-- A readable nil is Absent and the setter is not called: the caller clears the
+-- field. The function missing (Unavailable), the call raising (CallFailed) and the
+-- setter raising (SetterFailed) are Unavailable, with the reason.
+function ClientRead.Pass(setter, receiver, leading, index, clientFunction, ...)
+    if type(clientFunction) ~= "function" then
+        return UNAVAILABLE, UNAVAILABLE
+    end
+    local ok, value = statusAndNth(index, pcall(clientFunction, ...))
+    if not ok then
+        return UNAVAILABLE, CALL_FAILED
+    end
+    local hidden = not accessible(value)
+    if not hidden and value == nil then
+        return ABSENT, nil
+    end
+    local setterOk
+    if leading == nil then
+        setterOk = pcall(setter, receiver, value)
+    else
+        setterOk = pcall(setter, receiver, leading, value)
+    end
+    if not setterOk then
+        return UNAVAILABLE, SETTER_FAILED
+    end
+    return SHOWN, hidden
 end
 
 local function indexOf(container, key)

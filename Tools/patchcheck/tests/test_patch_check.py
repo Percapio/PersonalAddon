@@ -1,7 +1,9 @@
-"""The patch check's tests, T1-T15 (Architecture/20261002-Phase10.md section 10.1).
+"""The patch check's tests, T1-T15 (Architecture/20261002-Phase10.md section 10.1)
+and T16-T18 (Architecture/20261005-Phase11.md section 10.2).
 
-T1, T2 and T15 use the real exports and are skipped when one is missing. The rest
-copy the small synthetic export in fixtures/base to a temporary folder and change it.
+T1, T2, T15 and T18 use the real exports and are skipped when one is missing. The
+rest copy the small synthetic export in fixtures/base to a temporary folder and
+change it.
 
 Usage: python Tools/patchcheck/tests/test_patch_check.py
 """
@@ -274,6 +276,38 @@ class FixtureTests(FixtureCase):
             patch_check.accept(self.paths, reviewed=True, build_reader=known_build, out=quiet)
         self.assertEqual(raised.exception.kind, "VerdictFail")
 
+    def test_t16_flag_equals_holds_when_the_value_matches(self):
+        self.adopt()
+        result = self.check()
+        outcome = self.premise(result, "ARGUMENTS-UNTAINTED")
+        self.assertEqual(outcome["status"], premises.HOLDS, outcome["evidence"])
+        self.assertEqual(result["verdict"]["kind"], "Pass", result["verdict"]["reasons"])
+
+    def test_t17_flag_equals_breaks_on_a_new_value_then_on_removal(self):
+        self.adopt()
+        self.edit("Blizzard_APIDocumentationGenerated/UnitDocumentation.lua",
+                  'SecretArguments = "AllowedWhenUntainted",', 'SecretArguments = "NotAllowed",')
+        result = self.check()
+        outcome = self.premise(result, "ARGUMENTS-UNTAINTED")
+        self.assertEqual(outcome["status"], premises.BROKEN)
+        self.assertIn('"NotAllowed"', outcome["evidence"])
+        self.assertEqual(result["verdict"]["kind"], "Fail")
+        self.edit("Blizzard_APIDocumentationGenerated/UnitDocumentation.lua",
+                  'Name = "UnitThreatSituation",', 'Name = "UnitThreatSituationRenamed",')
+        result = self.check()
+        outcome = self.premise(result, "ARGUMENTS-UNTAINTED")
+        self.assertEqual(outcome["status"], premises.BROKEN)
+        self.assertIn("no longer documented", outcome["evidence"])
+
+    def test_t17_flag_equals_needs_a_value(self):
+        self.paths.register.write_text(
+            '[[premise]]\nid = "A"\nstatement = "s"\nsource = "s"\nconsequence = "c"\n'
+            'check = { kind = "FlagEquals", entry = "UnitThreatSituation", flag = "SecretArguments" }\n',
+            encoding="utf-8")
+        with self.assertRaises(premises.RegisterInvalid) as raised:
+            premises.load_register(self.paths.register)
+        self.assertIn("FlagEquals needs entry, flag and value", " | ".join(raised.exception.faults))
+
     def test_classic_only_file_is_outside_the_load_set(self):
         loaded = load_set.resolve_load_set(self.export, self.paths.config)
         self.assertIn("Blizzard_UnitFrame/Mainline/UnitFrame.lua", loaded.files)
@@ -332,6 +366,17 @@ class RealExportTests(unittest.TestCase):
                 self.assertNotIn(name, result["docsFlagsChanged"])
         finally:
             shutil.rmtree(temporary, ignore_errors=True)
+
+    def test_t18_the_phase11_premises_hold_on_the_current_export(self):
+        register = premises.load_register(patch_check.default_paths().register)
+        self.assertEqual(len(register), 22)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
+                           "FORMATTED-TEXT-TAKES-HIDDEN", "THREAT-PERCENT-READABLE",
+                           "PLATE-LOOKUP-READABLE", "PLATE-UNIT-TOKEN"):
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
 
     def test_t15_every_file_in_running_stacks_is_in_the_load_set(self):
         loaded = {name.lower() for name in load_set.resolve_load_set(paths.EXPORT).files}

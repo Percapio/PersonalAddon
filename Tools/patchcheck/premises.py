@@ -1,5 +1,6 @@
 """The premise register (Architecture/20261002-Phase10.md section 4): each fact a
-design relies on about Blizzard's code, with a check.
+design relies on about Blizzard's code, with a check. FlagEquals since
+Architecture/20261005-Phase11.md section 7.1.
 """
 import pathlib
 import re
@@ -9,7 +10,7 @@ from dataclasses import dataclass, field
 from common import paths
 from . import views
 
-CHECK_KINDS = {"Callers", "Defined", "Pattern", "FlagAbsent", "Watch"}
+CHECK_KINDS = {"Callers", "Defined", "Pattern", "FlagAbsent", "FlagEquals", "Watch"}
 
 HOLDS = "Holds"
 NEEDS_REVIEW = "NeedsReview"
@@ -85,6 +86,9 @@ def load_register(file):
             faults.append(f"{label}: Callers needs an integer count")
         if kind == "FlagAbsent" and not (check.get("entry") and check.get("flag")):
             faults.append(f"{label}: FlagAbsent needs entry and flag")
+        if kind == "FlagEquals" and not (check.get("entry") and check.get("flag")
+                                         and isinstance(check.get("value"), str) and check.get("value")):
+            faults.append(f"{label}: FlagEquals needs entry, flag and value")
         if kind in ("Callers", "Defined") and not check.get("name"):
             faults.append(f"{label}: {kind} needs a name")
         if kind == "Watch" and not check.get("files"):
@@ -146,6 +150,16 @@ def evaluate_premise(premise, current, baseline):
         if flagged:
             return Outcome(BROKEN, f"{check['flag']} is now set ({', '.join(flagged)})")
         return Outcome(HOLDS, f"{check['flag']} absent")
+    if kind == "FlagEquals":
+        # The value as the docs write it: a string keeps its quotes.
+        entries = current.docs.get(check["entry"])
+        if not entries:
+            return Outcome(BROKEN, f"{check['entry']} is no longer documented")
+        differing = [f"{entry.flags.get(check['flag'], 'absent')} ({entry.file})" for entry in entries
+                     if entry.flags.get(check["flag"]) != check["value"]]
+        if differing:
+            return Outcome(BROKEN, f"{check['flag']} is now {'; '.join(differing)}")
+        return Outcome(HOLDS, f"{check['flag']} = {check['value']}")
     changed, unknown = [], []
     for file in check["files"]:
         if file not in current.load_set.files:

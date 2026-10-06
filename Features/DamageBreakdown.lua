@@ -17,6 +17,10 @@
 -- draw, and its comparisons would have raised on every tick. What remains reads
 -- through ClientRead, and a withheld read keeps the last render: the settle reads
 -- after combat retry it.
+--
+-- Phase 11 (Architecture/20261005-Phase11.md section 6): with hideInCombat, on by
+-- default, the panel hides for the length of a fight, when it can only show the
+-- last one, and the threat panel takes its place.
 
 local ADDON_NAME, ns = ...
 
@@ -62,6 +66,7 @@ local state = {
         panelAlpha = 0.8,
         anchorOffsetX = 0,
         anchorOffsetY = 8,
+        hideInCombat = true,
     },
 }
 
@@ -413,6 +418,11 @@ local function formatShare(share)
     return format("%d%%", floor((share or 0) * 100 + 0.5))
 end
 
+-- During a fight the panel can only show the last one (Phase 11 section 6).
+local function hiddenForCombat()
+    return state.inCombat and state.settings.hideInCombat
+end
+
 local function renderBreakdown(breakdown)
     local panel = ensurePanel()
     releaseRows()
@@ -467,6 +477,10 @@ local function renderBreakdown(breakdown)
         + max(0, shown - 1) * ROW_SPACING
     panel:SetHeight(height)
     ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
+    if hiddenForCombat() then
+        panel:Hide()
+        return
+    end
     panel:Show()
 end
 
@@ -551,6 +565,10 @@ local function onCombatStart()
     state.inCombat = true
     -- A new fight invalidates any settle read still pending for the last one.
     cancelSettleReads()
+    -- Our own frame, hidden; the end-of-combat refresh and settle reads draw it again.
+    if state.settings.hideInCombat and state.panel then
+        state.panel:Hide()
+    end
 end
 
 local function onCombatEnd()
@@ -608,6 +626,7 @@ local function readSettings(config)
     state.settings.panelAlpha = settings.panelAlpha or state.settings.panelAlpha
     state.settings.anchorOffsetX = settings.anchorOffsetX or state.settings.anchorOffsetX
     state.settings.anchorOffsetY = settings.anchorOffsetY or state.settings.anchorOffsetY
+    state.settings.hideInCombat = (settings.hideInCombat ~= false)
 end
 
 local function enable(config)
@@ -683,6 +702,17 @@ local function onConfigChanged(config, changedKey)
         return ns.CONFIG_RESULT.APPLIED
     end
 
+    -- In a fight a re-read is withheld, so the last render is hidden or shown as it
+    -- stands rather than redrawn.
+    if changedKey == "hideInCombat" and state.inCombat then
+        if state.panel and hiddenForCombat() then
+            state.panel:Hide()
+        elseif state.panel and (state.lastRowCount > 0 or state.settings.showWhenEmpty) then
+            state.panel:Show()
+        end
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
     refreshNow()
     return ns.CONFIG_RESULT.APPLIED
 end
@@ -692,7 +722,8 @@ ns.Registry.Register(FEATURE_ID, {
     label = "Damage breakdown",
     description = "Your own damage by spell, above the player frame, read from the built-in meter.",
     -- inCombatRefreshSeconds went in Phase 9. ConfigStore prunes a saved key the
-    -- feature no longer declares, so no migration step is needed.
+    -- feature no longer declares, so no migration step is needed; it gives a new key,
+    -- such as Phase 11's hideInCombat, its default.
     settings = {
         sessionType = "Current",
         maximumRows = 4,
@@ -700,6 +731,7 @@ ns.Registry.Register(FEATURE_ID, {
         panelAlpha = 0.8,
         anchorOffsetX = 0,
         anchorOffsetY = 8,
+        hideInCombat = true,
     },
     schema = {
         sessionType = {
@@ -730,6 +762,10 @@ ns.Registry.Register(FEATURE_ID, {
         showWhenEmpty = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show when empty", curated = false,
         },
+        hideInCombat = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Hide during combat",
+            description = "During a fight the panel still shows the last fight's figures; hiding it leaves room for the threat panel",
+        },
     },
 }, {
     enable = enable,
@@ -748,6 +784,7 @@ ns.DamageBreakdown = {
             sessionType = state.settings.sessionType,
             maximumRows = state.settings.maximumRows,
             inCombat = state.inCombat,
+            hideInCombat = state.settings.hideInCombat,
             rowsShown = state.lastRowCount,
             truncatedRows = state.truncatedRows,
             panelShown = (state.panel ~= nil and state.panel:IsShown()) or false,

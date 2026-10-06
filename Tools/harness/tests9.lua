@@ -120,6 +120,8 @@ elseif HARNESS_SESSION == "phase9-baddiag" then
 elseif HARNESS_SESSION == "phase9-noapi" then
     UnitThreatSituation = nil
     Enum.AddOnRestrictionType = nil
+    -- Phase 11 section 11: without threat reads the threat panel declines at enable.
+    HARNESS.expectedFaults[#HARNESS.expectedFaults + 1] = "UnitThreatSituation is missing from this client"
 end
 
 -- Boot -----------------------------------------------------------------------------
@@ -452,6 +454,8 @@ elseif HARNESS_SESSION == "phase9-noapi" then
     local diag = ns.Diagnostics.CountersFor("nameplates")
     check("N15 unreadable counted", (diag.restrictedMapUnreadable or 0) >= 1, diag.restrictedMapUnreadable)
     check("N15 nothing called", HARNESS.restrictionCalls == 0, HARNESS.restrictionCalls)
+    check("N16 the threat panel declines", ns.Registry.State("threatPanel") == "FAULTED",
+        ns.Registry.State("threatPanel"))
 end
 
 -- Report -------------------------------------------------------------------------------

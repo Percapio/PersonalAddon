@@ -14,6 +14,11 @@
 -- it does not flicker when a monster retargets for a tick (Phase 2 section 4.8).
 -- Every value the client returns here goes through ClientRead (README rule 10).
 --
+-- The threat reads, the standing reads and the verdict live in Core/Threat.lua
+-- since Phase 11 (Architecture/20261005-Phase11.md section 2), so the threat panel
+-- colours a mob exactly as its plate is coloured. What stays here is everything
+-- about plates: scope, styling, the ledger, the contest and the sweep.
+--
 -- Restyle in place; own nothing. Blizzard's status bar is the only thing that
 -- knows a unit's health and on this client likely the only thing that ever will,
 -- so we recolour ITS bar. We create no frames, textures or font strings, which is
@@ -27,56 +32,16 @@ local ADDON_NAME, ns = ...
 
 local FEATURE_ID = "nameplates"
 
-local format, pcall, pairs, tonumber = string.format, pcall, pairs, tonumber
+local format, pcall, pairs = string.format, pcall, pairs
 
 local ClientRead = ns.ClientRead
 local PLAIN, ABSENT, WITHHELD = ClientRead.PLAIN, ClientRead.ABSENT, ClientRead.WITHHELD
 local bump = ns.Diagnostics.Bump
 
--- The allies whose threat makes a monster green: your pet first, then the party
--- or the raid. Built once, so a sweep concatenates no strings (Phase 9 section 4).
-local PARTY_ALLIES = { "pet", "party1", "party2", "party3", "party4" }
-local RAID_ALLIES = { "pet" }
-for index = 1, 40 do
-    RAID_ALLIES[#RAID_ALLIES + 1] = "raid" .. index
-end
+local Threat = ns.Threat
+local VERDICT = Threat.VERDICT
 
 local SCOPE = { IN = "InScope", OUT = "OutOfScope", UNREACHABLE = "Unreachable" }
-local AGGRO = {
-    ON_PLAYER = "OnPlayer",
-    ON_GROUP_OR_PET = "OnGroupOrPet",
-    ELSEWHERE = "Elsewhere",
-    UNKNOWN = "Unknown",
-}
-
--- A unit's standing is independent of whom it is attacking (Phase 7 section 5.3).
-local DISPOSITION = {
-    TAP_DENIED = "TapDenied",
-    NEUTRAL = "Neutral",
-    HOSTILE = "Hostile",
-    UNREADABLE = "Unreadable",
-}
-
--- What the bar should show. CEDED hands the bar back to Blizzard: the recorded
--- original is restored and we stop contesting it. It is Phase 2's Unknown
--- behaviour, renamed here because two different causes now lead to it.
-local VERDICT = {
-    ON_PLAYER = "OnPlayer",
-    TAP_DENIED = "TapDenied",
-    ON_GROUP_OR_PET = "OnGroupOrPet",
-    NEUTRAL = "Neutral",
-    ELSEWHERE = "Elsewhere",
-    CEDED = "Ceded",
-}
-
-local STANDING = {
-    NOT_YET_READ = "NotYetRead",
-    READABLE = "Readable",
-    WITHHELD = "Withheld",
-}
-
--- The client's reaction scale; 4 is neutral, which is what Blizzard paints yellow.
-local NEUTRAL_REACTION = 4
 
 -- Blizzard re-sets plate geometry on its own schedule. The sweep re-asserts;
 -- a hook, where one is available, only makes it react sooner.
@@ -118,9 +83,6 @@ local state = {
 local capability = {
     plateLookup = false,
     barRecolourable = nil,
-    -- Checked on the first standing read of the session and cached (Phase 2
-    -- section 4.7): a refusal can arrive as a log line and a nil, not an error.
-    standing = STANDING.NOT_YET_READ,
 }
 
 local function namePlateApi()
@@ -128,19 +90,6 @@ local function namePlateApi()
 end
 
 -- Config ----------------------------------------------------------------------
-
-local function hexToColour(hex, fallbackRed, fallbackGreen, fallbackBlue)
-    if type(hex) ~= "string" or #hex < 6 then
-        return { red = fallbackRed, green = fallbackGreen, blue = fallbackBlue, alpha = 1 }
-    end
-    local red = tonumber(string.sub(hex, 1, 2), 16)
-    local green = tonumber(string.sub(hex, 3, 4), 16)
-    local blue = tonumber(string.sub(hex, 5, 6), 16)
-    if not red or not green or not blue then
-        return { red = fallbackRed, green = fallbackGreen, blue = fallbackBlue, alpha = 1 }
-    end
-    return { red = red / 255, green = green / 255, blue = blue / 255, alpha = 1 }
-end
 
 local function readSettings(config)
     local settings = config and config.settings
@@ -150,11 +99,7 @@ local function readSettings(config)
     state.sweepInterval = settings.sweepInterval or state.sweepInterval
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
-    state.palette[VERDICT.ON_PLAYER] = hexToColour(settings.colourOnPlayer, 1, 0.25, 0.25)
-    state.palette[VERDICT.TAP_DENIED] = hexToColour(settings.colourTapDenied, 0.9, 0.9, 0.9)
-    state.palette[VERDICT.ON_GROUP_OR_PET] = hexToColour(settings.colourOnGroup, 0.25, 1, 0.25)
-    state.palette[VERDICT.NEUTRAL] = hexToColour(settings.colourNeutral, 1, 1, 0)
-    state.palette[VERDICT.ELSEWHERE] = hexToColour(settings.colourElsewhere, 1, 1, 1)
+    state.palette = Threat.PaletteFrom(settings)
 end
 
 -- Frame shape -----------------------------------------------------------------
@@ -218,165 +163,6 @@ local function shouldYield(unitToken)
     return true
 end
 
--- The group's shape, read once per sweep. A raid, a party, or nobody; when the
--- roster functions are absent or withheld, a party is assumed, which costs four
--- reads of possibly empty tokens and claims nothing.
-local function allyTokens()
-    local raidKind, inRaid = ClientRead.Call(IsInRaid, "boolean")
-    if raidKind == PLAIN and inRaid then
-        local sizeKind, size = ClientRead.Call(GetNumGroupMembers, "number")
-        if sizeKind == PLAIN and size >= 1 then
-            return RAID_ALLIES, math.min(size, 40) + 1
-        end
-        return PARTY_ALLIES, #PARTY_ALLIES
-    end
-    local groupKind, inGroup = ClientRead.Call(IsInGroup, "boolean")
-    if groupKind == PLAIN and not inGroup then
-        return PARTY_ALLIES, 1
-    end
-    return PARTY_ALLIES, #PARTY_ALLIES
-end
-
--- One threat read, counted by result. 2 and 3 mean the unit is the mob's current
--- target; nil means the unit is not on the mob's threat list at all.
-local function readThreat(unit, mobToken)
-    local kind, status = ClientRead.Call(UnitThreatSituation, "number", unit, mobToken)
-    local counters = state.counters
-    if kind == PLAIN then
-        bump(counters, "threatReadsPlain")
-    elseif kind == ABSENT then
-        bump(counters, "threatReadsAbsent")
-    else
-        bump(counters, "threatReadsWithheld")
-    end
-    return kind, status
-end
-
--- Who the monster on this plate is attacking, from threat, never from its target
--- (GAPBugs01 section 3.6). A mob has one current target, so an ally found tanking
--- settles it even when the player's own read was withheld. Reading stops at the
--- first unit found tanking. Returns the classification and how many reads were
--- withheld.
-local function classifyAggro(unitToken, allies, allyCount)
-    local withheld = 0
-    local kind, status = readThreat("player", unitToken)
-    if kind == PLAIN and status >= ns.TANKING_STATUS then
-        return AGGRO.ON_PLAYER, 0
-    end
-    if kind == WITHHELD then
-        withheld = withheld + 1
-    end
-
-    for index = 1, allyCount do
-        local allyKind, allyStatus = readThreat(allies[index], unitToken)
-        if allyKind == PLAIN and allyStatus >= ns.TANKING_STATUS then
-            return AGGRO.ON_GROUP_OR_PET, withheld
-        end
-        if allyKind == WITHHELD then
-            withheld = withheld + 1
-        end
-    end
-
-    if withheld > 0 then
-        return AGGRO.UNKNOWN, withheld
-    end
-    return AGGRO.ELSEWHERE, 0
-end
-
--- Standing --------------------------------------------------------------------
-
--- Tapped and neutral are what Blizzard's own plates already paint grey and yellow
--- (CompactUnitFrame_UpdateHealthColor). Our Elsewhere white painted over both;
--- Phase 7 puts them back under our priority.
---
--- None of the three reads carries a secret-return flag in this client's generated
--- API documentation, and Blizzard's plates make the first two on every colour
--- update. Documentation is evidence, not proof, so each value goes through
--- ClientRead before it is compared: testing a secret value is itself an error for
--- insecure code. Absent (nil) is accepted as "no", the direction that claims
--- nothing.
-
--- Returns tapDenied, playerControlled, reaction, readable.
-local function readStanding(unitToken)
-    local tapKind, tapDenied = ClientRead.Call(UnitIsTapDenied, "boolean", unitToken)
-    local controlKind, controlled = ClientRead.Call(UnitPlayerControlled, "boolean", unitToken)
-    local reactionKind, reaction = ClientRead.Call(UnitReaction, "number", "player", unitToken)
-    if tapKind == WITHHELD or controlKind == WITHHELD or reactionKind == WITHHELD then
-        bump(state.counters, "standingReadsWithheld")
-        return nil, nil, nil, false
-    end
-    return tapDenied == true, controlled == true, reaction, true
-end
-
--- Once per session, on the first in-scope plate the sweep reaches.
-local function checkDispositionCapability(unitToken)
-    local present = type(UnitIsTapDenied) == "function"
-        and type(UnitPlayerControlled) == "function"
-        and type(UnitReaction) == "function"
-    local readable = present and select(4, readStanding(unitToken))
-    if readable then
-        capability.standing = STANDING.READABLE
-        return
-    end
-    capability.standing = STANDING.WITHHELD
-    ns.Log.Once("plates:standingwithheld",
-        "this client withholds whether a nameplate unit is tapped or neutral; those plates keep the aggro colours")
-end
-
--- Pre: the capability is not withheld; standingOf is the only caller.
-local function classifyDisposition(unitToken)
-    local tapDenied, controlled, reaction, readable = readStanding(unitToken)
-    if not readable then
-        -- Never claim a standing we did not read (Phase 2 section 9.0).
-        return DISPOSITION.UNREADABLE
-    end
-    -- Mirrors CompactUnitFrame_IsTapDenied: a player or pet is never tap-denied.
-    if tapDenied and not controlled then
-        return DISPOSITION.TAP_DENIED
-    end
-    if reaction == NEUTRAL_REACTION then
-        return DISPOSITION.NEUTRAL
-    end
-    return DISPOSITION.HOSTILE
-end
-
-local function standingOf(unitToken)
-    if capability.standing == STANDING.NOT_YET_READ then
-        checkDispositionCapability(unitToken)
-    end
-    if capability.standing == STANDING.WITHHELD then
-        return DISPOSITION.UNREADABLE
-    end
-    return classifyDisposition(unitToken)
-end
-
--- The one place bar colour is decided (Phase 7 section 5.4). Priority: on you,
--- then tapped, then group or pet, then neutral, then hostile. Grey never hides a
--- mob that is hitting you.
---
--- Tapped is shown even when aggro is Unknown, because Blizzard paints tapped grey
--- ahead of its own threat red, so grey is exactly what ceding would show. Neutral
--- is not: there Blizzard's colour carries threat-list membership we could not
--- read, and yellow would claim "not on you". Unreadable behaves as Hostile.
-local function resolveColourVerdict(aggro, disposition)
-    if aggro == AGGRO.ON_PLAYER then
-        return VERDICT.ON_PLAYER
-    end
-    if disposition == DISPOSITION.TAP_DENIED then
-        return VERDICT.TAP_DENIED
-    end
-    if aggro == AGGRO.ON_GROUP_OR_PET then
-        return VERDICT.ON_GROUP_OR_PET
-    end
-    if aggro == AGGRO.UNKNOWN then
-        return VERDICT.CEDED
-    end
-    if disposition == DISPOSITION.NEUTRAL then
-        return VERDICT.NEUTRAL
-    end
-    return VERDICT.ELSEWHERE
-end
-
 -- The map-restriction state, as words for chat. Read on demand: it changes only
 -- with the map, and nothing about a verdict depends on it. The read itself lives in
 -- core since Phase 10 (section 7.1).
@@ -404,11 +190,12 @@ local function verdictFor(plate, allies, allyCount)
         return VERDICT.CEDED
     end
 
-    local aggro, withheld = classifyAggro(unitToken, allies, allyCount)
+    local counters = state.counters
+    local aggro, withheld = Threat.ClassifyAggro(unitToken, allies, allyCount, counters)
     if withheld > 0 then
         noteWithheldThreat()
     end
-    return resolveColourVerdict(aggro, standingOf(unitToken))
+    return Threat.ResolveVerdict(aggro, Threat.Disposition(unitToken, counters))
 end
 
 -- Styling ---------------------------------------------------------------------
@@ -772,7 +559,7 @@ local function sweep()
 
     state.reassertPending = false
 
-    local allies, allyCount = allyTokens()
+    local allies, allyCount = Threat.Allies()
     for _, plate in pairs(state.plates) do
         if plate.scope == SCOPE.IN then
             local ok, fault = ns.Isolation.Call(paintPlate, plate, allies, allyCount)
@@ -1046,29 +833,27 @@ local function onConfigChanged(config, changedKey)
     return ns.CONFIG_RESULT.APPLIED
 end
 
+-- The colour defaults come from Core/Threat.lua, which the threat panel paints
+-- with too, so the two cannot disagree (Phase 11 section 2.2). The tapped grey and
+-- the neutral yellow are Blizzard's own colours, so by default neither contests
+-- the bar: e6 is 0.902, inside COLOUR_TOLERANCE of Blizzard's 0.9 grey.
+local defaultSettings = Threat.PaletteDefaults()
+defaultSettings.aggroColouring = true
+-- Set true to stop contesting the bar colour on your current target and let
+-- Blizzard's selected-target red stand. Guaranteed stable, at the cost of no aggro
+-- colour on the one plate you are attacking.
+defaultSettings.yieldSelectedTarget = false
+defaultSettings.sweepInterval = 0.25
+
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Nameplates",
     description = "Hostile and neutral nameplates, coloured by who the monster is attacking.",
-    settings = {
-        aggroColouring = true,
-        -- Set true to stop contesting the bar colour on your current target and
-        -- let Blizzard's selected-target red stand. Guaranteed stable, at the
-        -- cost of no aggro colour on the one plate you are attacking.
-        yieldSelectedTarget = false,
-        colourOnPlayer = "ff4040",
-        colourOnGroup = "40ff40",
-        colourElsewhere = "ffffff",
-        -- Both are Blizzard's own colours, so by default neither contests the
-        -- bar: e6 is 0.902, inside COLOUR_TOLERANCE of Blizzard's 0.9 grey.
-        colourTapDenied = "e6e6e6",
-        colourNeutral = "ffff00",
-        sweepInterval = 0.25,
-    },
+    settings = defaultSettings,
     schema = {
         aggroColouring = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour nameplates",
-            description = "Red: it is attacking you. Grey: tagged by a player outside your group. Green: attacking your group or pet. Yellow: neutral. White: hostile, attacking neither.",
+            description = "Red: it is attacking you. Orange: you are about to pull it. Grey: tagged by a player outside your group. Green: attacking your group or pet. Yellow: neutral. White: hostile, attacking neither.",
         },
         yieldSelectedTarget = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone",
@@ -1076,6 +861,11 @@ ns.Registry.Register(FEATURE_ID, {
         },
         colourOnPlayer = {
             kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking you",
+        },
+        -- R7 (Phase 11 section 3).
+        colourAboutToPull = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "You are about to pull it",
+            description = "Your threat is above the tank's, and the mob is not on you yet",
         },
         colourOnGroup = {
             kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking your group or pet",
@@ -1138,7 +928,7 @@ ns.Nameplates = {
             unreachable = unreachable,
             coloured = coloured,
             verdicts = verdicts,
-            standingCapability = capability.standing,
+            standingCapability = Threat.StandingCapability(),
             sweeps = state.sweepCount,
             hookInstalled = state.hookInstalled,
             colouringActive = colouringActive(),

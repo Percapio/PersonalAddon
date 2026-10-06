@@ -11,6 +11,9 @@
 #   Defined    name                 a loaded file defines name at file scope
 #   Pattern    file, regex, expect  the regex is Present or Absent in the file
 #   FlagAbsent entry, flag          the documented entry does not carry flag
+#   FlagEquals entry, flag, value   every documented entry of that name carries flag
+#                                   with exactly value, as the docs write it (a string
+#                                   keeps its quotes); since Phase 11 section 7.1
 #   Watch      files                every file is unchanged since the baseline
 #
 # Hook targets, bag events and every documented function and event the addon uses
@@ -133,3 +136,54 @@ statement = "The player frame's layout the five-second-rule line is drawn agains
 source = "README rule 2's exceptions (the five-second-rule line)"
 consequence = "Re-check the line's anchoring and size reads (Features/FiveSecondRule.lua)"
 check = { kind = "Watch", files = ["Blizzard_UnitFrame/Mainline/PlayerFrame.lua", "Blizzard_UnitFrame/Camelot/PlayerFrame.lua"] }
+
+# Phase 11 (Architecture/20261005-Phase11.md section 7.2): the threat panel ----------
+
+[[premise]]
+id = "BAR-VALUE-TAKES-HIDDEN"
+statement = "A status bar's value accepts a hidden number"
+source = "Phase 11 sections 4.1 and 7.2"
+consequence = "Health bars stay empty; threatPanel.passFailures counts it (Features/ThreatPanel.lua)"
+check = { kind = "FlagEquals", entry = "SimpleStatusBarAPI:SetValue", flag = "SecretArguments", value = '"AllowedWhenTainted"' }
+
+[[premise]]
+id = "BAR-RANGE-TAKES-HIDDEN"
+statement = "A status bar's range accepts a hidden number"
+source = "Phase 11 sections 4.1 and 7.2"
+consequence = "Health bars stay empty; threatPanel.passFailures counts it (Features/ThreatPanel.lua)"
+check = { kind = "FlagEquals", entry = "SimpleStatusBarAPI:SetMinMaxValues", flag = "SecretArguments", value = '"AllowedWhenTainted"' }
+
+[[premise]]
+id = "TEXT-TAKES-HIDDEN"
+statement = "A font string accepts hidden text"
+source = "Phase 11 sections 4.1 and 7.2"
+consequence = "Mob names go blank on the threat panel (Features/ThreatPanel.lua)"
+check = { kind = "FlagEquals", entry = "SimpleFontStringAPI:SetText", flag = "SecretArguments", value = '"AllowedWhenTainted"' }
+
+[[premise]]
+id = "FORMATTED-TEXT-TAKES-HIDDEN"
+statement = "A font string formats a hidden number"
+source = "Phase 11 sections 4.1 and 7.2"
+consequence = "A hidden threat percentage goes blank on the threat panel (Features/ThreatPanel.lua)"
+check = { kind = "FlagEquals", entry = "SimpleFontStringAPI:SetFormattedText", flag = "SecretArguments", value = '"AllowedWhenTainted"' }
+
+[[premise]]
+id = "THREAT-PERCENT-READABLE"
+statement = "Your threat percentage on a nameplate is not hidden by default"
+source = "Phase 11 sections 5.3 and 7.2"
+consequence = "The threat panel can no longer sort; re-read Phase 11 section 5.3"
+check = { kind = "FlagAbsent", entry = "UnitDetailedThreatSituation", flag = "SecretReturns" }
+
+[[premise]]
+id = "PLATE-LOOKUP-READABLE"
+statement = "The target's nameplate can be looked up"
+source = "Phase 11 sections 5.4 and 7.2"
+consequence = "The threat panel's target marker cannot be drawn"
+check = { kind = "FlagAbsent", entry = "C_NamePlate.GetNamePlateForUnit", flag = "SecretReturns" }
+
+[[premise]]
+id = "PLATE-UNIT-TOKEN"
+statement = "A nameplate frame carries its unit token in unitToken"
+source = "Phase 11 sections 5.2 and 14"
+consequence = "The threat panel lists nothing; Nameplates' adoption of plates at enable finds none (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateBase.lua", regex = 'self\.unitToken\s*=', expect = "Present" }

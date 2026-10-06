@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.0.3-phase10"
+ns.VERSION = "1.1.0-phase11"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -84,6 +84,9 @@ ns.DIAGNOSTICS_FAULT_NOTE_LENGTH = 300
 -- The client's threat scale: 2 and 3 mean the unit is the mob's current target.
 -- A client fact, not a preference (GAPBugs01 section 3.6).
 ns.TANKING_STATUS = 2
+-- Status 1: your threat is above the tank's and the mob is not on you yet. A
+-- client fact (Phase 11 section 3).
+ns.ABOUT_TO_PULL_STATUS = 1
 -- Every eighth nameplate sweep asks whether this is an addon-restricted map: once
 -- every two seconds at the default interval (section 4.2).
 ns.RESTRICTION_SAMPLE_EVERY = 8
@@ -93,3 +96,9 @@ ns.RESTRICTION_SAMPLE_EVERY = 8
 ns.STORM_REFUSALS = 20
 ns.STORM_WINDOW_SECONDS = 10
 ns.STORM_FUNCTION_CAPACITY = 16
+
+-- Phase 11 (Architecture/20261005-Phase11.md) ---------------------------------
+
+-- The threat panel's row pool, built at enable. Above the largest maximumRows the
+-- schema allows (10), so no setting can exhaust it during a fight (section 5.5).
+ns.THREAT_ROW_CAPACITY = 16
