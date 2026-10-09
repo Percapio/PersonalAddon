@@ -3,7 +3,8 @@ APIs, then runs one test file per session, each in a fresh runtime.
 
 Sessions: Phase 7's nameplate checks (tests.lua, "main" and "withheld"), Phase 8's
 checks (tests8.lua, four variants), Phase 9's (tests9.lua, four variants),
-Phase 10's (tests10.lua) and Phase 11's (tests11.lua, three variants). The static secret-read lint (Tools/lint) runs first;
+Phase 10's (tests10.lua), Phase 11's (tests11.lua, three variants) and Phase 12's
+(tests12.lua, two variants). The static secret-read lint (Tools/lint) runs first;
 --no-lint skips it. Moved from c:\\tmp\\PersonalAddonHarness by
 Architecture/20261002-Phase10.md section 2.
 
@@ -39,6 +40,8 @@ SESSIONS = [
     ("phase11", "tests11.lua"),
     ("phase11-hidden", "tests11.lua"),
     ("phase11-noplates", "tests11.lua"),
+    ("phase12", "tests12.lua"),
+    ("phase12-nopages", "tests12.lua"),
 ]
 
 # A chat line naming one of these alongside "raised" or "faulted" is an error.
@@ -59,6 +62,7 @@ def run_session(session, tests):
     lua.execute((HERE / "stubs8.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubs9.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubs11.lua").read_text(encoding="utf-8"))
+    lua.execute((HERE / "stubs12.lua").read_text(encoding="utf-8"))
     lua.globals().HARNESS_SESSION = session
     load = lua.eval(
         "function(src, name) local f, err = loadstring(src, '@' .. name) "

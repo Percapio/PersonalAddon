@@ -36,6 +36,7 @@ function Registry.Register(featureId, defaults, lifecycle)
 
     features[featureId] = {
         id = featureId,
+        index = #order + 1,
         defaults = defaults,
         lifecycle = lifecycle,
         state = STATE.REGISTERED,
@@ -281,6 +282,23 @@ end
 
 -- The features a settings panel should offer. Ordered as registered, so the panel
 -- reads in the same order as /pa status.
+-- Where a feature's controls go in Settings (Phase 12 section 2): its declared page
+-- and order. A feature that declares neither goes on the parent page, after every
+-- feature that declares an order, in registration order, so a new feature is never
+-- left off the menu.
+function Registry.PlacementOf(featureId)
+    local record = features[featureId]
+    if not record then
+        return nil
+    end
+    local page = record.defaults.settingsPage or ns.SETTINGS_PAGE.GENERAL
+    local position = record.defaults.settingsOrder
+    if type(position) ~= "number" then
+        position = ns.SETTINGS_UNPLACED_ORDER + record.index
+    end
+    return page, position
+end
+
 function Registry.PublicIds()
     local ids = {}
     for index = 1, #order do

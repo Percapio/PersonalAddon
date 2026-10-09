@@ -27,22 +27,58 @@
 -- The panel writes through the SAME path as /pa set: ConfigStore, then
 -- Registry.NotifyConfigChanged, one frame later. /pa set and /pa on|off keep
 -- panelValues in step through the two Reflect functions at the bottom.
+--
+-- Since Phase 12 (Architecture/20261006-Phase12.md section 3) the controls are
+-- spread over pages: the parent page, then Combat, Nameplates, Bags & loot and
+-- Consumables, each a subcategory with its own "These settings" Defaults. Each
+-- feature names its page; its options are indented under its switch; sliders show
+-- their value through Blizzard's own pass-through label. Everything added for this
+-- is still registration-time data: strings, Blizzard's own formatter, parent links
+-- with no predicate. Blizzard calls none of our functions but the value-changed
+-- callback.
 
 local ADDON_NAME, ns = ...
 
 local FEATURE_ID = "settingsPanel"
 
-local format, type, tostring = string.format, type, tostring
+local format, type, tostring, floor = string.format, type, tostring, math.floor
 
 local SWITCH, KEY = "Switch", "Key"
-local CHECKBOX, SLIDER, COLOUR_SWATCH, CHOICE_CHECKBOX =
-    "Checkbox", "Slider", "ColourSwatch", "ChoiceCheckbox"
+local CHECKBOX, SLIDER, PERCENT_SLIDER, COLOUR_SWATCH, CHOICE_CHECKBOX =
+    "Checkbox", "Slider", "PercentSlider", "ColourSwatch", "ChoiceCheckbox"
+
+local PAGE = ns.SETTINGS_PAGE
+local PARENT_LABEL = "PersonalAddon"
+
+-- The subcategories, in the order they appear under the parent (section 3.1). The
+-- category list keeps registration order for subcategories.
+local PAGE_ORDER = {
+    { page = PAGE.COMBAT, label = "Combat" },
+    { page = PAGE.NAMEPLATES, label = "Nameplates" },
+    { page = PAGE.BAGS_AND_LOOT, label = "Bags & loot" },
+    { page = PAGE.CONSUMABLES, label = "Consumables" },
+}
+
+local KNOWN_PAGES = { [PAGE.GENERAL] = true }
+for index = 1, #PAGE_ORDER do
+    KNOWN_PAGES[PAGE_ORDER[index].page] = true
+end
+
+-- What a unit adds to a control's label. Seconds labels already say seconds.
+local UNIT_SUFFIX = {
+    Pixels = " (px)",
+    Fraction = " (%)",
+}
 
 local state = {
     categoryId = nil,
     registered = false,
     controlCount = 0,
     skipped = {},
+    -- One entry per page built: { page, label, controlCount }.
+    pages = {},
+    unlabelled = 0,
+    unindented = 0,
     -- The one table Blizzard's settings read and write. In memory for the
     -- session; the config store stays the only persisted copy.
     panelValues = {},
@@ -75,10 +111,18 @@ local function firstFunction(api, ...)
     return nil
 end
 
+-- The right-hand value label of Blizzard's slider. Read, never written.
+local function sliderValueLabel()
+    local mixin = _G.MinimalSliderWithSteppersMixin
+    local labels = type(mixin) == "table" and mixin.Label or nil
+    return type(labels) == "table" and labels.Right or nil
+end
+
 local function resolveControls(api)
     local controls = {}
     controls.registerCategory = firstFunction(api,
         "RegisterVerticalLayoutCategory", "RegisterCanvasLayoutCategory")
+    controls.registerSubcategory = firstFunction(api, "RegisterVerticalLayoutSubcategory")
     controls.addCategory = firstFunction(api, "RegisterAddOnCategory")
     -- Blizzard-stored settings only. RegisterProxySetting is deliberately not a
     -- fallback: it would silently restore the carrier this panel exists to remove.
@@ -89,6 +133,11 @@ local function resolveControls(api)
     -- CreateColorSwatch, not CreateColorPicker: the Phase 6 spike guessed both
     -- picker spellings wrong and the enumeration supplied the real name.
     controls.colourSwatch = firstFunction(api, "CreateColorSwatch")
+    -- A global of Blizzard_SettingControls.lua, not a Settings field. Its data is
+    -- two strings (section 3.2).
+    controls.sectionHeader = type(_G.CreateSettingsListSectionHeaderInitializer) == "function"
+        and _G.CreateSettingsListSectionHeaderInitializer or nil
+    controls.valueLabel = sliderValueLabel()
 
     local varType = (type(api.VarType) == "table") and api.VarType or nil
     controls.varTypes = {
@@ -105,10 +154,15 @@ local function variableFor(featureId, key)
     return format("PersonalAddon_%s_%s", featureId, tostring(key))
 end
 
+local function percent(value)
+    return floor(value * 100 + 0.5)
+end
+
 -- How one curated key is shown. A two-value choice is a checkbox: a dropdown's
 -- option list is a function Blizzard calls, and README rule 1 keeps our functions
 -- off Blizzard's stack. The feature itself does not change; what it stores does
--- not change either.
+-- not change either. A Fraction is shown as a whole percentage, so Blizzard's
+-- pass-through label reads 80 rather than 0.8000000119 (Phase 12 section 3.6).
 local function presentationFor(declaration)
     local KIND = ns.ConfigSchema.KIND
     if not declaration then
@@ -119,6 +173,14 @@ local function presentationFor(declaration)
     end
     if declaration.kind == KIND.NUMBER then
         if declaration.minimum and declaration.maximum and declaration.step then
+            if declaration.unit == ns.ConfigSchema.UNIT.FRACTION then
+                return {
+                    kind = PERCENT_SLIDER,
+                    minimum = percent(declaration.minimum),
+                    maximum = percent(declaration.maximum),
+                    step = percent(declaration.step),
+                }
+            end
             return {
                 kind = SLIDER,
                 minimum = declaration.minimum,
@@ -155,6 +217,9 @@ local function toPanelForm(presentation, storedValue)
     if presentation.kind == CHOICE_CHECKBOX then
         return storedValue == presentation.onValue
     end
+    if presentation.kind == PERCENT_SLIDER and type(storedValue) == "number" then
+        return percent(storedValue)
+    end
     return storedValue
 end
 
@@ -172,6 +237,9 @@ local function toStoreForm(presentation, panelValue)
     if presentation.kind == CHECKBOX then
         return panelValue == true
     end
+    if presentation.kind == PERCENT_SLIDER and type(panelValue) == "number" then
+        return panelValue / 100
+    end
     return panelValue
 end
 
@@ -179,10 +247,19 @@ local function panelVarType(controls, presentation)
     if presentation.kind == CHECKBOX or presentation.kind == CHOICE_CHECKBOX then
         return controls.varTypes.boolean
     end
-    if presentation.kind == SLIDER then
+    if presentation.kind == SLIDER or presentation.kind == PERCENT_SLIDER then
         return controls.varTypes.number
     end
     return controls.varTypes.string
+end
+
+-- A key's label with its unit, as section 3.1 shows it. A two-value choice keeps
+-- its second choice's label.
+local function labelFor(declaration, presentation)
+    if presentation.kind == CHOICE_CHECKBOX then
+        return presentation.label
+    end
+    return declaration.label .. (UNIT_SUFFIX[declaration.unit] or "")
 end
 
 local function storedValueFor(binding)
@@ -333,36 +410,69 @@ local function noteSkipped(featureId, key, why)
         featureId, tostring(key), why)
 end
 
+-- Slider options with Blizzard's own value label on the right (section 3.5).
+-- SetLabelFormatter with no function stores the client's file-local pass-through
+-- formatter: no function of ours is stored, so README rule 1 still holds. Without
+-- the label, the slider still works and is counted for /pa panel.
+local function sliderOptions(controls, presentation)
+    if not controls.sliderOptions then
+        return nil
+    end
+    local optionsOk, options = pcall(controls.sliderOptions,
+        presentation.minimum, presentation.maximum, presentation.step)
+    if not optionsOk or type(options) ~= "table" then
+        return nil
+    end
+    local labelled = controls.valueLabel ~= nil and type(options.SetLabelFormatter) == "function"
+        and pcall(options.SetLabelFormatter, options, controls.valueLabel)
+    if not labelled then
+        state.unlabelled = state.unlabelled + 1
+    end
+    return options
+end
+
+-- Returns the control's initializer when the client handed one back, so that the
+-- feature's options can be indented under its switch.
 local function createControl(controls, presentation, category, setting, tooltip)
-    if presentation.kind == SLIDER then
+    if presentation.kind == SLIDER or presentation.kind == PERCENT_SLIDER then
         if not controls.slider then
             return false, "no slider control"
         end
-        local options = nil
-        if controls.sliderOptions then
-            local optionsOk, built = pcall(controls.sliderOptions,
-                presentation.minimum, presentation.maximum, presentation.step)
-            options = optionsOk and built or nil
+        local ok, initializer = pcall(controls.slider, category, setting,
+            sliderOptions(controls, presentation), tooltip)
+        if not ok then
+            return false, "slider refused"
         end
-        return pcall(controls.slider, category, setting, options, tooltip), "slider refused"
+        return true, initializer
     end
     if presentation.kind == COLOUR_SWATCH then
         if not controls.colourSwatch then
             return false, "no colour swatch control"
         end
-        return pcall(controls.colourSwatch, category, setting, tooltip), "colour swatch refused"
+        local ok, initializer = pcall(controls.colourSwatch, category, setting, tooltip)
+        if not ok then
+            return false, "colour swatch refused"
+        end
+        return true, initializer
     end
     if not controls.checkbox then
         return false, "no checkbox control"
     end
-    return pcall(controls.checkbox, category, setting, tooltip), "checkbox refused"
+    local ok, initializer = pcall(controls.checkbox, category, setting, tooltip)
+    if not ok then
+        return false, "checkbox refused"
+    end
+    return true, initializer
 end
 
 -- Registers one control over panelValues. The value-changed handler is the only
 -- function of this addon's handed to the settings API; the default is the
 -- feature's DECLARED default, so Blizzard's Defaults button does what it says.
 -- (Revision 1 passed the current value, so Defaults restored the login-time
--- values: Patch01 R8.)
+-- values: Patch01 R8.) The setting is registered on its own page's category, so
+-- that page's "These settings" resets it and nothing else (section 3.3).
+--
+-- Returns true and the control's initializer, which may be nil, or false.
 local function buildControl(controls, category, binding, declaredDefault, label, tooltip)
     local keyName = binding.key or "enabled"
     if declaredDefault == nil then
@@ -392,21 +502,57 @@ local function buildControl(controls, category, binding, declaredDefault, label,
         return false
     end
 
-    local created, why = createControl(controls, binding.presentation, category, setting, tooltip)
+    local created, initializerOrWhy = createControl(controls, binding.presentation, category, setting, tooltip)
     if not created then
         state.panelValues[binding.variable] = nil
-        noteSkipped(binding.featureId, keyName, why)
+        noteSkipped(binding.featureId, keyName, initializerOrWhy)
         return false
     end
 
     state.bindings[binding.variable] = binding
     state.settings[binding.variable] = setting
+    state.controlCount = state.controlCount + 1
+    return true, initializerOrWhy
+end
+
+-- A section header: a Blizzard initializer whose data is two strings, drawn by
+-- Blizzard's own template (section 3.2). Not counted as a control.
+local function addHeader(controls, page, name, tooltip)
+    if not controls.sectionHeader or not page.layout or type(page.layout.AddInitializer) ~= "function" then
+        return false
+    end
+    local ok, initializer = pcall(controls.sectionHeader, name, tooltip)
+    if not ok or type(initializer) ~= "table" then
+        return false
+    end
+    return pcall(page.layout.AddInitializer, page.layout, initializer)
+end
+
+-- Indents a key's control under its feature's switch (section 3.4). With no
+-- predicate the client indents the control while its parent is on the page and
+-- never greys it out; Blizzard's own control listens to the parent setting, and
+-- nothing of ours is stored. Called while building, never after.
+local function indentUnder(control, switch)
+    if type(control) ~= "table" or type(switch) ~= "table"
+        or type(control.SetParentInitializer) ~= "function" then
+        state.unindented = state.unindented + 1
+        return false
+    end
+    if not pcall(control.SetParentInitializer, control, switch) then
+        state.unindented = state.unindented + 1
+        return false
+    end
     return true
 end
 
-local function addFeatureSection(controls, category, featureId)
+local function addFeatureSection(controls, page, featureId, headed)
     local defaults = ns.Registry.Defaults(featureId)
     local label = (defaults and defaults.label) or featureId
+    local before = state.controlCount
+
+    if headed then
+        addHeader(controls, page, label, defaults and defaults.description)
+    end
 
     -- The feature's own on/off switch, always first.
     local switch = {
@@ -415,12 +561,11 @@ local function addFeatureSection(controls, category, featureId)
         target = SWITCH,
         presentation = { kind = CHECKBOX },
     }
-    if buildControl(controls, category, switch, defaults ~= nil and defaults.enabledByDefault == true,
-        label, defaults and defaults.description) then
-        state.controlCount = state.controlCount + 1
-    end
+    local _, switchInitializer = buildControl(controls, page.category, switch,
+        defaults ~= nil and defaults.enabledByDefault == true, label, defaults and defaults.description)
 
-    local keys = ns.ConfigSchema.CuratedKeys(featureId)
+    local keys = ns.ConfigSchema.CuratedKeysInOrder(featureId)
+    local currentGroup = nil
     for index = 1, #keys do
         local key = keys[index]
         local declaration = ns.ConfigSchema.For(featureId, key)
@@ -430,6 +575,10 @@ local function addFeatureSection(controls, category, featureId)
         if not presentation then
             noteSkipped(featureId, key, why)
         else
+            if declaration.group and declaration.group ~= currentGroup then
+                currentGroup = declaration.group
+                addHeader(controls, page, declaration.group, declaration.groupDescription)
+            end
             local binding = {
                 variable = variableFor(featureId, key),
                 featureId = featureId,
@@ -437,13 +586,56 @@ local function addFeatureSection(controls, category, featureId)
                 key = key,
                 presentation = presentation,
             }
-            local controlLabel = (presentation.kind == CHOICE_CHECKBOX) and presentation.label
-                or declaration.label
-            if buildControl(controls, category, binding, declaredDefault, controlLabel,
-                declaration.description) then
-                state.controlCount = state.controlCount + 1
+            local built, initializer = buildControl(controls, page.category, binding, declaredDefault,
+                labelFor(declaration, presentation), declaration.description)
+            if built then
+                indentUnder(initializer, switchInitializer)
             end
         end
+    end
+
+    page.controlCount = page.controlCount + (state.controlCount - before)
+end
+
+-- The public features on each page, in each feature's declared order. A feature
+-- naming a page this panel does not know goes on the parent page, said once.
+local function featuresByPage()
+    local byPage = {}
+    local ids = ns.Registry.PublicIds()
+    for index = 1, #ids do
+        local featureId = ids[index]
+        local page, position = ns.Registry.PlacementOf(featureId)
+        if not KNOWN_PAGES[page] then
+            ns.Log.Once("panel:unknownpage:" .. featureId, format(
+                "%s names a settings page that does not exist (%s); it is shown on the PersonalAddon page",
+                featureId, tostring(page)))
+            page = PAGE.GENERAL
+        end
+        local list = byPage[page] or {}
+        byPage[page] = list
+        list[#list + 1] = { featureId = featureId, position = position }
+    end
+    for _, list in pairs(byPage) do
+        table.sort(list, function(left, right)
+            if left.position ~= right.position then
+                return left.position < right.position
+            end
+            return left.featureId < right.featureId
+        end)
+    end
+    return byPage
+end
+
+local function newPage(page, label, category, layout)
+    local record = { page = page, label = label, category = category, layout = layout, controlCount = 0 }
+    state.pages[#state.pages + 1] = record
+    return record
+end
+
+local function buildSections(controls, page, entries)
+    local headed = #entries >= 2
+    for index = 1, #entries do
+        addFeatureSection(controls, page, entries[index].featureId, headed)
     end
 end
 
@@ -463,17 +655,64 @@ local function buildPanel()
 
     state.controlCount = 0
     state.skipped = {}
+    state.pages = {}
+    state.unlabelled = 0
+    state.unindented = 0
 
-    local ok, category = pcall(controls.registerCategory, "PersonalAddon")
+    local ok, category, layout = pcall(controls.registerCategory, PARENT_LABEL)
     if not ok or not category then
         return nil, "registering the category was refused"
     end
+    local parent = newPage(PAGE.GENERAL, PARENT_LABEL, category, layout)
+    addHeader(controls, parent, format("PersonalAddon %s", tostring(ns.VERSION)),
+        "/pa help lists every command.")
 
     -- Only the features a user should see. The probes and the isolation test
     -- scaffolding are marked internal and never reach here (Phase 6 section 6).
-    local ids = ns.Registry.PublicIds()
-    for index = 1, #ids do
-        addFeatureSection(controls, category, ids[index])
+    local byPage = featuresByPage()
+    local parentEntries = byPage[PAGE.GENERAL] or {}
+    local pagesToBuild = {}
+
+    if not controls.registerSubcategory then
+        ns.Log.Once("panel:nosubcategories",
+            "this client offers no settings subcategories, so every setting is on the PersonalAddon page")
+    end
+
+    for index = 1, #PAGE_ORDER do
+        local spec = PAGE_ORDER[index]
+        local entries = byPage[spec.page]
+        if entries and #entries > 0 then
+            local subcategory, sublayout
+            if controls.registerSubcategory then
+                local registered
+                registered, subcategory, sublayout = pcall(controls.registerSubcategory, category, spec.label)
+                if not registered then
+                    subcategory = nil
+                end
+            end
+            if subcategory then
+                pagesToBuild[#pagesToBuild + 1] = {
+                    page = newPage(spec.page, spec.label, subcategory, sublayout),
+                    entries = entries,
+                }
+            else
+                -- One page that cannot be registered costs its own page, not its
+                -- controls: they go on the parent page.
+                if controls.registerSubcategory then
+                    ns.Log.Once("panel:nopage:" .. spec.page, format(
+                        "this client would not register the %s page; its settings are on the PersonalAddon page",
+                        spec.label))
+                end
+                for entry = 1, #entries do
+                    parentEntries[#parentEntries + 1] = entries[entry]
+                end
+            end
+        end
+    end
+
+    buildSections(controls, parent, parentEntries)
+    for index = 1, #pagesToBuild do
+        buildSections(controls, pagesToBuild[index].page, pagesToBuild[index].entries)
     end
 
     if state.controlCount == 0 then
@@ -542,20 +781,23 @@ ns.Registry.Register(FEATURE_ID, {
     onConfigChanged = onConfigChanged,
 })
 
+-- There is no Open. Settings.OpenToCategory calls C_SettingsUtil.OpenSettingsPanel,
+-- which the docs flag HasRestrictions: from this addon it is a refused call, and an
+-- insecure caller opening a panel (Phase 12 section 3.8).
 ns.SettingsPanel = {
-    Open = function()
-        local api = settingsApi()
-        local opener = api and firstFunction(api, "OpenToCategory")
-        if not opener or not state.categoryId then
-            return false, "no settings category to open"
-        end
-        return pcall(opener, state.categoryId)
-    end,
     Inspect = function()
+        local pages = {}
+        for index = 1, #state.pages do
+            local page = state.pages[index]
+            pages[index] = { label = page.label, controlCount = page.controlCount }
+        end
         return {
             registered = state.registered,
             controlCount = state.controlCount,
+            pages = pages,
             skipped = state.skipped,
+            unlabelled = state.unlabelled,
+            unindented = state.unindented,
             reverts = state.reverts,
             unreadable = state.unreadable,
         }

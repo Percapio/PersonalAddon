@@ -755,6 +755,8 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Equipped skills",
     description = "Your professions, the skills of your equipped weapons, and Defense, beside the bags while they are open.",
+    settingsPage = ns.SETTINGS_PAGE.BAGS_AND_LOOT,
+    settingsOrder = 10,
     settings = {
         anchorOffsetX = -4,
         anchorOffsetY = 0,
@@ -763,15 +765,18 @@ ns.Registry.Register(FEATURE_ID, {
     },
     schema = {
         anchorOffsetX = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset", order = 1,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -300, maximum = 300, step = 1,
         },
         anchorOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset", order = 2,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -300, maximum = 300, step = 1,
         },
         panelAlpha = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity", order = 3,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
             minimum = 0.1, maximum = 1.0, step = 0.05,
         },
         pollSeconds = {

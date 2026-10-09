@@ -849,35 +849,46 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Nameplates",
     description = "Hostile and neutral nameplates, coloured by who the monster is attacking.",
+    settingsPage = ns.SETTINGS_PAGE.NAMEPLATES,
+    settingsOrder = 10,
     settings = defaultSettings,
+    -- The colours are ordered by the verdict priority of Phase 11 section 2.3, so the
+    -- page reads in the order the colours win.
     schema = {
         aggroColouring = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour nameplates",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour nameplates", order = 1,
             description = "Red: it is attacking you. Orange: you are about to pull it. Grey: tagged by a player outside your group. Green: attacking your group or pet. Yellow: neutral. White: hostile, attacking neither.",
         },
         yieldSelectedTarget = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 2,
             description = "Stops contesting the bar colour on the unit you have selected. Turn this on if that plate flickers.",
         },
         colourOnPlayer = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking you",
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking you", order = 10,
+            group = "Colours, highest priority first",
+            groupDescription = "The threat panel's bars use these colours too.",
         },
         -- R7 (Phase 11 section 3).
         colourAboutToPull = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "You are about to pull it",
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "You are about to pull it", order = 11,
+            group = "Colours, highest priority first",
             description = "Your threat is above the tank's, and the mob is not on you yet",
         },
-        colourOnGroup = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking your group or pet",
-        },
-        colourElsewhere = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "Hostile, and attacking neither",
-        },
         colourTapDenied = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "Tagged by a player outside your group",
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Tagged by a player outside your group", order = 12,
+            group = "Colours, highest priority first",
+        },
+        colourOnGroup = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking your group or pet", order = 13,
+            group = "Colours, highest priority first",
         },
         colourNeutral = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "Neutral, and on neither you nor your group",
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Neutral, and on neither you nor your group", order = 14,
+            group = "Colours, highest priority first",
+        },
+        colourElsewhere = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Hostile, and attacking neither", order = 15,
+            group = "Colours, highest priority first",
         },
         -- Not curated: a frame-rate decision dressed as a preference.
         sweepInterval = {

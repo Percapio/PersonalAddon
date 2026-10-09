@@ -64,6 +64,7 @@ local state = {
         maximumRows = 4,
         showWhenEmpty = false,
         panelAlpha = 0.8,
+        scale = 1.0,
         anchorOffsetX = 0,
         anchorOffsetY = 8,
         hideInCombat = true,
@@ -365,9 +366,11 @@ local function anchorPanel()
         return
     end
     state.anchorIsPlayerFrame = usedPlayerFrame
-    state.panel:ClearAllPoints()
-    state.panel:SetPoint(panelPoint, anchorFrame, anchorPoint,
-        state.settings.anchorOffsetX, state.settings.anchorOffsetY)
+    ns.PanelChrome.Place(state.panel, anchorFrame, panelPoint, anchorPoint, {
+        scale = state.settings.scale,
+        offsetX = state.settings.anchorOffsetX,
+        offsetY = state.settings.anchorOffsetY,
+    })
 end
 
 -- The frame, border chain and background live in Core/PanelChrome.lua since Phase 8,
@@ -624,6 +627,7 @@ local function readSettings(config)
     state.settings.maximumRows = settings.maximumRows or state.settings.maximumRows
     state.settings.showWhenEmpty = (settings.showWhenEmpty == true)
     state.settings.panelAlpha = settings.panelAlpha or state.settings.panelAlpha
+    state.settings.scale = settings.scale or state.settings.scale
     state.settings.anchorOffsetX = settings.anchorOffsetX or state.settings.anchorOffsetX
     state.settings.anchorOffsetY = settings.anchorOffsetY or state.settings.anchorOffsetY
     state.settings.hideInCombat = (settings.hideInCombat ~= false)
@@ -697,7 +701,7 @@ end
 local function onConfigChanged(config, changedKey)
     readSettings(config)
 
-    if changedKey == "anchorOffsetX" or changedKey == "anchorOffsetY" then
+    if changedKey == "anchorOffsetX" or changedKey == "anchorOffsetY" or changedKey == "scale" then
         anchorPanel()
         return ns.CONFIG_RESULT.APPLIED
     end
@@ -721,21 +725,24 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Damage breakdown",
     description = "Your own damage by spell, above the player frame, read from the built-in meter.",
+    settingsPage = ns.SETTINGS_PAGE.COMBAT,
+    settingsOrder = 20,
     -- inCombatRefreshSeconds went in Phase 9. ConfigStore prunes a saved key the
     -- feature no longer declares, so no migration step is needed; it gives a new key,
-    -- such as Phase 11's hideInCombat, its default.
+    -- such as Phase 11's hideInCombat or Phase 12's scale, its default.
     settings = {
         sessionType = "Current",
         maximumRows = 4,
         showWhenEmpty = false,
         panelAlpha = 0.8,
+        scale = 1.0,
         anchorOffsetX = 0,
         anchorOffsetY = 8,
         hideInCombat = true,
     },
     schema = {
         sessionType = {
-            kind = ns.ConfigSchema.KIND.CHOICE, label = "Which fight",
+            kind = ns.ConfigSchema.KIND.CHOICE, label = "Which fight", order = 1,
             description = "Current shows the last fight; Overall sums your whole session.",
             choices = {
                 { value = "Current", label = "Current fight" },
@@ -743,27 +750,38 @@ ns.Registry.Register(FEATURE_ID, {
             },
         },
         maximumRows = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Rows shown",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Rows shown", order = 2,
+            unit = ns.ConfigSchema.UNIT.COUNT,
             description = "How many spells to list. Anything beyond this is counted, not dropped.",
             minimum = 1, maximum = 10, step = 1,
         },
         panelAlpha = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity", order = 3,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
             minimum = 0.1, maximum = 1.0, step = 0.05,
         },
+        scale = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Scale", order = 4,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
+            description = "The panel's size. Offsets stay in screen pixels at any scale.",
+            minimum = 0.5, maximum = 2.0, step = 0.05,
+        },
+        -- Phase 12: wide enough to reach across the screen from the player frame.
         anchorOffsetX = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset",
-            minimum = -300, maximum = 300, step = 1,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset", order = 5,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = -1200, maximum = 1200, step = 1,
         },
         anchorOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset",
-            minimum = -300, maximum = 300, step = 1,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset", order = 6,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = -800, maximum = 800, step = 1,
         },
         showWhenEmpty = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show when empty", curated = false,
         },
         hideInCombat = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Hide during combat",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Hide during combat", order = 7,
             description = "During a fight the panel still shows the last fight's figures; hiding it leaves room for the threat panel",
         },
     },

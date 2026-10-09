@@ -11,8 +11,10 @@ to match the game's own look. It is built for, and tested with, Blizzard's Gamep
 2. Put the `PersonalAddon` folder in `_classic_beta_/Interface/AddOns/`.
 3. Start the game and make sure the addon is enabled in the AddOns list.
 
-Every feature can be switched on or off and adjusted in **Settings > Options > AddOns >
-PersonalAddon**, or with `/pa` commands (below).
+Every feature can be switched on or off and adjusted in **Options > AddOns > PersonalAddon**,
+on its pages **Combat**, **Nameplates** and **Bags & loot**, or with `/pa` commands (below).
+Each feature's options sit indented under its switch, sliders show their value, and each
+page's Defaults resets only that page.
 
 ## Features
 
@@ -43,12 +45,13 @@ PersonalAddon**, or with `/pa` commands (below).
   - your threat on each, highest first;
   - your target marked, with level and elite tags.
 
-  It needs enemy nameplates on, and it hides when the fight ends.
+  It needs enemy nameplates on, and it hides when the fight ends. Its scale and position
+  are in Settings.
 - **Damage breakdown.** A small panel above the player frame lists your damage by spell,
   with icon, DPS and share of your total. It reads the game's own damage meter, so its
   numbers match it exactly. Choose the current fight or the whole session. By default it
   hides during combat, when it can only show the last fight, and its place goes to the
-  threat panel.
+  threat panel. Its scale and position are in Settings, separate from the threat panel's.
 
 **Bags and loot**
 
@@ -82,6 +85,7 @@ PersonalAddon**, or with `/pa` commands (below).
 | `/pa toasts`, `/pa toasts test` | Toast counts; show one of each toast |
 | `/pa bags`, `/pa vend` | The last sort or sale, and why any was skipped |
 | `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | State of the damage breakdown, threat panel, nameplates and five-second rule |
+| `/pa panel` | How the settings pages built. It does not open Options: that call is restricted |
 | `/pa blocked` | Actions the game refused with PersonalAddon named |
 | `/pa diag` | Counters and fault notes from the last five sessions |
 | `/pa diag clear` | Drop all but the current session's record |
@@ -98,9 +102,10 @@ addon, or `/run`) opening or closing a window, or closing Options with the contr
 an addon's page was drawn, can leave the Gamepad UI's focus, binding and cursor state
 tainted. Later controller actions are then refused, most often updating the interact icon,
 though a jump or a Game Menu button can be refused too. The game names whichever addon's
-taint that state carries: it has been PersonalAddon, BugSack, Questie, Chatify, SnapPrice
-and Auctionator, and with no addons at all, `/run`. This is a Blizzard defect, still present
-on build 1.60.1.70205. **`/reload` clears it.** Keep BugGrabber installed: without it,
+taint that state carries: it has been PersonalAddon, BugSack, Questie, Chatify, SnapPrice,
+Auctionator, BetterForeverChat and DrinkBot, and with no addons at all, `/run`. This is a
+Blizzard defect, still present on build 1.60.1.70291. **`/reload` clears it**, so reload
+after using Options with the controller. Keep BugGrabber installed: without it,
 Blizzard's own warning dialog takes part, and one session flooded until it disconnected.
 PersonalAddon now counts such a flood quietly and says `/reload`. Details:
 [Architecture/20261002-GAPBugs01.md](Architecture/20261002-GAPBugs01.md).
@@ -133,6 +138,7 @@ Attempted and dropped, with the reason, so nobody spends the time twice:
 | Quest tracker sorted by level | Reordering means removing and re-adding watches, and the game runs the tracker's update inside that call, carrying this addon's taint into the tracker. See [Phase 7 §6.4](Architecture/20260926-Phase07.md) |
 | Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon |
 | Raid markers on the threat panel | The client always hides them |
+| Greying out a feature's options while it is off | It needs a function Blizzard calls on every draw (rule 1). The options are indented under their switch instead |
 
 ## Planned
 
@@ -165,8 +171,12 @@ by number, so the numbers stay fixed.
      proxy settings with getters and setters.
    - No dropdowns: their option lists are functions Blizzard calls. Two-value choices are
      checkboxes.
-   - No commit, default or refresh hooks, slider label formatters, colour-picker
-     callbacks, or functions stored in Blizzard's tables.
+   - No commit, default or refresh hooks, slider label formatters of ours, colour-picker
+     callbacks, or functions stored in Blizzard's tables. Blizzard's own pass-through
+     slider label (`SetLabelFormatter` with no function) is allowed: it stores Blizzard's
+     function, not ours.
+   - No predicates on settings: a parent link (`SetParentInitializer`) takes no function,
+     so an option is indented under its switch but never greyed out.
 2. **We never write into Blizzard's variables or tables.** No `print()`, which goes
    through a shared chat global; no fields on Blizzard frames; no entries in
    `UIPanelWindows`, `UISpecialFrames` or other Blizzard registries. Slash-command

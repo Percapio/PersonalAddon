@@ -187,3 +187,54 @@ statement = "A nameplate frame carries its unit token in unitToken"
 source = "Phase 11 sections 5.2 and 14"
 consequence = "The threat panel lists nothing; Nameplates' adoption of plates at enable finds none (Features/Nameplates.lua)"
 check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateBase.lua", regex = 'self\.unitToken\s*=', expect = "Present" }
+
+# Phase 12 Part A: the settings pages (Architecture/20261006-Phase12.md section 11).
+
+[[premise]]
+id = "OPEN-SETTINGS-RESTRICTED"
+statement = "Opening the settings panel is restricted, so this addon never opens it"
+source = "Phase 12 section 3.8"
+consequence = "The reason /pa panel stopped opening Options. If the flag goes, an insecure open is still the first G1 writer (GAPBugs01 section 2.2); keep it out"
+check = { kind = "FlagEquals", entry = "C_SettingsUtil.OpenSettingsPanel", flag = "HasRestrictions", value = "true" }
+
+[[premise]]
+id = "SLIDER-BUILTIN-LABEL"
+statement = "A slider label formatter given no function is Blizzard's own pass-through"
+source = "Phase 12 section 3.5"
+consequence = "The slider label would become ours to supply, which README rule 1 forbids: drop the label in Features/SettingsPanel.lua (sliderOptions)"
+check = { kind = "Pattern", file = "Blizzard_SharedXML/Shared/Slider/MinimalSlider.lua", regex = 'if value == nil then\s*\n\s*formatter = NoModification', expect = "Present" }
+
+[[premise]]
+id = "PARENT-WITHOUT-PREDICATE"
+statement = "A settings parent link adds no predicate unless one is given"
+source = "Phase 12 section 3.4"
+consequence = "Indenting an option may start calling something; re-read SetParentInitializer before the next build (Features/SettingsPanel.lua, indentUnder)"
+check = { kind = "Pattern", file = "Blizzard_Settings_Shared/Blizzard_SettingControls.lua", regex = 'if modifyPredicate then\s*\n\s*self:AddModifyPredicate\(modifyPredicate\)', expect = "Present" }
+
+[[premise]]
+id = "SECTION-HEADER-DATA-ONLY"
+statement = "A settings section header's initializer holds strings only"
+source = "Phase 12 section 3.2"
+consequence = "A header may carry a function Blizzard calls; re-read it before keeping the headers (Features/SettingsPanel.lua, addHeader)"
+check = { kind = "Pattern", file = "Blizzard_Settings_Shared/Blizzard_SettingControls.lua", regex = 'function CreateSettingsListSectionHeaderInitializer\(name, tooltip, newTagID\)\s*\n\s*local data = \{name = name, tooltip = tooltip, newTagID = newTagID\};', expect = "Present" }
+
+[[premise]]
+id = "DEFAULTS-PER-PAGE"
+statement = "Defaults, These settings, resets only the current category"
+source = "Phase 12 section 3.3"
+consequence = "Defaults on one page may reset every page's settings; say so in the README"
+check = { kind = "Pattern", file = "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua", regex = 'if category == currentCategory then', expect = "Present" }
+
+[[premise]]
+id = "SUBCATEGORIES-IN-ORDER"
+statement = "Settings subcategories keep their registration order unless asked to sort"
+source = "Phase 12 section 3.2"
+consequence = "The pages sort by name; reorder PAGE_ORDER's labels or accept the client's order"
+check = { kind = "Pattern", file = "Blizzard_Settings_Shared/Blizzard_CategoryList.lua", regex = 'canSort = category:ShouldSortAlphabetically\(\)', expect = "Present" }
+
+[[premise]]
+id = "SUBCATEGORY-SECURE"
+statement = "An addon's settings subcategory is created inside a secure call"
+source = "Phase 12 section 15"
+consequence = "Registering the pages would run Blizzard's category code in this addon's execution; re-read section 3.2 before the next build"
+check = { kind = "Pattern", file = "Blizzard_Settings_Shared/Blizzard_SettingsInbound.lua", regex = 'securecallfunction\(PrivateSettingsCategoryMixin\.CreateSubcategory, parentCategory, categoryName\)', expect = "Present" }

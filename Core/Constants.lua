@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.1.0-phase11"
+ns.VERSION = "1.2.0-phase12"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -102,3 +102,19 @@ ns.STORM_FUNCTION_CAPACITY = 16
 -- The threat panel's row pool, built at enable. Above the largest maximumRows the
 -- schema allows (10), so no setting can exhaust it during a fight (section 5.5).
 ns.THREAT_ROW_CAPACITY = 16
+
+-- Phase 12 (Architecture/20261006-Phase12.md) ---------------------------------
+
+-- The pages of the settings menu, in the order they appear under PersonalAddon
+-- (section 3.1). General is the parent page itself. A feature names its page in
+-- its registration; one that names none goes on the parent page.
+ns.SETTINGS_PAGE = {
+    GENERAL = "General",
+    COMBAT = "Combat",
+    NAMEPLATES = "Nameplates",
+    BAGS_AND_LOOT = "BagsAndLoot",
+    CONSUMABLES = "Consumables",
+}
+-- After every declared settingsOrder, so an unplaced feature sorts last, in
+-- registration order.
+ns.SETTINGS_UNPLACED_ORDER = 1000

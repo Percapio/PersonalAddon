@@ -1,13 +1,13 @@
 {
- "acceptedAt": 1791255904.339738,
- "acceptedBy": "Accepted",
+ "acceptedAt": 1791517744.633708,
+ "acceptedBy": "AcceptedAfterReview",
  "client": {
-  "binaryModifiedAt": 1791243632.4908729,
-  "build": "1.60.1.70235"
+  "binaryModifiedAt": 1791514114.7888856,
+  "build": "1.60.1.70291"
  },
- "exportDigest": "2a5463e1b1dbe8eb4c9f2402948b9e0bcdf674580f535e94d2a2f394eb6dd8d6",
- "exportedAt": 1791255779.658224,
- "report": "2026-10-05-1.60.1.70235.md",
+ "exportDigest": "62705aa5d4d8fbf56ce79a417a31b76e8b730b9a3a4169130f5187342baa35d7",
+ "exportedAt": 1791516018.4978256,
+ "report": "2026-10-08-1.60.1.70291.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
@@ -57,6 +57,9 @@
   "C_NamePlate.GetNamePlateForUnit": [
    "Blizzard_APIDocumentationGenerated/NamePlateDocumentation.lua"
   ],
+  "C_NamePlate.GetNamePlates": [
+   "Blizzard_APIDocumentationGenerated/NamePlateDocumentation.lua"
+  ],
   "C_PaperDollInfo.GetInventorySlotInfoForInvSlot": [
    "Blizzard_APIDocumentationGenerated/PaperDollInfoDocumentation.lua"
   ],
@@ -99,6 +102,9 @@
   "FrameAPIModelSceneFrameActorBase:SetAlpha": [
    "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
   ],
+  "FrameAPIModelSceneFrameActorBase:SetScale": [
+   "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
+  ],
   "FrameAPIModelSceneFrameActorBase:Show": [
    "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
   ],
@@ -123,6 +129,12 @@
   "SimpleAnimGroupAPI:SetScript": [
    "Blizzard_APIDocumentationGenerated/SimpleAnimGroupAPIDocumentation.lua"
   ],
+  "SimpleAnimScaleAPI:SetScale": [
+   "Blizzard_APIDocumentationGenerated/SimpleAnimScaleAPIDocumentation.lua"
+  ],
+  "SimpleButtonAPI:SetFormattedText": [
+   "Blizzard_APIDocumentationGenerated/SimpleButtonAPIDocumentation.lua"
+  ],
   "SimpleButtonAPI:SetText": [
    "Blizzard_APIDocumentationGenerated/SimpleButtonAPIDocumentation.lua"
   ],
@@ -143,6 +155,9 @@
   ],
   "SimpleFontAPI:SetTextColor": [
    "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:SetFormattedText": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
   ],
   "SimpleFontStringAPI:SetJustifyH": [
    "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
@@ -181,6 +196,9 @@
    "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
   ],
   "SimpleFrameAPI:SetFrameStrata": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:SetScale": [
    "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
   ],
   "SimpleFrameAPI:Show": [
@@ -222,6 +240,9 @@
   "SimpleRegionAPI:SetAlpha": [
    "Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua"
   ],
+  "SimpleRegionAPI:SetScale": [
+   "Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua"
+  ],
   "SimpleRegionAPI:SetVertexColor": [
    "Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua"
   ],
@@ -261,10 +282,25 @@
   "SimpleScriptRegionResizingAPI:SetWidth": [
    "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
   ],
+  "SimpleSliderAPI:SetMinMaxValues": [
+   "Blizzard_APIDocumentationGenerated/SimpleSliderAPIDocumentation.lua"
+  ],
+  "SimpleSliderAPI:SetValue": [
+   "Blizzard_APIDocumentationGenerated/SimpleSliderAPIDocumentation.lua"
+  ],
   "SimpleStatusBarAPI:GetStatusBarColor": [
    "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
   ],
+  "SimpleStatusBarAPI:SetMinMaxValues": [
+   "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
+  ],
   "SimpleStatusBarAPI:SetStatusBarColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
+  ],
+  "SimpleStatusBarAPI:SetStatusBarTexture": [
+   "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
+  ],
+  "SimpleStatusBarAPI:SetValue": [
    "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
   ],
   "SimpleTextureBaseAPI:SetColorTexture": [
@@ -282,16 +318,37 @@
   "UnitCanAttack": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
+  "UnitClassification": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitDetailedThreatSituation": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
   "UnitExists": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitGUID": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
+  "UnitHealth": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitHealthMax": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitIsDead": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
   "UnitIsTapDenied": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitIsUnit": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitLevel": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitName": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitPlayerControlled": [
@@ -426,6 +483,9 @@
   "lua ContainerFrameCombinedBags": [
    "Blizzard_UIPanels_Game/Mainline/ContainerFrame.xml"
   ],
+  "lua CreateSettingsListSectionHeaderInitializer": [
+   "Blizzard_Settings_Shared/Blizzard_SettingControls.lua"
+  ],
   "lua DEFAULT_CHAT_FRAME": [
    "Blizzard_ChatFrameBase/Shared/ChatFrameUtil.lua"
   ],
@@ -473,6 +533,9 @@
   ],
   "lua LAST_ACTIVE_CHAT_EDIT_BOX": [
    "Blizzard_ChatFrameBase/Shared/ChatFrameUtil.lua"
+  ],
+  "lua MinimalSliderWithSteppersMixin": [
+   "Blizzard_SharedXML/Shared/Slider/MinimalSlider.lua"
   ],
   "lua NUM_BAG_SLOTS": [
    "Blizzard_FrameXMLBase/Constants.lua"
@@ -648,6 +711,11 @@
    "Returns.nameplate.Type": "\"NamePlateFrame\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "C_NamePlate.GetNamePlates": {
+   "Returns.nameplates.InnerType": "\"NamePlateFrame\"",
+   "Returns.nameplates.Nilable": "false",
+   "Returns.nameplates.Type": "\"table\""
+  },
   "C_PaperDollInfo.GetInventorySlotInfoForInvSlot": {
    "Arguments.invSlotValue.Nilable": "false",
    "Arguments.invSlotValue.Type": "\"number\"",
@@ -754,6 +822,11 @@
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Alpha }"
   },
+  "FrameAPIModelSceneFrameActorBase:SetScale": {
+   "Arguments.scale.Nilable": "false",
+   "Arguments.scale.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "FrameAPIModelSceneFrameActorBase:Show": {},
   "FrameAPITooltip:SetText": {
    "Arguments.alpha.ConditionalSecret": "true",
@@ -820,6 +893,19 @@
    "RequiresAssignableScript": "true",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "SimpleAnimScaleAPI:SetScale": {
+   "Arguments.scaleX.Nilable": "false",
+   "Arguments.scaleX.Type": "\"number\"",
+   "Arguments.scaleY.Nilable": "false",
+   "Arguments.scaleY.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleButtonAPI:SetFormattedText": {
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
+  },
   "SimpleButtonAPI:SetText": {
    "Arguments.text.Default": "\"\"",
    "Arguments.text.Nilable": "false",
@@ -869,6 +955,12 @@
    "Arguments.colorR.Nilable": "false",
    "Arguments.colorR.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontStringAPI:SetFormattedText": {
+   "Arguments.text.Nilable": "false",
+   "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
   },
   "SimpleFontStringAPI:SetJustifyH": {
    "Arguments.justifyH.Nilable": "false",
@@ -960,7 +1052,15 @@
    "Arguments.strata.Nilable": "false",
    "Arguments.strata.Type": "\"FrameStrata\"",
    "IsProtectedFunction": "true",
-   "SecretArguments": "\"NotAllowed\""
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.FrameStrata }"
+  },
+  "SimpleFrameAPI:SetScale": {
+   "Arguments.scale.Nilable": "false",
+   "Arguments.scale.Type": "\"number\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Scale }"
   },
   "SimpleFrameAPI:Show": {
    "IsProtectedFunction": "true"
@@ -1061,6 +1161,13 @@
    "SecretArguments": "\"AllowedWhenTainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Alpha }"
   },
+  "SimpleRegionAPI:SetScale": {
+   "Arguments.scale.Nilable": "false",
+   "Arguments.scale.Type": "\"number\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Scale }"
+  },
   "SimpleRegionAPI:SetVertexColor": {
    "Arguments.a.Nilable": "true",
    "Arguments.a.Type": "\"SingleColorValue\"",
@@ -1156,6 +1263,21 @@
    "IsProtectedFunction": "true",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "SimpleSliderAPI:SetMinMaxValues": {
+   "Arguments.maxValue.Nilable": "false",
+   "Arguments.maxValue.Type": "\"number\"",
+   "Arguments.minValue.Nilable": "false",
+   "Arguments.minValue.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleSliderAPI:SetValue": {
+   "Arguments.treatAsMouseEvent.Default": "false",
+   "Arguments.treatAsMouseEvent.Nilable": "false",
+   "Arguments.treatAsMouseEvent.Type": "\"bool\"",
+   "Arguments.value.Nilable": "false",
+   "Arguments.value.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "SimpleStatusBarAPI:GetStatusBarColor": {
    "Returns.colorA.Nilable": "false",
    "Returns.colorA.Type": "\"number\"",
@@ -1166,6 +1288,18 @@
    "Returns.colorR.Nilable": "false",
    "Returns.colorR.Type": "\"number\"",
    "SecretReturnsForAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
+  },
+  "SimpleStatusBarAPI:SetMinMaxValues": {
+   "Arguments.interpolation.Default": "\"Immediate\"",
+   "Arguments.interpolation.NeverSecret": "true",
+   "Arguments.interpolation.Nilable": "false",
+   "Arguments.interpolation.Type": "\"StatusBarInterpolation\"",
+   "Arguments.maxValue.Nilable": "false",
+   "Arguments.maxValue.Type": "\"number\"",
+   "Arguments.minValue.Nilable": "false",
+   "Arguments.minValue.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.BarValue }"
   },
   "SimpleStatusBarAPI:SetStatusBarColor": {
    "Arguments.a.Nilable": "true",
@@ -1178,6 +1312,24 @@
    "Arguments.colorR.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenTainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
+  },
+  "SimpleStatusBarAPI:SetStatusBarTexture": {
+   "Arguments.asset.Nilable": "false",
+   "Arguments.asset.Type": "\"TextureAsset\"",
+   "CheckAllowChangeParent": "true",
+   "Returns.success.Nilable": "false",
+   "Returns.success.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleStatusBarAPI:SetValue": {
+   "Arguments.interpolation.Default": "\"Immediate\"",
+   "Arguments.interpolation.NeverSecret": "true",
+   "Arguments.interpolation.Nilable": "false",
+   "Arguments.interpolation.Type": "\"StatusBarInterpolation\"",
+   "Arguments.value.Nilable": "false",
+   "Arguments.value.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.BarValue }"
   },
   "SimpleTextureBaseAPI:SetColorTexture": {
    "Arguments.a.Nilable": "true",
@@ -1232,6 +1384,32 @@
    "Returns.result.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "UnitClassification": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitDetailedThreatSituation": {
+   "Arguments.mobGUID.Nilable": "false",
+   "Arguments.mobGUID.Type": "\"UnitToken\"",
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "MayReturnNothing": "true",
+   "Returns.isTanking.Nilable": "false",
+   "Returns.isTanking.Type": "\"bool\"",
+   "Returns.rawPercentage.Nilable": "false",
+   "Returns.rawPercentage.Type": "\"number\"",
+   "Returns.rawThreat.Nilable": "false",
+   "Returns.rawThreat.Type": "\"number\"",
+   "Returns.scaledPercentage.Nilable": "false",
+   "Returns.scaledPercentage.Type": "\"number\"",
+   "Returns.status.Nilable": "false",
+   "Returns.status.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenUnitThreatValuesRestricted": "true"
+  },
   "UnitExists": {
    "Arguments.unit.Nilable": "true",
    "Arguments.unit.Type": "\"UnitToken\"",
@@ -1246,6 +1424,32 @@
    "Returns.result.Type": "\"WOWGUID\"",
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretWhenUnitIdentityRestricted": "true"
+  },
+  "UnitHealth": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitTokenPvPRestrictedForAddOns\"",
+   "Arguments.usePredicted.Default": "true",
+   "Arguments.usePredicted.Nilable": "false",
+   "Arguments.usePredicted.Type": "\"bool\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretReturns": "true"
+  },
+  "UnitHealthMax": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitTokenPvPRestrictedForAddOns\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenUnitHealthMaxRestricted": "true"
+  },
+  "UnitIsDead": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "UnitIsTapDenied": {
    "Arguments.unit.Nilable": "false",
@@ -1264,6 +1468,23 @@
    "Returns.result.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretWhenUnitComparisonRestricted": "true"
+  },
+  "UnitLevel": {
+   "Arguments.name.Nilable": "false",
+   "Arguments.name.Type": "\"cstring\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitName": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.unitName.Nilable": "false",
+   "Returns.unitName.Type": "\"cstring\"",
+   "Returns.unitServer.Nilable": "false",
+   "Returns.unitServer.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretWhenUnitNameIdentityRestricted": "true"
   },
   "UnitPlayerControlled": {
    "Arguments.unit.Nilable": "true",
@@ -1575,25 +1796,25 @@
  "watchedHashes": {
   "Blizzard_FrameXML/Mainline/AlertFrames.lua": "cbb1013acd8beed871e50009fc659654b8ba3f03600aff74a5729c6919b2a43f",
   "Blizzard_Game/Shared/EventImplementation.lua": "9314fccf86511c4dc21f48d4aa9cc37134c7b503eb66946db591593b062bafc7",
-  "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "3f4ab9b67e1aeddf5be57d70ee6e4c0770cf7c333af07dd27d4c9e3c6d3a5046",
-  "Blizzard_GamepadActionBars/PageUnit.lua": "36bc08a18e67aa4b97ed6548a39fde353ecab2aa3c7782d2da813f1a00c8fb72",
-  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "ab5245cd786860b879f5f832b04c37deeb47d7131db016c7f52ce1d95f249072",
-  "Blizzard_GamepadSharedUtility/FrameReformUtility.lua": "fb1c41ddc47fa6f2d9cc49c429d77ee024f75fb369820295d4385fce54c8a72e",
+  "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "4d40713f327cf0e102a6b3997e2e57800d1cf2861a9589d0889bf57e223cd810",
+  "Blizzard_GamepadActionBars/PageUnit.lua": "124d6821ea94ffa04d50bd4ce304494707753577437b2009f1a44672afdff11a",
+  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "6b302dade8185480b4e6a9f9284ccc6abe13e812a93d264e533d27113853449f",
+  "Blizzard_GamepadSharedUtility/FrameReformUtility.lua": "f7202f0a5b679f0d35ab04c57e8e26a1a25244e7e0e60fbbfb2c6dee85d03a2b",
   "Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua": "ef5beda0110e7213d86de6aebe3f838f4624bac36e3a6047f78b5954fbf36dbe",
   "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua": "27318d5b42f396b5f246cfde2fe2225d5bbfa39d61e4544eb3cd34ae29c26897",
   "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "d314e6b29f184aebc82247382acd1c3ddc6d8bb8ebeb218ab0f1c75bc7d4d669",
-  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "5d5f113e45fd8d1d01bc4632a97895c230e88afca9cc03156dcfa96a0c771298",
+  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "187b1fe25a05bb428381a23561bb389c1acc5776c9f0f30c5e26c09376066ab6",
   "Blizzard_GamepadSmartNavigation/Utility.lua": "fee22413d6ff69ba861bae59c2f43818a09bfaea52c88f3133e7c05f4a986011",
   "Blizzard_Settings_Shared/Blizzard_Settings.lua": "76ab19d14675e4e3dcf4fb1b02af35898e253e254da3cfce0ef655eab475e293",
   "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua": "27f6db7d502104ad26d2893519fd810b4769616398a0ebb3fb08632f7745f4a7",
   "Blizzard_SharedXMLBase/FrameUtil.lua": "61de9061104e83dbd7e704ca129e9784143bade0437b2acbd337a604656bfdd1",
   "Blizzard_StaticPopup/StaticPopupGamepad.lua": "eb4a1abd9b3d2471d4ffe36bf259eb443a47f7bd26c305ef66386139f1c60a27",
   "Blizzard_TextStatusBar/TextStatusBar.lua": "8139222b91d434534d86d5b1ddb2c75c9ea4d43780a6e97e6c098c127836d462",
-  "Blizzard_UIPanels_Game/Camelot/BankFrame.lua": "04ebda782f99dc7c2204a91676326dec4894c9d10628c3e6714c62744e4aa7cb",
-  "Blizzard_UIPanels_Game/Mainline/BankFrameTemplates.lua": "a879abe67d136c8da7cc3071a476c73568fe640c899ba3368a7b63749879733c",
+  "Blizzard_UIPanels_Game/Camelot/BankFrame.lua": "990b432d120f85aaa8dea3c982e0e1384206078ce1ed330ef667c2965a08e503",
+  "Blizzard_UIPanels_Game/Mainline/BankFrameTemplates.lua": "7d3496b42acc6adf4a6e42a5efa4f147d2185eff4d644f3da8d4b8e806c77030",
   "Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua": "dab48c237737ec71e1a40b024c851ace6c4d4c51f7671ae94683597f0ca2c310",
   "Blizzard_UnitFrame/Camelot/PlayerFrame.lua": "fa850df2506d3bdd47e1c3a610e89cb87dab87a7d007c9102632352f25e6b9c9",
-  "Blizzard_UnitFrame/Mainline/PlayerFrame.lua": "fac14c351cc62729e655780dda394cf6344b298a09ab2b7b1cd3d9afe44ec5a1",
-  "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua": "c0b035a25fe54eb86baf136f1b06b1e615f1aa5577ae45ed049d00ded3b5ec1d"
+  "Blizzard_UnitFrame/Mainline/PlayerFrame.lua": "492d25f7ec1ddf4b6fb4fbb7d8ee68bc0c2f37bfa4eb372be30bbf6c987f557b",
+  "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua": "23daeb08adabf241904e4d4b13136915ed486353b76b366700efa4af629efa6b"
  }
 }

@@ -2,7 +2,7 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 1.1.0
+## Version: 1.2.0
 ## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their
 # stacks, so they survive a reload (Architecture/20260924-Patch01Implementation.md
@@ -10,7 +10,7 @@
 # PersonalAddonDiagnostics holds counters and fault notes from the last five
 # sessions (Architecture/20261002-Phase09.md section 3); /pa diag clear empties it.
 ## X-License: Artistic License 2.0
-## X-Phase: 11
+## X-Phase: 12
 
 # Interface number follows Blizzard's major*10000 + minor*100 + patch
 # convention for the stated client version 1.60.1. If the beta reports a

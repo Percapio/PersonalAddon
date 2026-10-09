@@ -34,8 +34,19 @@ ConfigSchema.VIOLATION = {
     NO_SCHEMA = "NoSchema",
 }
 
+-- What a number counts (Phase 12 section 2). Semantic, like the kind: the panel
+-- decides that a Fraction is shown as a percentage and that Pixels get "(px)".
+ConfigSchema.UNIT = {
+    COUNT = "Count",
+    PIXELS = "Pixels",
+    SECONDS = "Seconds",
+    FRACTION = "Fraction",
+    PLAIN = "Plain",
+}
+
 local KIND = ConfigSchema.KIND
 local VIOLATION = ConfigSchema.VIOLATION
+local UNIT = ConfigSchema.UNIT
 
 local schemas = {}
 
@@ -66,6 +77,10 @@ function ConfigSchema.Declare(featureId, keySchemas)
             step = declaration.step,
             choices = declaration.choices,
             curated = (declaration.curated ~= false),
+            unit = declaration.unit or UNIT.PLAIN,
+            order = declaration.order,
+            group = declaration.group,
+            groupDescription = declaration.groupDescription,
         }
     end
 end
@@ -87,6 +102,28 @@ function ConfigSchema.CuratedKeys(featureId)
         end
     end
     table.sort(keys)
+    return keys
+end
+
+-- The curated keys in the order the settings page draws them: keys with an order
+-- first, ascending, then the rest by name. With no order declared this is exactly
+-- CuratedKeys, so a key that forgets its order is still shown, last.
+function ConfigSchema.CuratedKeysInOrder(featureId)
+    local byKey = schemas[featureId] or {}
+    local keys = ConfigSchema.CuratedKeys(featureId)
+    table.sort(keys, function(left, right)
+        local leftOrder, rightOrder = byKey[left].order, byKey[right].order
+        if leftOrder and rightOrder then
+            if leftOrder ~= rightOrder then
+                return leftOrder < rightOrder
+            end
+            return left < right
+        end
+        if leftOrder or rightOrder then
+            return leftOrder ~= nil
+        end
+        return left < right
+    end)
     return keys
 end
 

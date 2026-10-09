@@ -92,6 +92,7 @@ local state = {
     settings = {
         maximumRows = 6,
         panelAlpha = 0.8,
+        scale = 1.0,
         anchorOffsetX = 0,
         anchorOffsetY = 8,
         showLevel = true,
@@ -384,9 +385,11 @@ local function anchorPanel()
         return
     end
     state.anchorIsPlayerFrame = usedPlayerFrame
-    state.panel:ClearAllPoints()
-    state.panel:SetPoint(panelPoint, anchorFrame, anchorPoint,
-        state.settings.anchorOffsetX, state.settings.anchorOffsetY)
+    ns.PanelChrome.Place(state.panel, anchorFrame, panelPoint, anchorPoint, {
+        scale = state.settings.scale,
+        offsetX = state.settings.anchorOffsetX,
+        offsetY = state.settings.anchorOffsetY,
+    })
 end
 
 local function createRow()
@@ -736,6 +739,7 @@ local function readSettings(config)
     local own = state.settings
     own.maximumRows = settings.maximumRows or own.maximumRows
     own.panelAlpha = settings.panelAlpha or own.panelAlpha
+    own.scale = settings.scale or own.scale
     own.anchorOffsetX = settings.anchorOffsetX or own.anchorOffsetX
     own.anchorOffsetY = settings.anchorOffsetY or own.anchorOffsetY
     own.showLevel = (settings.showLevel ~= false)
@@ -793,7 +797,7 @@ end
 -- The rest lands on the next sweep, under a quarter of a second away in a fight.
 local function onConfigChanged(config, changedKey)
     readSettings(config)
-    if changedKey == "anchorOffsetX" or changedKey == "anchorOffsetY" then
+    if changedKey == "anchorOffsetX" or changedKey == "anchorOffsetY" or changedKey == "scale" then
         anchorPanel()
     elseif changedKey == "panelAlpha" then
         ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
@@ -808,9 +812,12 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Threat panel",
     description = "In combat, the mobs fighting you or your group, with their health and your threat on each, in the damage breakdown's place. The bars use the nameplate colours, set under Nameplates. Needs enemy nameplates on.",
+    settingsPage = ns.SETTINGS_PAGE.COMBAT,
+    settingsOrder = 30,
     settings = {
         maximumRows = 6,
         panelAlpha = 0.8,
+        scale = 1.0,
         anchorOffsetX = 0,
         anchorOffsetY = 8,
         showLevel = true,
@@ -820,27 +827,38 @@ ns.Registry.Register(FEATURE_ID, {
     },
     schema = {
         maximumRows = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Rows shown",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Rows shown", order = 1,
+            unit = ns.ConfigSchema.UNIT.COUNT,
             description = "How many mobs to list, highest threat first.",
             minimum = 1, maximum = 10, step = 1,
         },
         panelAlpha = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity", order = 2,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
             minimum = 0.1, maximum = 1.0, step = 0.05,
         },
+        scale = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Scale", order = 3,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
+            description = "The panel's size. Offsets stay in screen pixels at any scale.",
+            minimum = 0.5, maximum = 2.0, step = 0.05,
+        },
+        -- Phase 12: wide enough to reach across the screen from the player frame.
         anchorOffsetX = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset",
-            minimum = -300, maximum = 300, step = 1,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset", order = 4,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = -1200, maximum = 1200, step = 1,
         },
         anchorOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset",
-            minimum = -300, maximum = 300, step = 1,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset", order = 5,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = -800, maximum = 800, step = 1,
         },
         showLevel = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show level and elite tag",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show level and elite tag", order = 6,
         },
         markTarget = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Mark your target",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Mark your target", order = 7,
         },
         showWhenEmpty = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show when empty", curated = false,

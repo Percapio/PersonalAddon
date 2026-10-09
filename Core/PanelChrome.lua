@@ -160,3 +160,21 @@ function PanelChrome.SetAlpha(chrome, alpha)
         chrome.background:SetAlpha(alpha)
     end
 end
+
+-- Scales a panel and anchors it (Phase 12 section 4). A frame's anchor offsets are
+-- measured in its own scaled units, so the offsets are divided by the scale: they
+-- stay screen pixels, and the anchored corner stays put while the panel grows.
+--
+-- placement.scale     1 is the panel's natural size
+-- placement.offsetX   pixels from the anchor point, at any scale
+-- placement.offsetY   likewise
+function PanelChrome.Place(panel, anchorFrame, panelPoint, anchorPoint, placement)
+    local scale = placement.scale
+    if type(scale) ~= "number" or scale <= 0 then
+        scale = 1
+    end
+    panel:SetScale(scale)
+    panel:ClearAllPoints()
+    panel:SetPoint(panelPoint, anchorFrame, anchorPoint,
+        placement.offsetX / scale, placement.offsetY / scale)
+end

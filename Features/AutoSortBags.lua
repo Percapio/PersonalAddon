@@ -217,12 +217,15 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Tidy bags when closed",
     description = "Runs the game's Clean Up Bags when the bags close, at most once a minute, never in combat.",
+    settingsPage = ns.SETTINGS_PAGE.BAGS_AND_LOOT,
+    settingsOrder = 30,
     settings = {
         cooldownSeconds = 60,
     },
     schema = {
         cooldownSeconds = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Minimum seconds between sorts",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Minimum seconds between sorts", order = 1,
+            unit = ns.ConfigSchema.UNIT.SECONDS,
             minimum = 10, maximum = 600, step = 10,
         },
     },

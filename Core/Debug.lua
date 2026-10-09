@@ -395,14 +395,20 @@ local function commandPanel()
         return
     end
     local view = ns.SettingsPanel.Inspect()
-    ns.Log.Info(format("panel registered=%s controls=%d skipped=%d reverts=%d unreadableColours=%d",
+    ns.Log.Info(format("panel registered=%s controls=%d skipped=%d reverts=%d unreadableColours=%d unlabelledSliders=%d unindented=%d",
         tostring(view.registered), view.controlCount, #view.skipped,
-        view.reverts or 0, view.unreadable or 0))
+        view.reverts or 0, view.unreadable or 0, view.unlabelled or 0, view.unindented or 0))
+    for index = 1, #(view.pages or {}) do
+        local page = view.pages[index]
+        ns.Log.Info(format("  page %s: %d control(s)", page.label, page.controlCount))
+    end
     for index = 1, #view.skipped do
         ns.Log.Warn("  skipped " .. view.skipped[index])
     end
+    -- Opening Options from here would be a restricted call made by this addon
+    -- (Phase 12 section 3.8), so the command says where the page is instead.
     if view.registered then
-        ns.SettingsPanel.Open()
+        ns.Log.Info("the settings are in Options > AddOns > PersonalAddon")
     end
 end
 
@@ -713,7 +719,7 @@ local function commandHelp()
     ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each toast")
     ns.Log.Info("/pa bags                tidy bags: sorts, skips, and who listens")
     ns.Log.Info("/pa vend                sell junk: the last sale and any skips")
-    ns.Log.Info("/pa panel               open the settings panel and report how it built")
+    ns.Log.Info("/pa panel               how the settings pages built, and where to find them")
     ns.Log.Info("/pa blocked             refusals the client blamed on this addon, with their paths")
     ns.Log.Info("/pa blocked stack <n>   one record's stored stack")
     ns.Log.Info("/pa blocked clear       empty the saved block log")

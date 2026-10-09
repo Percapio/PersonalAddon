@@ -1,7 +1,9 @@
-"""The patch check's tests, T1-T15 (Architecture/20261002-Phase10.md section 10.1)
-and T16-T18 (Architecture/20261005-Phase11.md section 10.2).
+"""The patch check's tests, T1-T15 (Architecture/20261002-Phase10.md section 10.1),
+T16-T18 (Architecture/20261005-Phase11.md section 10.2) and T19
+(Architecture/20261006-Phase12.md section 14.2).
 
-T1, T2, T15 and T18 use the real exports and are skipped when one is missing. The
+T1, T2, T15, T18 and T19 use the real exports and are skipped when one is missing. T2
+also needs the current export to be the 10-02 UI source, and is skipped otherwise. The
 rest copy the small synthetic export in fixtures/base to a temporary folder and
 change it.
 
@@ -26,6 +28,10 @@ from patchcheck import client_build, patch_check, premises, store, views  # noqa
 FIXTURE = TOOLS / "patchcheck" / "fixtures" / "base"
 OLD_EXPORT = pathlib.Path(r"C:\tmp\BlizzardInterfaceCode-20260926")
 BUILD = "1.60.1.70205"
+# The export GAPBugs01 section 1.4 was derived from: the 10-02 UI source, which builds
+# 70205 and 70235 exported byte for byte. T2 pins its counts, so it runs only while that
+# export is the current one (Architecture/20261006-Phase12.md section 19).
+GAPBUGS01_EXPORT_DIGEST = "2a5463e1b1dbe8eb4c9f2402948b9e0bcdf674580f535e94d2a2f394eb6dd8d6"
 
 
 class Crash(Exception):
@@ -337,6 +343,10 @@ class RealExportTests(unittest.TestCase):
 
     @unittest.skipUnless(paths.docs_root(OLD_EXPORT).is_dir(), "the 09-26 export is missing")
     def test_t2_reproduces_gapbugs01_section_1_4(self):
+        hashes, _ = views.hash_export(paths.EXPORT)
+        if views.export_digest(hashes) != GAPBUGS01_EXPORT_DIGEST:
+            self.skipTest("the current export is not the 10-02 UI source GAPBugs01 section 1.4 was "
+                          "derived from; the last copy was replaced by 70291's accept on 2026-10-08")
         temporary = pathlib.Path(tempfile.mkdtemp(prefix="patchcheck-t2-"))
         try:
             tool_paths = self.make_paths(temporary)
@@ -369,12 +379,24 @@ class RealExportTests(unittest.TestCase):
 
     def test_t18_the_phase11_premises_hold_on_the_current_export(self):
         register = premises.load_register(patch_check.default_paths().register)
-        self.assertEqual(len(register), 22)
+        self.assertEqual(len(register), 29)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
                            "FORMATTED-TEXT-TAKES-HIDDEN", "THREAT-PERCENT-READABLE",
                            "PLATE-LOOKUP-READABLE", "PLATE-UNIT-TOKEN"):
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+
+    def test_t19_the_phase12_settings_premises_hold_on_the_current_export(self):
+        # Architecture/20261006-Phase12.md section 14.2: the settings pages' premises,
+        # FlagEquals on a boolean flag included.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        for premise_id in ("OPEN-SETTINGS-RESTRICTED", "SLIDER-BUILTIN-LABEL", "PARENT-WITHOUT-PREDICATE",
+                           "SECTION-HEADER-DATA-ONLY", "DEFAULTS-PER-PAGE", "SUBCATEGORIES-IN-ORDER",
+                           "SUBCATEGORY-SECURE"):
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
 

@@ -6,7 +6,7 @@ the files `PersonalAddon.toc` lists. The design is
 
 | Folder | What it does |
 |---|---|
-| `harness/` | Loads the addon into a real Lua 5.1 over stubbed client APIs and runs the Phase 7–11 checks, one fresh runtime per session |
+| `harness/` | Loads the addon into a real Lua 5.1 over stubbed client APIs and runs the Phase 7–12 checks, one fresh runtime per session: seventeen sessions, 439 checks |
 | `lint/` | The secret-read lint (README rule 10): fails any read of a value the client may make secret that bypasses `ClientRead` |
 | `patchcheck/` | The patch check (README rule 11): after a client patch, tests every fact our designs rely on about Blizzard's code against the new UI export |
 | `common/` | What they share: paths, the API docs parser, the load set, the Lua index |

@@ -841,6 +841,8 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Toasts",
     description = "Pop-up notices for money and notable items you loot, and for junk sold automatically.",
+    settingsPage = ns.SETTINGS_PAGE.BAGS_AND_LOOT,
+    settingsOrder = 20,
     settings = {
         showLootedItems = true,
         showQuestItems = true,
@@ -853,24 +855,27 @@ ns.Registry.Register(FEATURE_ID, {
     },
     schema = {
         showLootedItems = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Looted items of green quality or better",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Looted items of green quality or better", order = 1,
         },
         showQuestItems = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Looted quest items, whatever their quality",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Looted quest items, whatever their quality", order = 2,
         },
         showLootedMoney = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Looted money",
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Looted money", order = 3,
         },
         durationSeconds = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Seconds on screen",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Seconds on screen", order = 4,
+            unit = ns.ConfigSchema.UNIT.SECONDS,
             minimum = 2, maximum = 10, step = 0.5,
         },
         anchorOffsetX = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal position",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal position", order = 5,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -800, maximum = 800, step = 1,
         },
         anchorOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical position, from the top",
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical position, from the top", order = 6,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -800, maximum = 0, step = 1,
         },
         minimumQuality = {

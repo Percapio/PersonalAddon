@@ -335,6 +335,8 @@ ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Sell junk automatically",
     description = "Sells every grey item when you open a merchant, with the game's own Sell All Junk, without the confirmation.",
+    settingsPage = ns.SETTINGS_PAGE.BAGS_AND_LOOT,
+    settingsOrder = 40,
     settings = {},
     schema = {},
 }, {
