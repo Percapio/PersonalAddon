@@ -128,6 +128,23 @@ function FramePool.Prewarm(pool)
     return built
 end
 
+-- Every frame the pool has built, live or free, in no particular order. Added in
+-- Phase 13 for a geometry change that has to reach frames nobody is holding: a
+-- row resized only while live comes back at the old width the next time it is
+-- acquired. Bounded by the pool's capacity, like everything else here.
+function FramePool.ForEach(pool, visit)
+    local visited = 0
+    for index = 1, #pool.free do
+        visit(pool.free[index])
+        visited = visited + 1
+    end
+    for index = 1, #pool.live do
+        visit(pool.live[index])
+        visited = visited + 1
+    end
+    return visited
+end
+
 function FramePool.Stats(pool)
     return pool.constructed, #pool.live, #pool.free, pool.capacity
 end

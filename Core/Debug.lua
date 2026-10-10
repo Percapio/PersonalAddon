@@ -248,6 +248,14 @@ local function commandPlates()
     end
 end
 
+-- Phase 13 section 5.1: the line that keeps sample contents from being read as
+-- real. It goes FIRST in each report, not last.
+local function notePreview(view)
+    if view and view.preview then
+        ns.Log.Warn("  preview: on -- these are sample contents, not live figures")
+    end
+end
+
 local function commandDps()
     if not ns.DamageBreakdown then
         ns.Log.Error("the damage breakdown feature did not load")
@@ -255,6 +263,7 @@ local function commandDps()
     end
     ns.DamageBreakdown.Refresh()
     local view = ns.DamageBreakdown.Inspect()
+    notePreview(view)
     ns.Log.Info(format("session=%s rows=%d/%d truncated=%d panel=%s inCombat=%s",
         view.sessionType, view.rowsShown, view.maximumRows, view.truncatedRows,
         tostring(view.panelShown), tostring(view.inCombat)))
@@ -275,6 +284,7 @@ local function commandThreat()
         return
     end
     local view = ns.ThreatPanel.Inspect()
+    notePreview(view)
     ns.Log.Info(format("enabled=%s inCombat=%s rows=%d/%d truncated=%d timer=%s (%ss) sweeps=%d panel=%s anchor=%s",
         tostring(view.enabled), tostring(view.inCombat), view.rowsDrawn, view.maximumRows,
         view.rowsTruncated, view.sweeping and "running" or "stopped", tostring(view.updateInterval),
@@ -301,6 +311,7 @@ local function commandSkills()
     end
     ns.EquippedSkills.Refresh()
     local view = ns.EquippedSkills.Inspect()
+    notePreview(view)
     ns.Log.Info(format("enabled=%s capability=%s bagShown=%s windowShown=%s poll=%s (%ss)",
         tostring(view.enabled), tostring(view.capability), tostring(view.bagShown),
         tostring(view.panelShown), tostring(view.pollRunning), tostring(view.pollSeconds)))
@@ -341,6 +352,7 @@ local function commandToasts(subcommand)
         return
     end
     local view = ns.Toasts.Inspect()
+    notePreview(view)
     local counts = view.counts
     ns.Log.Info(format("enabled=%s visible=%d/%d queued=%d lootCapture=%s%s",
         tostring(view.enabled), view.visible, view.maximumVisible, view.queued,
@@ -714,6 +726,7 @@ local function commandHelp()
     ns.Log.Info("/pa pool                exercise both frame pool drop policies")
     ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
+    ns.Log.Info("/pa preview [on|off|threat|dps]  show every window with sample contents while you adjust")
     ns.Log.Info("/pa threat              the threat panel's rows, timer and counters")
     ns.Log.Info("/pa skills              what the skills window shows, and how each row resolved")
     ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each toast")
@@ -727,6 +740,55 @@ local function commandHelp()
     ns.Log.Info("/pa diag                counters and fault notes from the last five sessions")
     ns.Log.Info("/pa diag clear          drop all but the current session's record")
     ns.Log.Info("/pa taint [name]        ask the client what is tainted, and by whom")
+end
+
+-- Phase 13 section 7: the preview's state, each group's focus and subject, and
+-- one line per KNOWN window -- so one that is off, or standing aside, says so
+-- rather than being missing.
+local function reportPreview(subcommand)
+    if not ns.Preview then
+        ns.Log.Error("the preview did not load")
+        return
+    end
+
+    local wanted = string.lower(subcommand or "")
+    if wanted == "on" or wanted == "off" then
+        ns.Preview.SetEnabled(wanted == "on")
+    elseif wanted == "threat" then
+        ns.Preview.Focus(ns.PREVIEW_PANEL.THREAT_PANEL)
+    elseif wanted == "dps" then
+        ns.Preview.Focus(ns.PREVIEW_PANEL.DAMAGE_BREAKDOWN)
+    elseif wanted ~= "" then
+        ns.Log.Warn("/pa preview [on | off | threat | dps]")
+        return
+    end
+
+    local view = ns.Preview.Inspect()
+    ns.Log.Info(format("preview=%s observing=%s", tostring(view.state),
+        tostring(view.observing)))
+    if view.refusal then
+        ns.Log.Warn("  " .. tostring(view.refusal))
+    end
+
+    for index = 1, #view.windows do
+        local window = view.windows[index]
+        local line = format("  %-16s %s", window.panelId, tostring(window.kind or "-"))
+        if window.kind == ns.Preview.OUTCOME.SKIPPED then
+            line = line .. format(" (%s)", tostring(window.detail))
+        elseif window.kind == ns.Preview.OUTCOME.DEFERRED then
+            line = line .. format(" (showing %s instead)", tostring(window.detail))
+        elseif window.kind == ns.Preview.OUTCOME.SHOWN then
+            line = line .. format(" (%d rows)", window.rowsDrawn or 0)
+        elseif not window.registered then
+            line = line .. format(" (%s)", tostring(window.standing))
+        end
+        ns.Log.Info(line)
+    end
+
+    for group, focused in pairs(view.focus) do
+        ns.Log.Info(format("  focus %-12s %s  subject=%s", tostring(group),
+            tostring(focused), tostring(view.subject[group] or "none")))
+    end
 end
 
 local function handler(input)
@@ -761,6 +823,8 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
+    elseif command == "preview" then
+        reportPreview(words[2])
     elseif command == "threat" then
         commandThreat()
     elseif command == "skills" then

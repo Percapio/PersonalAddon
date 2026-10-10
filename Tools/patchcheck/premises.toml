@@ -238,3 +238,17 @@ statement = "An addon's settings subcategory is created inside a secure call"
 source = "Phase 12 section 15"
 consequence = "Registering the pages would run Blizzard's category code in this addon's execution; re-read section 3.2 before the next build"
 check = { kind = "Pattern", file = "Blizzard_Settings_Shared/Blizzard_SettingsInbound.lua", regex = 'securecallfunction\(PrivateSettingsCategoryMixin\.CreateSubcategory, parentCategory, categoryName\)', expect = "Present" }
+
+[[premise]]
+id = "SETTINGS-PANEL-STRATA"
+statement = "Blizzard's settings window sits at HIGH strata, so DIALOG is above it"
+source = "Phase 13 section 3.1"
+consequence = "Preview windows are drawn behind the Options window (Core/Preview.lua)"
+check = { kind = "Pattern", file = "Blizzard_Settings_Shared/Blizzard_SettingsPanel.xml", regex = 'name="SettingsPanel"[^>]*frameStrata="HIGH"', expect = "Present" }
+
+[[premise]]
+id = "PLAYER-HEALTH-BAR-WIDTH"
+statement = "The player frame's health bar is 124 pixels wide, declared in XML and resized nowhere in Lua"
+source = "Phase 13 section 6.1; decision D7"
+consequence = "The threat panel's 112 px minimum is no longer 10% under the player frame's bar (Core/Constants.lua)"
+check = { kind = "Pattern", file = "Blizzard_UnitFrame/Mainline/PlayerFrame.xml", regex = '<Size x="124" y="20"/>', expect = "Present" }

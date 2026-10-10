@@ -35,8 +35,9 @@ local READING = { READABLE = "Readable", HIDDEN = "Hidden", NOT_ON_YOUR_LIST = "
 -- Readable first, then hidden, then not on your list (section 5.3).
 local READING_RANK = { Readable = 1, Hidden = 2, NotOnYourList = 3 }
 
--- Layout (section 5.1).
-local PANEL_WIDTH = 200
+-- Layout (section 5.1). The width is no longer here: it is settings.panelWidth,
+-- defaulting to 200, and Phase 13 section 6.2 resizes the panel and every row in
+-- the pool when it changes.
 local PANEL_PADDING = 6
 local ROW_HEIGHT = 16
 local ROW_SPACING = 2
@@ -91,6 +92,7 @@ local state = {
     counters = {},
     settings = {
         maximumRows = 6,
+        panelWidth = 200,
         panelAlpha = 0.8,
         scale = 1.0,
         anchorOffsetX = 0,
@@ -392,10 +394,37 @@ local function anchorPanel()
     })
 end
 
+-- Geometry derived from the width, never read back off a frame (rule 10 keeps
+-- Blizzard geometry behind ClientRead, and reading our own back to recover a
+-- number we just computed buys nothing).
+
+local function rowWidthFor(panelWidth)
+    return panelWidth - PANEL_PADDING * 2
+end
+
+-- The bar is the only flexible column, and the mob name is drawn OVER it rather
+-- than beside it, so the name has no width of its own to give up (section 6.3).
+-- The tag's space is counted whether or not showLevel is set, so turning that
+-- option on can never overflow a width already chosen.
+local function barWidthFor(panelWidth, showLevel)
+    local left = MARKER_WIDTH + CELL_GAP
+    if showLevel then
+        left = left + TAG_WIDTH + CELL_GAP
+    end
+    return rowWidthFor(panelWidth) - left - (THREAT_WIDTH + CELL_GAP)
+end
+
+-- Below this much bar the name is hidden outright: a narrow panel then reads as
+-- marker, tag, bar and threat rather than as a row with a letter and an
+-- ellipsis on it (decision D8).
+local function nameShownFor(barWidth)
+    return barWidth >= ns.THREAT_NAME_MINIMUM_BAR
+end
+
 local function createRow()
     local row = CreateFrame("Frame", nil, state.panel)
     row:SetHeight(ROW_HEIGHT)
-    row:SetWidth(PANEL_WIDTH - PANEL_PADDING * 2)
+    row:SetWidth(rowWidthFor(state.settings.panelWidth))
 
     row.marker = row:CreateTexture(nil, "OVERLAY")
     row.marker:SetWidth(MARKER_WIDTH)
@@ -468,7 +497,7 @@ local function ensurePanel()
     end
     local chrome = ns.PanelChrome.Build({
         frameName = "PersonalAddonThreatPanel",
-        width = PANEL_WIDTH,
+        width = state.settings.panelWidth,
         height = ROW_HEIGHT + PANEL_PADDING * 2,
         alpha = state.settings.panelAlpha,
         ownerKey = "threat",
@@ -493,6 +522,23 @@ local function releaseRows()
         ns.FramePool.Release(state.rowPool, liveRows[index])
         liveRows[index] = nil
     end
+end
+
+-- Width (section 6.2) -----------------------------------------------------------------
+
+-- Every row in the POOL, not just the live ones: a row resized only while live
+-- would come back at the old width the next time it is acquired. Creates no
+-- frame, so it is safe during a fight.
+local function applyWidth()
+    if not state.panel then
+        return
+    end
+    local width = state.settings.panelWidth
+    state.panel:SetWidth(width)
+    local rowWidth = rowWidthFor(width)
+    ns.FramePool.ForEach(state.rowPool, function(row)
+        row:SetWidth(rowWidth)
+    end)
 end
 
 -- Draw (section 5.4) ------------------------------------------------------------------
@@ -533,8 +579,14 @@ local function drawRow(row, record, targetPlate, counters)
     end
 
     local name = row.name
-    if not shown(counters, ClientRead.Pass(name.SetText, name, nil, 1, UnitName, token)) then
+    if nameShownFor(barWidthFor(state.settings.panelWidth, state.settings.showLevel)) then
+        if not shown(counters, ClientRead.Pass(name.SetText, name, nil, 1, UnitName, token)) then
+            name:SetText("")
+        end
+        name:Show()
+    else
         name:SetText("")
+        name:Hide()
     end
 
     local threat = row.threat
@@ -607,10 +659,104 @@ local function renderRows(count, targetPlate, counters)
     return drawCount
 end
 
+-- Preview (section 5.2) ---------------------------------------------------------------
+
+-- Sample rows, drawn by a path that is not the sweep. Reads no client value and
+-- moves no counter, so /pa threat's figures mean what they say and a screenshot
+-- of this is not mistakable for a fight.
+local PREVIEW_VERDICTS = {
+    VERDICT.ON_PLAYER, VERDICT.ABOUT_TO_PULL, VERDICT.TAP_DENIED,
+    VERDICT.ON_GROUP_OR_PET, VERDICT.NEUTRAL, VERDICT.ELSEWHERE,
+}
+
+local function showPlaceholders()
+    if not state.panel then
+        return 0
+    end
+    local settings = state.settings
+    local drawCount = max(1, min(settings.maximumRows, ns.THREAT_ROW_CAPACITY))
+    local liveRows = state.liveRows
+
+    releaseRows()
+    local showName = nameShownFor(barWidthFor(settings.panelWidth, settings.showLevel))
+
+    for index = 1, drawCount do
+        local row, poolError = ns.FramePool.Acquire(state.rowPool)
+        if not row then
+            ns.Log.OnceError("threat:previewpool", format(
+                "the threat panel's row pool was exhausted drawing a preview (%s)",
+                tostring(poolError)))
+            drawCount = #liveRows
+            break
+        end
+        liveRows[index] = row
+        anchorRow(row, index)
+
+        -- The palette cycles, because this is the one place the six nameplate
+        -- colours can be seen without finding six kinds of mob.
+        local verdict = PREVIEW_VERDICTS[(index - 1) % #PREVIEW_VERDICTS + 1]
+        local colour = state.palette and (state.palette[verdict] or state.palette[VERDICT.ELSEWHERE])
+        if colour then
+            row.bar:SetStatusBarColor(colour.red, colour.green, colour.blue)
+        end
+        row.bar:SetMinMaxValues(0, 1)
+        row.bar:SetValue(1 - (index - 1) * 0.12)
+
+        placeBar(row)
+        row.tag:SetText(settings.showLevel and "60+" or "")
+        row.threat:SetText(format(PERCENT_FORMAT, max(0, 100 - (index - 1) * 14)))
+        if showName then
+            row.name:SetText(format("Sample %d", index))
+            row.name:Show()
+        else
+            row.name:SetText("")
+            row.name:Hide()
+        end
+        if settings.markTarget and index == 1 then
+            row.marker:Show()
+        else
+            row.marker:Hide()
+        end
+        row:Show()
+    end
+
+    state.panel:SetHeight(PANEL_PADDING * 2 + max(1, drawCount) * ROW_HEIGHT
+        + max(0, drawCount - 1) * ROW_SPACING)
+    ns.PanelChrome.SetAlpha(state.chrome, settings.panelAlpha)
+    state.panel:Show()
+    state.panelShown = true
+    return drawCount
+end
+
+local function clearPlaceholders()
+    releaseRows()
+    state.drawnCount = 0
+    state.truncatedCount = 0
+    if state.panel then
+        state.panel:Hide()
+        state.panelShown = false
+    end
+end
+
+local function registerPreview()
+    ns.Preview.Register({
+        panelId = ns.PREVIEW_PANEL.THREAT_PANEL,
+        raiseTarget = state.panel,
+        baseStrata = state.chrome and state.chrome.baseStrata or nil,
+        show = showPlaceholders,
+        clear = clearPlaceholders,
+    })
+end
+
 -- Sweep (section 5.5) -----------------------------------------------------------------
 
 local function sweep()
     if not state.enabled or not state.inCombat then
+        return
+    end
+    -- The preview owns the panel while it is on, and it ends at combat start, so
+    -- this is belt and braces rather than the usual case (section 5.7).
+    if ns.Preview.IsEnabled() then
         return
     end
     state.sweepCount = state.sweepCount + 1
@@ -738,6 +884,7 @@ local function readSettings(config)
     end
     local own = state.settings
     own.maximumRows = settings.maximumRows or own.maximumRows
+    own.panelWidth = settings.panelWidth or own.panelWidth
     own.panelAlpha = settings.panelAlpha or own.panelAlpha
     own.scale = settings.scale or own.scale
     own.anchorOffsetX = settings.anchorOffsetX or own.anchorOffsetX
@@ -757,7 +904,9 @@ local function enable(config)
 
     state.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
     ensurePanel()
+    applyWidth()
     anchorPanel()
+    registerPreview()
 
     local tokens = state.tokens
     for index = 1, #SIGNALS do
@@ -787,6 +936,7 @@ local function disable()
     state.enabled = false
     state.inCombat = false
     state.generation = state.generation + 1
+    ns.Preview.Unregister(ns.PREVIEW_PANEL.THREAT_PANEL)
     goIdle()
     for index = #state.tokens, 1, -1 do
         ns.Dispatch.Unsubscribe(state.tokens[index])
@@ -799,6 +949,17 @@ local function onConfigChanged(config, changedKey)
     readSettings(config)
     if changedKey == "anchorOffsetX" or changedKey == "anchorOffsetY" or changedKey == "scale" then
         anchorPanel()
+    elseif changedKey == "panelWidth" then
+        applyWidth()
+        if ns.Preview.IsEnabled() then
+            showPlaceholders()
+        end
+    elseif changedKey == "showLevel" and ns.Preview.IsEnabled() then
+        showPlaceholders()
+    elseif changedKey == "maximumRows" and ns.Preview.IsEnabled() then
+        showPlaceholders()
+    elseif changedKey == "markTarget" and ns.Preview.IsEnabled() then
+        showPlaceholders()
     elseif changedKey == "panelAlpha" then
         ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
     elseif changedKey == "updateInterval" and state.ticker then
@@ -816,6 +977,7 @@ ns.Registry.Register(FEATURE_ID, {
     settingsOrder = 30,
     settings = {
         maximumRows = 6,
+        panelWidth = 200,
         panelAlpha = 0.8,
         scale = 1.0,
         anchorOffsetX = 0,
@@ -832,33 +994,43 @@ ns.Registry.Register(FEATURE_ID, {
             description = "How many mobs to list, highest threat first.",
             minimum = 1, maximum = 10, step = 1,
         },
+        -- Phase 13: the minimum is 10% under the player frame's health bar
+        -- (Core/Constants.lua). At it, mob names are hidden rather than cut to
+        -- nothing.
+        panelWidth = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel width", order = 2,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            description = "Narrower panels drop the mob names and keep the bars and your threat.",
+            minimum = ns.THREAT_PANEL_MINIMUM_WIDTH,
+            maximum = ns.THREAT_PANEL_MAXIMUM_WIDTH, step = 1,
+        },
         panelAlpha = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity", order = 2,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Panel opacity", order = 3,
             unit = ns.ConfigSchema.UNIT.FRACTION,
             minimum = 0.1, maximum = 1.0, step = 0.05,
         },
         scale = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Scale", order = 3,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Scale", order = 4,
             unit = ns.ConfigSchema.UNIT.FRACTION,
             description = "The panel's size. Offsets stay in screen pixels at any scale.",
             minimum = 0.5, maximum = 2.0, step = 0.05,
         },
         -- Phase 12: wide enough to reach across the screen from the player frame.
         anchorOffsetX = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset", order = 4,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset", order = 5,
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -1200, maximum = 1200, step = 1,
         },
         anchorOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset", order = 5,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical offset", order = 6,
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -800, maximum = 800, step = 1,
         },
         showLevel = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show level and elite tag", order = 6,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show level and elite tag", order = 7,
         },
         markTarget = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Mark your target", order = 7,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Mark your target", order = 8,
         },
         showWhenEmpty = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show when empty", curated = false,
@@ -906,12 +1078,17 @@ ns.ThreatPanel = {
         end
         return {
             enabled = state.enabled,
+            -- First, because it is the whole defence against reading sample rows
+            -- as a real fight (section 5.1).
+            preview = ns.Preview.IsEnabled(),
             inCombat = state.inCombat,
             sweeping = state.ticker ~= nil,
             updateInterval = state.settings.updateInterval,
             sweeps = state.sweepCount,
             rowsDrawn = state.drawnCount,
             maximumRows = state.settings.maximumRows,
+            panelWidth = state.settings.panelWidth,
+            barWidth = barWidthFor(state.settings.panelWidth, state.settings.showLevel),
             rowsTruncated = state.truncatedCount,
             panelShown = state.panelShown,
             anchorIsPlayerFrame = state.anchorIsPlayerFrame == true,

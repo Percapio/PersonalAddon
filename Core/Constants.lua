@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.2.0-phase12"
+ns.VERSION = "1.3.0-phase13"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -118,3 +118,58 @@ ns.SETTINGS_PAGE = {
 -- After every declared settingsOrder, so an unplaced feature sorts last, in
 -- registration order.
 ns.SETTINGS_UNPLACED_ORDER = 1000
+
+-- Phase 13 (Architecture/20261009-Phase13.md) ---------------------------------
+
+-- The windows the preview knows, and the places on screen they are drawn in
+-- (section 2.2). The static table that maps one to the other lives in
+-- Core/Preview.lua; these are the names both it and the features use.
+ns.PREVIEW_PANEL = {
+    THREAT_PANEL = "ThreatPanel",
+    DAMAGE_BREAKDOWN = "DamageBreakdown",
+    EQUIPPED_SKILLS = "EquippedSkills",
+    TOASTS = "Toasts",
+}
+ns.PREVIEW_GROUP = {
+    PLAYER_FRAME = "PlayerFrame",
+    BAGS = "Bags",
+    SCREEN = "Screen",
+}
+-- Which window the player-frame group shows before anything has been adjusted.
+-- The threat panel: it has the most geometry to set, and it is the one Phase 13
+-- exists for (section 2.5).
+ns.PREVIEW_INITIAL_FOCUS = ns.PREVIEW_PANEL.THREAT_PANEL
+-- Above Blizzard's settings window, which is HIGH (section 3.1).
+ns.PREVIEW_STRATA = "DIALOG"
+-- The skills window's preview draws a fixed six rows. Its live height is what
+-- you have equipped, behind reads that can be withheld, and width is what this
+-- phase adjusts (section 5.4).
+ns.PREVIEW_SKILL_ROWS = 6
+-- Two samples: enough to show the stacking, few enough that the default
+-- maximumVisible of 3 leaves a slot free, so the first real toast evicts
+-- nothing (section 5.5).
+ns.PREVIEW_TOAST_SAMPLES = 2
+
+-- The threat panel's narrowest width: 10% under the player frame's health bar.
+-- That bar is 124 x 20, declared in XML at
+-- Blizzard_UnitFrame/Mainline/PlayerFrame.xml lines 124 and 173 and resized
+-- nowhere in Lua, so 124 * 0.9 rounds to 112 (section 6.1, decision D7). The
+-- fact about Blizzard's bar is in the patch check's register as
+-- PLAYER-HEALTH-BAR-WIDTH, because this number is only right while it holds.
+ns.THREAT_PANEL_MINIMUM_WIDTH = 112
+ns.THREAT_PANEL_MAXIMUM_WIDTH = 400
+-- A CONSEQUENCE of the line above, not a judgement about how narrow a bar may
+-- usefully be: at the minimum width, with the level tag shown, this is what is
+-- left for the bar.
+ns.THREAT_BAR_MINIMUM = 22
+-- Below this much bar the mob name is hidden rather than truncated to nothing.
+-- Roughly six characters at GameFontHighlightSmall. A legibility floor, not a
+-- preference (section 6.3, decision D8).
+ns.THREAT_NAME_MINIMUM_BAR = 40
+
+-- The skills window's width bounds. The minimum is padding, icon, gap and the
+-- least the rank text can have; the maximum is generous for
+-- "Blacksmithing 300 / 300" (section 6.1).
+ns.SKILL_PANEL_MINIMUM_WIDTH = 74
+ns.SKILL_PANEL_MAXIMUM_WIDTH = 240
+ns.SKILL_TEXT_MINIMUM = 44

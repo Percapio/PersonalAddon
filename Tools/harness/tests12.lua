@@ -156,11 +156,16 @@ if HARNESS_SESSION == "phase12" then
         "Hostile, and attacking neither" }, "|"), table.concat(swatches, "|"))
 
     -- A5: every option indented under its own feature's switch, with no predicate.
+    -- Phase 13 added one PAGE-level control, the preview toggle: it belongs to no
+    -- feature, so it has no switch to indent under. Phase 13's own test P1
+    -- asserts it is top-level, so skipping it here excuses nothing.
     local linked, wrong = 0, {}
     for _, category in ipairs(HARNESS.settingsCategories) do
         local currentSwitch = nil
         for _, initializer in ipairs(category.layout.initializers) do
-            if initializer.kind ~= "header" then
+            local isPreviewToggle = initializer.setting ~= nil
+                and initializer.setting.variable == "PersonalAddon_preview_showAll"
+            if initializer.kind ~= "header" and not isPreviewToggle then
                 if isSwitch(initializer) then
                     currentSwitch = initializer
                     if initializer.parentInitializer ~= nil then

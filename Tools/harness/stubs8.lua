@@ -105,6 +105,10 @@ function CreateFrame(frameType, name, parent, template)
         frameType = frameType, name = name, parent = parent, template = template,
         scripts = {}, events = {}, allEvents = false, shown = false, alpha = 1,
         points = {}, regions = {}, mouse = false,
+        -- A new frame inherits its parent's strata, as the client's does, so a
+        -- caller that records one at creation reads a string rather than nil
+        -- (Phase 13 section 3.3).
+        strata = (parent and parent.strata) or "MEDIUM",
     }
     setmetatable(frame, {
         __index = function(_, key)

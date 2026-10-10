@@ -44,6 +44,16 @@ local FEATURE_ID = "settingsPanel"
 local format, type, tostring, floor = string.format, type, tostring, math.floor
 
 local SWITCH, KEY = "Switch", "Key"
+-- Phase 13: a control whose value is session-only and reaches no config key.
+-- The preview toggle is the only one.
+local PREVIEW_TOGGLE = "PreviewToggle"
+local PREVIEW_VARIABLE = "PersonalAddon_preview_showAll"
+local PREVIEW_LABEL = "Show all windows for adjusting"
+local PREVIEW_DESCRIPTION =
+    "Shows this addon's windows with sample contents so you can see your changes as you make them."
+    .. " They stay up after you close Options, and turn off when a fight starts."
+    .. " The threat panel and the damage breakdown share one place, so you see whichever you last changed."
+
 local CHECKBOX, SLIDER, PERCENT_SLIDER, COLOUR_SWATCH, CHOICE_CHECKBOX =
     "Checkbox", "Slider", "PercentSlider", "ColourSwatch", "ChoiceCheckbox"
 
@@ -266,6 +276,12 @@ local function storedValueFor(binding)
     if binding.target == SWITCH then
         return ns.ConfigStore.IsEnabled(binding.featureId)
     end
+    -- The preview toggle is session-only: it has no key and the store has no
+    -- "preview" feature, so there is nothing to ask for. Said here rather than
+    -- relying on a nil key reading as nil.
+    if binding.target == PREVIEW_TOGGLE then
+        return nil
+    end
     return ns.ConfigStore.Get(binding.featureId, binding.key)
 end
 
@@ -303,6 +319,15 @@ local function applyBinding(binding)
         ns.Registry.SetEnabled(binding.featureId, state.panelValues[binding.variable] == true)
         return
     end
+    if binding.target == PREVIEW_TOGGLE then
+        ns.Preview.SetEnabled(state.panelValues[binding.variable] == true)
+        return
+    end
+    -- Adjusting a feature's setting is what makes its window the one on screen
+    -- (Phase 13 section 4.3). A featureId no window claims is ignored, so this
+    -- costs one table lookup for every other key. On the deferred side of the
+    -- queue, so a slider drag focuses once per frame rather than once per step.
+    ns.Preview.FocusFeature(binding.featureId)
     applyKey(binding.featureId, binding.key)
 end
 
@@ -318,7 +343,12 @@ local function flushPendingApplies()
 
     for index = 1, #order do
         local binding = queued[order[index]]
-        if binding and ns.Registry.Defaults(binding.featureId) then
+        -- The registry check drops a queued apply whose feature went away between
+        -- the click and this frame. The preview toggle has no feature to go away:
+        -- its featureId names no registered feature, so Registry.Defaults is nil
+        -- for it and the guard swallowed every toggle (Phase 13 section 16 item 7).
+        if binding and (binding.target == PREVIEW_TOGGLE
+            or ns.Registry.Defaults(binding.featureId)) then
             applyBinding(binding)
         end
     end
@@ -363,6 +393,14 @@ end
 -- shows the stored value the next time it is drawn, and the notice says so.
 local function onPanelValueChanged(binding, panelValue)
     if binding.target == SWITCH then
+        scheduleApply(binding)
+        return "Accepted"
+    end
+
+    -- Session-only: the value lives in panelValues and reaches no config key, so
+    -- a reload ends the preview and no saved variable can strand sample windows
+    -- on a future login (Phase 13 section 4.2).
+    if binding.target == PREVIEW_TOGGLE then
         scheduleApply(binding)
         return "Accepted"
     end
@@ -597,6 +635,42 @@ local function addFeatureSection(controls, page, featureId, headed)
     page.controlCount = page.controlCount + (state.controlCount - before)
 end
 
+-- The preview toggle (section 4.2) ---------------------------------------------
+
+-- First on the General page, above every feature section. Registered the same
+-- way as any other control -- against state.panelValues, with the standard
+-- value-changed callback -- but its target is PREVIEW_TOGGLE, so the handler
+-- writes no config key.
+local function buildPreviewToggle(controls, page)
+    local binding = {
+        variable = PREVIEW_VARIABLE,
+        featureId = "preview",
+        target = PREVIEW_TOGGLE,
+        presentation = { kind = CHECKBOX },
+    }
+    local built = buildControl(controls, page.category, binding, false,
+        PREVIEW_LABEL, PREVIEW_DESCRIPTION)
+    state.previewToggleBuilt = built == true
+    return state.previewToggleBuilt
+end
+
+-- Preview's state observer. The preview ends on signals the page knows nothing
+-- about -- a fight starting, /pa preview off -- and without this the checkbox
+-- would show checked over an off preview, costing the user two clicks to turn it
+-- back on.
+--
+-- It writes panelValues and NOTHING else: not the setting, not the control, not
+-- the store. A setting:SetValue from here would run Blizzard's setting and
+-- control code in our execution (see this file's header). The control on screen
+-- shows the written value the next time the page is drawn, which is the same
+-- guarantee copyStoredValueToPanel gives a refused value.
+local function reflectPreviewState(previewState)
+    if not state.previewToggleBuilt then
+        return
+    end
+    state.panelValues[PREVIEW_VARIABLE] = (previewState == ns.Preview.STATE.ON)
+end
+
 -- The public features on each page, in each feature's declared order. A feature
 -- naming a page this panel does not know goes on the parent page, said once.
 local function featuresByPage()
@@ -666,6 +740,10 @@ local function buildPanel()
     local parent = newPage(PAGE.GENERAL, PARENT_LABEL, category, layout)
     addHeader(controls, parent, format("PersonalAddon %s", tostring(ns.VERSION)),
         "/pa help lists every command.")
+    -- Before the feature sections: it is about adjusting all of them.
+    if not buildPreviewToggle(controls, parent) then
+        noteSkipped("preview", "showAll", "the preview toggle could not be built")
+    end
 
     -- Only the features a user should see. The probes and the isolation test
     -- scaffolding are marked internal and never reach here (Phase 6 section 6).
@@ -750,6 +828,10 @@ local function enable()
     if not category then
         return nil, reason
     end
+
+    -- One observer, so a preview that ends on its own reaches the checkbox
+    -- (section 4.2).
+    ns.Preview.SetStateObserver(reflectPreviewState)
     return true
 end
 
@@ -758,6 +840,7 @@ end
 -- (Phase 6 section 9's documented exception). What CAN be abandoned is work this
 -- feature scheduled and has not run yet.
 local function disable()
+    ns.Preview.SetStateObserver(nil)
     state.pending = {}
     state.pendingOrder = {}
     -- flushScheduled stays true if a timer is already in flight: the callback is
@@ -793,6 +876,7 @@ ns.SettingsPanel = {
         end
         return {
             registered = state.registered,
+            previewToggleBuilt = state.previewToggleBuilt == true,
             controlCount = state.controlCount,
             pages = pages,
             skipped = state.skipped,

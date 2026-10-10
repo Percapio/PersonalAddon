@@ -487,8 +487,89 @@ local function renderBreakdown(breakdown)
     panel:Show()
 end
 
+-- Preview (section 5.3) --------------------------------------------------------
+
+-- Sample rows, drawn by a path that is not the refresh: no C_DamageMeter call
+-- and no counter moved. The row carries no name string -- the icon is the
+-- identifier -- so there is nothing inside a row to mark as a sample, and
+-- /pa dps reporting preview: on is the whole signal. The figures are plainly
+-- round.
+local PREVIEW_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local PREVIEW_RATES = { 184.0, 121.5, 96.0, 62.5, 41.0, 27.5, 18.0, 12.5, 8.0, 5.5 }
+
+local function showPlaceholders()
+    if not state.panel then
+        return 0
+    end
+    releaseRows()
+
+    local drawCount = max(1, math.min(state.settings.maximumRows, #PREVIEW_RATES))
+
+    local total = 0
+    for index = 1, drawCount do
+        total = total + PREVIEW_RATES[index]
+    end
+
+    local previous = nil
+    for index = 1, drawCount do
+        local row, poolError = ns.FramePool.Acquire(state.rowPool)
+        if not row then
+            ns.Log.OnceError("dps:previewpool", format(
+                "the breakdown row pool was exhausted drawing a preview (%s)",
+                tostring(poolError)))
+            break
+        end
+        row.icon:SetTexture(PREVIEW_ICON)
+        row.icon:Show()
+        row.rate:SetText(formatRate(PREVIEW_RATES[index]))
+        row.share:SetText(formatShare(PREVIEW_RATES[index] / total))
+
+        row:ClearAllPoints()
+        if previous then
+            row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -ROW_SPACING)
+        else
+            row:SetPoint("TOPLEFT", state.panel, "TOPLEFT", PANEL_PADDING, -PANEL_PADDING)
+        end
+        row:Show()
+        state.liveRows[#state.liveRows + 1] = row
+        previous = row
+    end
+
+    local shown = #state.liveRows
+    state.panel:SetHeight(PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
+        + max(0, shown - 1) * ROW_SPACING)
+    ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
+    state.panel:Show()
+    return shown
+end
+
+local function clearPlaceholders()
+    if state.rowPool then
+        releaseRows()
+    end
+    if state.panel then
+        state.panel:Hide()
+    end
+end
+
+local function registerPreview()
+    ns.Preview.Register({
+        panelId = ns.PREVIEW_PANEL.DAMAGE_BREAKDOWN,
+        raiseTarget = state.panel,
+        baseStrata = state.chrome and state.chrome.baseStrata or nil,
+        show = showPlaceholders,
+        clear = clearPlaceholders,
+    })
+end
+
 local function refreshNow()
     if not state.enabled then
+        return false
+    end
+    -- The preview owns the panel while it is on. Unlike the threat panel's
+    -- sweep, this path DOES fire out of combat -- the refresh and both settle
+    -- reads -- which is exactly when the preview runs (section 5.7).
+    if ns.Preview.IsEnabled() then
         return false
     end
 
@@ -647,6 +728,7 @@ local function enable(config)
 
     ensurePanel()
     anchorPanel()
+    registerPreview()
     state.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
 
     local tokens = state.tokens
@@ -679,6 +761,7 @@ end
 -- have created the panel or the pool.
 local function disable()
     state.enabled = false
+    ns.Preview.Unregister(ns.PREVIEW_PANEL.DAMAGE_BREAKDOWN)
     cancelSettleReads()
 
     if state.rowPool then
@@ -799,6 +882,9 @@ ns.DamageBreakdown = {
             constructed, live, free, capacity = ns.FramePool.Stats(state.rowPool)
         end
         return {
+            -- First: the defence against reading sample figures as real
+            -- (section 5.1).
+            preview = ns.Preview.IsEnabled(),
             sessionType = state.settings.sessionType,
             maximumRows = state.settings.maximumRows,
             inCombat = state.inCombat,

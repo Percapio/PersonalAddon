@@ -1,13 +1,13 @@
 {
- "acceptedAt": 1791517744.633708,
- "acceptedBy": "AcceptedAfterReview",
+ "acceptedAt": 1791606049.4941888,
+ "acceptedBy": "Accepted",
  "client": {
-  "binaryModifiedAt": 1791514114.7888856,
-  "build": "1.60.1.70291"
+  "binaryModifiedAt": 1791599385.9554334,
+  "build": "1.60.1.70334"
  },
  "exportDigest": "62705aa5d4d8fbf56ce79a417a31b76e8b730b9a3a4169130f5187342baa35d7",
- "exportedAt": 1791516018.4978256,
- "report": "2026-10-08-1.60.1.70291.md",
+ "exportedAt": 1791604812.8280582,
+ "report": "2026-10-09-1.60.1.70334.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
@@ -93,6 +93,9 @@
   "CursorHasItem": [
    "Blizzard_APIDocumentationGenerated/GameCursorDocumentation.lua"
   ],
+  "DurationTextBindingObjectAPI:SetEnabled": [
+   "Blizzard_APIDocumentationGenerated/DurationTextBindingObjectAPIDocumentation.lua"
+  ],
   "FrameAPIModelSceneFrameActorBase:Hide": [
    "Blizzard_APIDocumentationGenerated/FrameAPIModelSceneFrameActorBaseDocumentation.lua"
   ],
@@ -132,11 +135,17 @@
   "SimpleAnimScaleAPI:SetScale": [
    "Blizzard_APIDocumentationGenerated/SimpleAnimScaleAPIDocumentation.lua"
   ],
+  "SimpleButtonAPI:SetEnabled": [
+   "Blizzard_APIDocumentationGenerated/SimpleButtonAPIDocumentation.lua"
+  ],
   "SimpleButtonAPI:SetFormattedText": [
    "Blizzard_APIDocumentationGenerated/SimpleButtonAPIDocumentation.lua"
   ],
   "SimpleButtonAPI:SetText": [
    "Blizzard_APIDocumentationGenerated/SimpleButtonAPIDocumentation.lua"
+  ],
+  "SimpleEditBoxAPI:SetEnabled": [
+   "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
   ],
   "SimpleEditBoxAPI:SetJustifyH": [
    "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
@@ -175,6 +184,9 @@
    "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
   ],
   "SimpleFrameAPI:CreateTexture": [
+   "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
+  ],
+  "SimpleFrameAPI:GetFrameStrata": [
    "Blizzard_APIDocumentationGenerated/SimpleFrameAPIDocumentation.lua"
   ],
   "SimpleFrameAPI:Hide": [
@@ -281,6 +293,9 @@
   ],
   "SimpleScriptRegionResizingAPI:SetWidth": [
    "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
+  ],
+  "SimpleSliderAPI:SetEnabled": [
+   "Blizzard_APIDocumentationGenerated/SimpleSliderAPIDocumentation.lua"
   ],
   "SimpleSliderAPI:SetMinMaxValues": [
    "Blizzard_APIDocumentationGenerated/SimpleSliderAPIDocumentation.lua"
@@ -811,6 +826,11 @@
    "Returns.result.Nilable": "false",
    "Returns.result.Type": "\"bool\""
   },
+  "DurationTextBindingObjectAPI:SetEnabled": {
+   "Arguments.enabled.Nilable": "false",
+   "Arguments.enabled.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "FrameAPIModelSceneFrameActorBase:Hide": {},
   "FrameAPIModelSceneFrameActorBase:IsShown": {
    "Returns.isShown.Nilable": "false",
@@ -900,6 +920,14 @@
    "Arguments.scaleY.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "SimpleButtonAPI:SetEnabled": {
+   "Arguments.enabled.Default": "false",
+   "Arguments.enabled.Nilable": "false",
+   "Arguments.enabled.Type": "\"bool\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.ButtonState }"
+  },
   "SimpleButtonAPI:SetFormattedText": {
    "Arguments.text.Nilable": "false",
    "Arguments.text.Type": "\"cstring\"",
@@ -912,6 +940,12 @@
    "Arguments.text.Type": "\"cstring\"",
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
+  },
+  "SimpleEditBoxAPI:SetEnabled": {
+   "Arguments.enabled.Default": "false",
+   "Arguments.enabled.Nilable": "false",
+   "Arguments.enabled.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "SimpleEditBoxAPI:SetJustifyH": {
    "Arguments.justifyH.Nilable": "false",
@@ -1014,6 +1048,11 @@
    "Returns.texture.Nilable": "false",
    "Returns.texture.Type": "\"SimpleTexture\"",
    "SecretArguments": "\"NotAllowed\""
+  },
+  "SimpleFrameAPI:GetFrameStrata": {
+   "Returns.strata.Nilable": "false",
+   "Returns.strata.Type": "\"FrameStrata\"",
+   "SecretReturnsForAspect": "{ Enum.SecretAspect.FrameStrata }"
   },
   "SimpleFrameAPI:Hide": {
    "IsProtectedFunction": "true"
@@ -1261,6 +1300,11 @@
    "Arguments.width.Nilable": "false",
    "Arguments.width.Type": "\"uiUnit\"",
    "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleSliderAPI:SetEnabled": {
+   "Arguments.enabled.Nilable": "false",
+   "Arguments.enabled.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "SimpleSliderAPI:SetMinMaxValues": {

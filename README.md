@@ -45,8 +45,10 @@ page's Defaults resets only that page.
   - your threat on each, highest first;
   - your target marked, with level and elite tags.
 
-  It needs enemy nameplates on, and it hides when the fight ends. Its scale and position
-  are in Settings.
+  It needs enemy nameplates on, and it hides when the fight ends. Its scale, width and
+  position are in Settings. Narrowing it below about 140 pixels drops the mob names and
+  keeps the bars and your threat; it stops at 112, ten per cent under the player frame's
+  own health bar.
 - **Damage breakdown.** A small panel above the player frame lists your damage by spell,
   with icon, DPS and share of your total. It reads the game's own damage meter, so its
   numbers match it exactly. Choose the current fight or the whole session. By default it
@@ -58,7 +60,7 @@ page's Defaults resets only that page.
 - **Equipped skills.** While your bags are open, a small panel at their left edge shows
   your primary professions, the skill of each equipped weapon, and Defense, as
   `rank / maximum`. Each weapon slot gets its own row; an empty main hand shows
-  Unarmed, and a fishing pole shows Fishing.
+  Unarmed, and a fishing pole shows Fishing. Its width and position are in Settings.
 - **Toasts.** Pop-ups for looted money, looted items of green quality or better, and
   looted quest items of any quality. Purchases, quest rewards and crafted items do not
   show. Position, duration and each type can be adjusted.
@@ -72,6 +74,14 @@ page's Defaults resets only that page.
 
 **Other**
 
+- **Show all windows for adjusting.** A switch at the top of the settings menu's General
+  page draws every window this addon owns -- the skills panel, the damage breakdown or
+  threat panel, and two sample toasts -- filled with sample contents, above the Options
+  window, so a change to a width, a scale or a position can be seen as it is made. The
+  windows stay up after Options closes and switch off when a fight starts. The threat
+  panel and the damage breakdown sit in the same place, so whichever one you last
+  adjusted is the one shown. Sample contents are never real figures: `/pa threat`,
+  `/pa dps`, `/pa skills` and `/pa toasts` each say `preview: on` while it is.
 - **`/rl`** reloads the interface.
 
 ## Commands
@@ -85,6 +95,7 @@ page's Defaults resets only that page.
 | `/pa toasts`, `/pa toasts test` | Toast counts; show one of each toast |
 | `/pa bags`, `/pa vend` | The last sort or sale, and why any was skipped |
 | `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | State of the damage breakdown, threat panel, nameplates and five-second rule |
+| `/pa preview [on\|off\|threat\|dps]` | Show every window with sample contents while you adjust; which window each place is showing |
 | `/pa panel` | How the settings pages built. It does not open Options: that call is restricted |
 | `/pa blocked` | Actions the game refused with PersonalAddon named |
 | `/pa diag` | Counters and fault notes from the last five sessions |
@@ -93,9 +104,18 @@ page's Defaults resets only that page.
 
 ## Troubleshooting
 
-**Any entry in `/pa blocked` is a bug in this addon**, even if nothing looked wrong.
-Please open an issue with that output. Without BugGrabber, the game shows its own dialog
-for the same event.
+**Any entry in `/pa blocked` is a bug in this addon**, even if nothing looked wrong —
+**with one exception**, the known issue below. Please open an issue with that output.
+Without BugGrabber, the game shows its own dialog for the same event.
+
+How to tell the exception apart: the known issue refuses controller actions, most often
+`SetPreferredGamepadInteractTarget`, and `/pa blocked` shows the stack reaching Blizzard's
+own `MainActionBarFrame.lua` or `FrameControlsManager.lua` rather than any file of this
+addon. The game blames whichever addon's taint the UI state happens to carry, so
+`/pa diag` counts those under `refusalsOurs` even though the call was Blizzard's;
+`knownDefectHintShown` beside it means this addon recognised the defect and said
+`/reload`. Any **other** function name, or a stack that passes through
+`Interface/AddOns/PersonalAddon/`, is this addon's bug.
 
 **Known issue: the Gamepad UI and refused actions.** Any code that is not Blizzard's (an
 addon, or `/run`) opening or closing a window, or closing Options with the controller after
@@ -104,7 +124,7 @@ tainted. Later controller actions are then refused, most often updating the inte
 though a jump or a Game Menu button can be refused too. The game names whichever addon's
 taint that state carries: it has been PersonalAddon, BugSack, Questie, Chatify, SnapPrice,
 Auctionator, BetterForeverChat and DrinkBot, and with no addons at all, `/run`. This is a
-Blizzard defect, still present on build 1.60.1.70291. **`/reload` clears it**, so reload
+Blizzard defect, still present on build 1.60.1.70334. **`/reload` clears it**, so reload
 after using Options with the controller. Keep BugGrabber installed: without it,
 Blizzard's own warning dialog takes part, and one session flooded until it disconnected.
 PersonalAddon now counts such a flood quietly and says `/reload`. Details:
@@ -128,17 +148,21 @@ The Gamepad UI already covers these, so this addon does not:
 
 Attempted and dropped, with the reason, so nobody spends the time twice:
 
-| Idea | Why not |
-|---|---|
-| Scrolling combat text | The client restricts the combat log for addons, so every attempt misses hits. The damage breakdown replaces it |
-| Camera pitch, DynamicCam style | The client accepts the settings and then ignores them. Worth retrying after a client patch |
-| Moving nameplate names, guilds and role tags | The client treats nameplate text as a restricted region |
-| Resizing nameplates | Both available methods are accepted and change nothing on screen |
-| Minimal player frames | Dropped by choice: it would mean moving Blizzard's frames, and the five-second-rule line anchors to the mana bar |
-| Quest tracker sorted by level | Reordering means removing and re-adding watches, and the game runs the tracker's update inside that call, carrying this addon's taint into the tracker. See [Phase 7 §6.4](Architecture/20260926-Phase07.md) |
-| Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon |
-| Raid markers on the threat panel | The client always hides them |
-| Greying out a feature's options while it is off | It needs a function Blizzard calls on every draw (rule 1). The options are indented under their switch instead |
+The **Tried in** column says where the attempt is written up and which client it
+failed on, so a later patch can be judged against it. The reason an idea failed is often
+build-specific, which is what makes that column worth carrying.
+
+| Idea | Why not | Tried in |
+|---|---|---|
+| Scrolling combat text | The client restricts the combat log for addons, so every attempt misses hits. The damage breakdown replaces it | [Phase 4](Architecture/20260919-Phase04.md) §1.1, build not recorded |
+| Camera pitch, DynamicCam style | The client accepts the settings and then ignores them. Worth retrying after a client patch | [Phase 5](Architecture/20260919-Phase05.md) §4.5b, build not recorded |
+| Moving nameplate names, guilds and role tags | The client treats nameplate text as a restricted region | [Phase 2](Architecture/20260919-Phase02.md) §4.7, build not recorded |
+| Resizing nameplates | Both methods tried are accepted and change nothing on screen. A third frame was never tried: see [Roadmap 03](Architecture/20261009-RoadmapProposal03.md) §3 | [Phase 2](Architecture/20260919-Phase02.md) §4.9, build not recorded |
+| Minimal player frames | Dropped by choice: it would mean moving Blizzard's frames, and the five-second-rule line anchors to the mana bar | [Phase 6](Architecture/20260919-Phase06.md), never attempted |
+| Quest tracker sorted by level | Reordering means removing and re-adding watches, and the game runs the tracker's update inside that call, carrying this addon's taint into the tracker | [Phase 7](Architecture/20260926-Phase07.md) §6.4, client of 2026-09-24 |
+| Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon | [Phase 8](Architecture/20260927-Phase08.md), client of 2026-09-24 |
+| Raid markers on the threat panel | The client always hides them | [Phase 11](Architecture/20261005-Phase11.md), build 1.60.1.70235 |
+| Greying out a feature's options while it is off | It needs a modify predicate, a function Blizzard calls on every draw (rule 1). The options are indented under their switch instead | [Phase 12](Architecture/20261006-Phase12.md) §3.4, build 1.60.1.70291 |
 
 ## Planned
 

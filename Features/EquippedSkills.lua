@@ -19,13 +19,17 @@ local ADDON_NAME, ns = ...
 local FEATURE_ID = "equippedSkills"
 
 local format, pcall, pairs, type, tostring = string.format, pcall, pairs, type, tostring
-local concat, max = table.concat, math.max
+local concat, max, min = table.concat, math.max, math.min
 
 local ROW_HEIGHT = 16
 local ROW_SPACING = 2
-local PANEL_WIDTH = 96
+-- The width is settings.panelWidth, defaulting to 96. Phase 13 section 6.2
+-- resizes the panel and every row in the pool when it changes.
 local PANEL_PADDING = 6
 local ICON_SIZE = 14
+-- The gap between the icon and the rank text, which the text's width is derived
+-- from. Named because the width floor is computed from it.
+local ICON_TEXT_GAP = 4
 
 local CAPABILITY = {
     NOT_YET_READ = "NotYetRead",
@@ -91,6 +95,7 @@ local state = {
     settings = {
         anchorOffsetX = -4,
         anchorOffsetY = 0,
+        panelWidth = 96,
         panelAlpha = 0.8,
         pollSeconds = 1,
     },
@@ -451,10 +456,21 @@ end
 
 -- Panel ---------------------------------------------------------------------------
 
+-- Geometry derived from the width, never read back off a frame.
+
+local function rowWidthFor(panelWidth)
+    return panelWidth - PANEL_PADDING * 2
+end
+
+-- The rank text is the only flexible column; the icon is fixed.
+local function textWidthFor(panelWidth)
+    return rowWidthFor(panelWidth) - ICON_SIZE - ICON_TEXT_GAP
+end
+
 local function createRow()
     local row = CreateFrame("Frame", nil, state.panel)
     row:SetHeight(ROW_HEIGHT)
-    row:SetWidth(PANEL_WIDTH - PANEL_PADDING * 2)
+    row:SetWidth(rowWidthFor(state.settings.panelWidth))
     row:EnableMouse(false)
 
     row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -465,7 +481,7 @@ local function createRow()
     row.level = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.level:SetPoint("RIGHT", row, "RIGHT", 0, 0)
     row.level:SetJustifyH("RIGHT")
-    row.level:SetWidth(PANEL_WIDTH - PANEL_PADDING * 2 - ICON_SIZE - 4)
+    row.level:SetWidth(textWidthFor(state.settings.panelWidth))
 
     return row
 end
@@ -502,7 +518,7 @@ local function ensurePanel()
     end
     local chrome = ns.PanelChrome.Build({
         frameName = "PersonalAddonEquippedSkills",
-        width = PANEL_WIDTH,
+        width = state.settings.panelWidth,
         height = ROW_HEIGHT + PANEL_PADDING * 2,
         alpha = state.settings.panelAlpha,
         strata = "MEDIUM",
@@ -595,6 +611,96 @@ local function render(snapshot)
     return true
 end
 
+-- Width (section 6.2) ------------------------------------------------------------
+
+-- Every row in the POOL, not just the live ones: a row resized only while live
+-- would come back at the old width the next time it is acquired.
+local function applyWidth()
+    if not state.panel then
+        return
+    end
+    local width = state.settings.panelWidth
+    state.panel:SetWidth(width)
+    local rowWidth, textWidth = rowWidthFor(width), textWidthFor(width)
+    ns.FramePool.ForEach(state.rowPool, function(row)
+        row:SetWidth(rowWidth)
+        row.level:SetWidth(textWidth)
+    end)
+end
+
+-- Preview (section 5.4) ----------------------------------------------------------
+
+-- A fixed six rows, which is the normal case: two professions, three weapon
+-- slots and Defense. The live count is what you have equipped, behind reads that
+-- can be withheld, so the previewed HEIGHT can differ from the live one; width
+-- is what this phase adjusts and it is unaffected. Reads no skill value.
+local PREVIEW_LABELS = {
+    "Sample 1", "Sample 2", "Sample 3", "Sample 4", "Sample 5", "Sample 6",
+    "Sample 7", "Sample 8",
+}
+
+local function showPlaceholders()
+    if not state.panel then
+        return 0
+    end
+    releaseRows()
+    -- The live render short-circuits on an unchanged signature, so the preview
+    -- clears it: the next real render must redraw rather than believe the sample
+    -- rows are its own.
+    state.lastSignature = nil
+
+    local drawCount = min(ns.PREVIEW_SKILL_ROWS, ns.SKILL_ROW_CAPACITY)
+    local previous = nil
+    for index = 1, drawCount do
+        local row, poolError = ns.FramePool.Acquire(state.rowPool)
+        if not row then
+            ns.Log.OnceError("skills:previewpool", format(
+                "the skills window row pool was exhausted drawing a preview (%s)",
+                tostring(poolError)))
+            break
+        end
+        row.icon:SetTexture(ns.DEFENSE_ICON)
+        row.icon:Show()
+        row.level:SetText(PREVIEW_LABELS[index] or "Sample")
+        row:ClearAllPoints()
+        if previous then
+            row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -ROW_SPACING)
+        else
+            row:SetPoint("TOPLEFT", state.panel, "TOPLEFT", PANEL_PADDING, -PANEL_PADDING)
+        end
+        row:Show()
+        state.liveRows[#state.liveRows + 1] = row
+        previous = row
+    end
+
+    local shown = #state.liveRows
+    state.panel:SetHeight(PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
+        + max(0, shown - 1) * ROW_SPACING)
+    ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
+    state.panel:Show()
+    return shown
+end
+
+local function clearPlaceholders()
+    if state.rowPool then
+        releaseRows()
+    end
+    state.lastSignature = nil
+    if state.panel then
+        state.panel:Hide()
+    end
+end
+
+local function registerPreview()
+    ns.Preview.Register({
+        panelId = ns.PREVIEW_PANEL.EQUIPPED_SKILLS,
+        raiseTarget = state.panel,
+        baseStrata = state.chrome and state.chrome.baseStrata or nil,
+        show = showPlaceholders,
+        clear = clearPlaceholders,
+    })
+end
+
 -- Visibility and refresh (section 5.5) -------------------------------------------
 
 local function stopPoll()
@@ -617,6 +723,12 @@ local function hideWindow()
 end
 
 local function refresh()
+    -- The preview owns the panel while it is on, and the poll ticker runs
+    -- whenever the bags are open, so opening them during a preview would
+    -- otherwise overwrite the sample rows (section 5.7).
+    if ns.Preview.IsEnabled() then
+        return
+    end
     local snapshot = readSkills()
     state.lastSnapshot = snapshot
     render(snapshot)
@@ -682,6 +794,7 @@ local function readSettings(config)
     if not settings then
         return
     end
+    state.settings.panelWidth = settings.panelWidth or state.settings.panelWidth
     state.settings.anchorOffsetX = settings.anchorOffsetX or state.settings.anchorOffsetX
     state.settings.anchorOffsetY = settings.anchorOffsetY or state.settings.anchorOffsetY
     state.settings.panelAlpha = settings.panelAlpha or state.settings.panelAlpha
@@ -711,7 +824,9 @@ local function enable(config)
     end
 
     ensurePanel()
+    applyWidth()
     anchorPanel()
+    registerPreview()
 
     for index = 1, #BAG_EVENTS do
         local token, reason = ns.Dispatch.SubscribeCallback(FEATURE_ID, BAG_EVENTS[index], onBagSignal)
@@ -730,6 +845,7 @@ end
 -- Tolerates a partial enable (Phase 1 section 6.1).
 local function disable()
     state.enabled = false
+    ns.Preview.Unregister(ns.PREVIEW_PANEL.EQUIPPED_SKILLS)
     hideWindow()
     for index = #state.tokens, 1, -1 do
         ns.Dispatch.Unsubscribe(state.tokens[index])
@@ -741,6 +857,11 @@ local function onConfigChanged(config, changedKey)
     readSettings(config)
     if changedKey == "anchorOffsetX" or changedKey == "anchorOffsetY" then
         anchorPanel()
+    elseif changedKey == "panelWidth" then
+        applyWidth()
+        if ns.Preview.IsEnabled() then
+            showPlaceholders()
+        end
     elseif changedKey == "panelAlpha" then
         ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
     elseif changedKey == "pollSeconds" then
@@ -760,10 +881,19 @@ ns.Registry.Register(FEATURE_ID, {
     settings = {
         anchorOffsetX = -4,
         anchorOffsetY = 0,
+        panelWidth = 96,
         panelAlpha = 0.8,
         pollSeconds = 1,
     },
     schema = {
+        -- Phase 13: the minimum is padding, icon, gap and the least the rank
+        -- text can have (Core/Constants.lua).
+        panelWidth = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Window width", order = 0,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = ns.SKILL_PANEL_MINIMUM_WIDTH,
+            maximum = ns.SKILL_PANEL_MAXIMUM_WIDTH, step = 1,
+        },
         anchorOffsetX = {
             kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal offset", order = 1,
             unit = ns.ConfigSchema.UNIT.PIXELS,
@@ -839,6 +969,10 @@ ns.EquippedSkills = {
         end
         local fistLine = state.unarmedSubclass and state.resolvedLines[state.unarmedSubclass]
         return {
+            -- First: the defence against reading sample rows as real
+            -- (section 5.1).
+            preview = ns.Preview.IsEnabled(),
+            panelWidth = state.settings.panelWidth,
             enabled = state.enabled,
             capability = state.capability,
             capabilityReason = state.capabilityReason,

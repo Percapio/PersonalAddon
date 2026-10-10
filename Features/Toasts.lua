@@ -20,8 +20,11 @@ local ADDON_NAME, ns = ...
 local FEATURE_ID = "toasts"
 
 local format, pcall, type, tostring, tonumber = string.format, pcall, type, tostring, tonumber
-local concat, remove, floor = table.concat, table.remove, math.floor
+local concat, remove, floor, min = table.concat, table.remove, math.floor, math.min
 
+-- The container's strata, named because the preview has to put it back after
+-- raising it over Blizzard's Options window, which is HIGH too (section 3.1).
+local CONTAINER_STRATA = "HIGH"
 local TOAST_WIDTH = 249
 local TOAST_HEIGHT = 71
 local TOAST_SPACING = 4
@@ -198,6 +201,7 @@ local function resetToast(toast)
     cancelToastTimer(toast)
     toast:SetScript("OnUpdate", nil)
     toast.fading = false
+    toast.isPreviewSample = false
     toast.generation = (toast.generation or 0) + 1
     toast.request = nil
     toast:Hide()
@@ -260,6 +264,8 @@ end
 
 local showNext
 local beginFade
+-- Put a sample back once a real toast that took its slot has gone.
+local refillPreviewSamples
 
 local function startToastTimer(toast)
     cancelToastTimer(toast)
@@ -283,6 +289,9 @@ local function release(toast)
     ns.FramePool.Release(state.pool, toast)
     layout()
     showNext()
+    if refillPreviewSamples then
+        refillPreviewSamples()
+    end
 end
 
 -- The fade is our own OnUpdate on our own frame, set only while it runs.
@@ -302,16 +311,22 @@ beginFade = function(toast)
     end)
 end
 
-local function display(request)
+-- isSample: a preview sample, which gets no duration timer so it never fades,
+-- and is marked so a real toast can take its slot (Phase 13 section 5.5). The
+-- mark is a field on one of OUR frames, so rule 2 is untouched.
+local function display(request, isSample)
     local toast = ns.FramePool.Acquire(state.pool)
     if not toast then
         return false
     end
     paint(toast, request)
+    toast.isPreviewSample = (isSample == true)
     state.visible[#state.visible + 1] = toast
     layout()
     toast:Show()
-    startToastTimer(toast)
+    if not isSample then
+        startToastTimer(toast)
+    end
     return true
 end
 
@@ -326,11 +341,34 @@ showNext = function()
     end
 end
 
+-- Preview samples (section 5.5) ---------------------------------------------------
+
+-- Frees a slot for a real toast by giving up the NEWEST sample, so no real loot
+-- notification is ever lost to the preview. The sample comes back on the next
+-- ShowPreviewSamples, which the real toast's release triggers while the preview
+-- is on.
+local function evictSampleForRealToast()
+    for index = #state.visible, 1, -1 do
+        local toast = state.visible[index]
+        if toast.isPreviewSample then
+            remove(state.visible, index)
+            ns.FramePool.Release(state.pool, toast)
+            layout()
+            return true
+        end
+    end
+    return false
+end
+
 -- Money merges into a visible money toast, whose timer restarts, or into a queued one.
 local function coalesceMoney(amount)
     for index = 1, #state.visible do
         local toast = state.visible[index]
-        if toast.request and toast.request.kind == KIND.LOOTED_MONEY then
+        -- Never into a preview sample. Merging would add real loot to a made-up
+        -- figure, and the sample carries no duration timer, so the merged total
+        -- would sit on screen until the preview ended (Phase 13 section 5.5).
+        if toast.request and toast.request.kind == KIND.LOOTED_MONEY
+            and not toast.isPreviewSample then
             toast.request.amount = toast.request.amount + amount
             toast:SetScript("OnUpdate", nil)
             toast.fading = false
@@ -371,6 +409,15 @@ local function post(request)
         return OUTCOME.COALESCED
     end
 
+    -- A sample gives up its slot BEFORE the pool is asked, not after it fails:
+    -- FramePool is SURFACE_AND_FAIL at TOAST_POOL_CAPACITY and logs "the cap is
+    -- wrong" when exhausted, and two held samples with maximumVisible at its own
+    -- maximum would trip that notice about a cap that is correct
+    -- (Phase 13 section 5.5, decision D6).
+    if #state.visible >= state.settings.maximumVisible then
+        evictSampleForRealToast()
+    end
+
     if #state.visible < state.settings.maximumVisible and display(request) then
         bump(state.counts, "shown")
         return OUTCOME.SHOWN
@@ -386,6 +433,81 @@ local function post(request)
     state.queue[#state.queue + 1] = request
     bump(state.counts, "queued")
     return OUTCOME.QUEUED
+end
+
+-- The samples the preview holds (decision D5): one item and one money toast.
+-- Two, so the default maximumVisible of 3 leaves a slot free and the first real
+-- toast evicts nothing. They go through display(), which bumps no counter --
+-- post() is what counts, and these are not posts.
+local SAMPLE_REQUESTS = {
+    {
+        kind = KIND.LOOTED_ITEM, itemId = 0, name = "Sample item",
+        icon = "Interface\\Icons\\INV_Misc_QuestionMark", quantity = 1, quality = 2,
+        isQuestItem = false,
+    },
+    { kind = KIND.LOOTED_MONEY, amount = 12345 },
+}
+
+local function visibleSampleCount()
+    local count = 0
+    for index = 1, #state.visible do
+        if state.visible[index].isPreviewSample then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+local function showPreviewSamples()
+    if not state.enabled then
+        return 0
+    end
+    local wanted = min(ns.PREVIEW_TOAST_SAMPLES, #SAMPLE_REQUESTS)
+    local shownAlready = visibleSampleCount()
+    for index = shownAlready + 1, wanted do
+        if #state.visible >= state.settings.maximumVisible then
+            break
+        end
+        if not display(SAMPLE_REQUESTS[index], true) then
+            break
+        end
+    end
+    return visibleSampleCount()
+end
+
+local function clearPreviewSamples()
+    local released = 0
+    for index = #state.visible, 1, -1 do
+        local toast = state.visible[index]
+        if toast.isPreviewSample then
+            remove(state.visible, index)
+            ns.FramePool.Release(state.pool, toast)
+            released = released + 1
+        end
+    end
+    if released > 0 then
+        layout()
+        showNext()
+    end
+    return released
+end
+
+refillPreviewSamples = function()
+    if ns.Preview.IsEnabled() and state.enabled then
+        showPreviewSamples()
+    end
+end
+
+local function registerPreview()
+    ns.Preview.Register({
+        panelId = ns.PREVIEW_PANEL.TOASTS,
+        raiseTarget = state.container,
+        -- The container sets its own strata in code rather than through
+        -- PanelChrome, so the literal is handed over here (section 3.1).
+        baseStrata = CONTAINER_STRATA,
+        show = showPreviewSamples,
+        clear = clearPreviewSamples,
+    })
 end
 
 -- Loot patterns (section 6.3) -----------------------------------------------------
@@ -747,7 +869,7 @@ local function ensureContainer()
     local container = CreateFrame("Frame", "PersonalAddonToasts", _G.UIParent)
     container:SetWidth(TOAST_WIDTH)
     container:SetHeight(TOAST_HEIGHT)
-    container:SetFrameStrata("HIGH")
+    container:SetFrameStrata(CONTAINER_STRATA)
     container:EnableMouse(false)
     container:Hide()
     state.container = container
@@ -784,6 +906,7 @@ local function enable(config)
     anchorContainer()
     state.container:Show()
     state.enabled = true
+    registerPreview()
 
     local patterns, missing = buildLootPatterns()
     state.patterns = patterns
@@ -806,6 +929,7 @@ end
 
 -- Tolerates a partial enable (Phase 1 section 6.1).
 local function disable()
+    ns.Preview.Unregister(ns.PREVIEW_PANEL.TOASTS)
     state.enabled = false
     state.inboxGeneration = state.inboxGeneration + 1
     state.inboxScheduled = false
@@ -928,6 +1052,10 @@ ns.Toasts = {
             constructed, live, free, capacity = ns.FramePool.Stats(state.pool)
         end
         return {
+            -- First: the defence against reading sample toasts as real loot
+            -- (section 5.1).
+            preview = ns.Preview.IsEnabled(),
+            previewSamples = visibleSampleCount(),
             enabled = state.enabled,
             visible = #state.visible,
             queued = #state.queue,

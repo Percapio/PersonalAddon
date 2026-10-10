@@ -120,8 +120,26 @@ function PanelChrome.Build(spec)
     local panel, frameTemplate = createPanelFrame(spec.frameName)
     panel:SetWidth(spec.width)
     panel:SetHeight(spec.height)
-    if spec.strata then
-        panel:SetFrameStrata(spec.strata)
+
+    -- The strata to put back after the preview raises this panel (Phase 13
+    -- section 3.3). A spec that names one gives us the literal; a spec that does
+    -- not leaves the panel on whatever it inherits from UIParent, and UIParent is
+    -- created in C++ so the export cannot tell us what that is. So it is read
+    -- ONCE, here, from our own brand-new frame, before anything of ours has
+    -- written it -- not read back later to recover a value we already had.
+    --
+    -- The read goes through ClientRead because GetFrameStrata is secret-capable
+    -- in the docs, and Phase 12's review recorded that a hidden value marks the
+    -- strata hidden. Withheld means "could not tell", so no literal is recorded
+    -- and Restore falls back (rule 10).
+    local baseStrata = spec.strata
+    if baseStrata then
+        panel:SetFrameStrata(baseStrata)
+    else
+        local kind, current = ns.ClientRead.Call(panel.GetFrameStrata, "string", panel)
+        if kind == ns.ClientRead.PLAIN then
+            baseStrata = current
+        end
     end
     -- Never a mouse target: with no mouse and no buttons, the Gamepad UI's
     -- navigation has nothing to find in the panel.
@@ -152,7 +170,35 @@ function PanelChrome.Build(spec)
         frame = panel,
         background = background,
         borderStyle = borderStyle,
+        baseStrata = baseStrata,
     }
+end
+
+-- Raising a panel over Blizzard's Options window, and putting it back (Phase 13
+-- section 3). Both write a fixed strata name and neither reads one: Phase 12's
+-- patch review recorded that SetFrameStrata accepts hidden values only when
+-- called untainted, and that a hidden value marks the strata hidden.
+--
+-- Returns false rather than raising, so one refused panel does not take the
+-- others down with it.
+function PanelChrome.Raise(frame)
+    if not frame or type(frame.SetFrameStrata) ~= "function" then
+        return false
+    end
+    return (pcall(frame.SetFrameStrata, frame, ns.PREVIEW_STRATA))
+end
+
+function PanelChrome.Restore(frame, baseStrata)
+    if not frame or type(frame.SetFrameStrata) ~= "function" then
+        return false
+    end
+    if type(baseStrata) ~= "string" or baseStrata == "" then
+        -- Build could not read one. Leaving the panel raised would be worse than
+        -- a guess, and MEDIUM is the client's own default for a frame with no
+        -- strata of its own.
+        baseStrata = "MEDIUM"
+    end
+    return (pcall(frame.SetFrameStrata, frame, baseStrata))
 end
 
 function PanelChrome.SetAlpha(chrome, alpha)
