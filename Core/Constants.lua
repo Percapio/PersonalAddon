@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.3.0-phase13"
+ns.VERSION = "1.4.0-phase14"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -173,3 +173,11 @@ ns.THREAT_NAME_MINIMUM_BAR = 40
 ns.SKILL_PANEL_MINIMUM_WIDTH = 74
 ns.SKILL_PANEL_MAXIMUM_WIDTH = 240
 ns.SKILL_TEXT_MINIMUM = 44
+
+-- Phase 14 (Architecture/20261010-Phase14.md) ---------------------------------
+
+-- The floor on a health bar's height, in pixels. It bounds the RESULT where
+-- barHeightFraction bounds the intent: 30% of the smallest base Blizzard can
+-- produce (8px, the Classic style at Small scale) is 2.4px, which is a line and
+-- not a bar (section 5.3).
+ns.MINIMUM_BAR_PIXELS = 4

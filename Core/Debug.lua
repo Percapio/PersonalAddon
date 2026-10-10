@@ -230,6 +230,18 @@ local function commandPlates()
     ns.Log.Info(format("  contested=%d driver=%s yieldSelectedTarget=%s",
         view.contested or 0, tostring(view.contestedRunning),
         tostring(view.yieldSelectedTarget)))
+    -- Phase 14. A fraction of 1 means the setting is inert, so say so rather
+    -- than printing counters that will all be zero.
+    if (view.barHeightFraction or 1) >= 1 then
+        ns.Log.Info("  bar height: the game's own (setting at 100%)")
+    else
+        ns.Log.Info(format("  bar height: %d%% of the game's own; base=%s written=%s",
+            math.floor(view.barHeightFraction * 100 + 0.5),
+            tostring(view.barHeightBase), tostring(view.barHeightWritten)))
+        ns.Log.Info(format("    writes=%d unchanged=%d baseWithheld=%d compareWithheld=%d refused=%d",
+            view.barHeightWrites, view.barHeightUnchanged, view.barHeightBaseWithheld,
+            view.barHeightCompareWithheld, view.barHeightRefused))
+    end
     ns.Log.Info(format("  ledger: widgets=%d restored=%d widgetGone=%d writeRefused=%d",
         view.ledgerWidgets, view.ledgerRestored, view.ledgerWidgetGone,
         view.ledgerWriteRefused))
@@ -823,13 +835,6 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
-    elseif command == "probe" then
-        -- Spike N only. Deleted with Spikes/BarHeightProbe.lua.
-        if string.lower(tostring(words[2] or "")) == "barheight" and ns.BarHeightProbe then
-            ns.BarHeightProbe.Route(words[3], words[4])
-        else
-            ns.Log.Warn("/pa probe barheight [look | set <px> | check | restore]")
-        end
     elseif command == "preview" then
         reportPreview(words[2])
     elseif command == "threat" then

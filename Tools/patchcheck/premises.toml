@@ -252,3 +252,31 @@ statement = "The player frame's health bar is 124 pixels wide, declared in XML a
 source = "Phase 13 section 6.1; decision D7"
 consequence = "The threat panel's 112 px minimum is no longer 10% under the player frame's bar (Core/Constants.lua)"
 check = { kind = "Pattern", file = "Blizzard_UnitFrame/Mainline/PlayerFrame.xml", regex = '<Size x="124" y="20"/>', expect = "Present" }
+
+[[premise]]
+id = "PLATE-BAR-CONTAINER-HEIGHT"
+statement = "The nameplate health bar's height is an explicit SetHeight on HealthBarsContainer, whose two anchors are both at the bottom"
+source = "Phase 14 sections 2 and 4.1"
+consequence = "The height restyle is discarded again, as Phase 2 section 4.9's was (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua", regex = 'HealthBarsContainer:SetHeight\(setupOptions\.healthBarHeight\)', expect = "Present" }
+
+[[premise]]
+id = "PLATE-OPTIONS-REACH-SETUNIT"
+statement = "ApplyFrameOptions ends by calling CompactUnitFrame_SetUnit, so every layout pass reaches the hook the nameplate feature already installs"
+source = "Phase 14 section 4.1"
+consequence = "A height is not re-asserted after an Options change, and bars stay tall until their plates recycle (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateBase.lua", regex = 'CompactUnitFrame_SetUnit\(self\.UnitFrame, self\.unitToken\)', expect = "Present" }
+
+[[premise]]
+id = "PLATE-SETUP-OPTIONS-HEIGHT"
+statement = "NamePlateSetupOptions.healthBarHeight holds the base height UpdateAnchors applies to every plate"
+source = "Phase 14 section 5.2"
+consequence = "The height feature has no base to scale and writes nothing (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlates.lua", regex = 'NamePlateSetupOptions\.healthBarHeight\s*=\s*GetHealthBarHeight\(', expect = "Present" }
+
+[[premise]]
+id = "PLATE-CONTAINER-NO-SIZE-SCRIPT"
+statement = "Only the nameplate's base frame has an OnSizeChanged script; the health bar's container and bar have none"
+source = "Phase 14 section 6.3"
+consequence = "A SetHeight of ours runs a Blizzard size handler inside our execution (rule 9)"
+check = { kind = "Watch", files = ["Blizzard_NamePlates/Blizzard_NamePlateBase.lua", "Blizzard_NamePlates/Blizzard_NamePlates.xml", "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua"] }

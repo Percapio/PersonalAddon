@@ -39,6 +39,11 @@ page's Defaults resets only that page.
   that is hitting you or that you are about to pull. Grey and yellow match the game's own
   colours by default. All six can be changed. Colours come from the game's threat data,
   so they also work in dungeons and raids.
+- **Nameplate health bar height.** A slider sets the bar's height as a share of the game's
+  own, from 30% to 100%. It is a share and not a number of pixels because the game's own
+  height depends on the Style and Global Scale you chose, and a fixed number would be half
+  the bar under one and a third under another. Everything else on the plate stays the
+  game's, so a shorter bar brings the name down with it.
 - **Threat panel.** In combat, the mobs fighting you or your group are listed in the
   damage breakdown's place above the player frame:
   - their health as a bar, in the nameplate colours;
@@ -157,7 +162,7 @@ build-specific, which is what makes that column worth carrying.
 | Scrolling combat text | The client restricts the combat log for addons, so every attempt misses hits. The damage breakdown replaces it | [Phase 4](Architecture/20260919-Phase04.md) §1.1, build not recorded |
 | Camera pitch, DynamicCam style | The client accepts the settings and then ignores them. Worth retrying after a client patch | [Phase 5](Architecture/20260919-Phase05.md) §4.5b, build not recorded |
 | Moving nameplate names, guilds and role tags | The client treats nameplate text as a restricted region | [Phase 2](Architecture/20260919-Phase02.md) §4.7, build not recorded |
-| Resizing nameplates | Both methods tried are accepted and change nothing on screen. A third frame was never tried: see [Roadmap 03](Architecture/20261009-RoadmapProposal03.md) §3 | [Phase 2](Architecture/20260919-Phase02.md) §4.9, build not recorded |
+| Widening or narrowing the nameplate health bar | Its width comes from two opposing anchors and no written value, so a width of ours is discarded. Changing it means replacing one of Blizzard's anchors, which is a far larger thing than the height was. **The height is a setting** — see Nameplates above | [Phase 14](Architecture/20261010-Phase14.md) §1.3, build 1.60.1.70334 |
 | Minimal player frames | Dropped by choice: it would mean moving Blizzard's frames, and the five-second-rule line anchors to the mana bar | [Phase 6](Architecture/20260919-Phase06.md), never attempted |
 | Quest tracker sorted by level | Reordering means removing and re-adding watches, and the game runs the tracker's update inside that call, carrying this addon's taint into the tracker | [Phase 7](Architecture/20260926-Phase07.md) §6.4, client of 2026-09-24 |
 | Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon | [Phase 8](Architecture/20260927-Phase08.md), client of 2026-09-24 |
@@ -254,6 +259,12 @@ Known exceptions, kept on purpose:
 - The settings page: Blizzard's Settings API stores our controls' initializer data and
   callback handles in its own tables when we register them. Every addon with a settings
   page does this.
+- The nameplate re-assert runs inside Blizzard's call, not a frame later (rule 5). Both
+  the bar colour and the bar height are values Blizzard writes on its own schedule, and a
+  `hooksecurefunc` post-hook on the function that does the writing corrects them in the
+  same frame. Deferring would show Blizzard's value for one frame first, which is a
+  visible flicker rather than a corrected pixel. In place since Phase 7 for the colour;
+  stated here from Phase 14.
 
 To trace how taint reached a refusal:
 

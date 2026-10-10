@@ -73,6 +73,10 @@ local state = {
     palette = {},
     colouringWanted = true,
     sweepInterval = 0.25,
+    -- Phase 14. 1 writes nothing; the feature is inert until the slider moves.
+    barHeightFraction = 1.0,
+    lastBarBase = nil,
+    lastBarHeight = nil,
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
     -- enable binds it, so nothing here ever indexes nil.
     counters = {},
@@ -97,6 +101,7 @@ local function readSettings(config)
         return
     end
     state.sweepInterval = settings.sweepInterval or state.sweepInterval
+    state.barHeightFraction = settings.barHeightFraction or state.barHeightFraction
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
     state.palette = Threat.PaletteFrom(settings)
@@ -109,7 +114,12 @@ end
 local function resolveParts(frame)
     local unitFrame = frame.UnitFrame or frame.unitFrame or frame
     local healthBar = unitFrame.healthBar or unitFrame.HealthBar or unitFrame.healthbar
-    return unitFrame, healthBar
+    -- Phase 14: the bar's height is written on its CONTAINER, not on the bar.
+    -- The bar carries two vertical anchors and discards a height; the container
+    -- carries two BOTTOM anchors and an explicit height, which is the difference
+    -- Phase 2 section 4.9 missed.
+    local container = unitFrame.HealthBarsContainer or unitFrame.healthBarsContainer
+    return unitFrame, healthBar, container
 end
 
 -- Scope -----------------------------------------------------------------------
@@ -196,6 +206,106 @@ local function verdictFor(plate, allies, allyCount)
         noteWithheldThreat()
     end
     return Threat.ResolveVerdict(aggro, Threat.Disposition(unitToken, counters))
+end
+
+-- Bar height (Phase 14) -------------------------------------------------------
+--
+-- Blizzard writes the bar's height on every layout pass:
+-- NamePlateUnitFrameMixin:UpdateAnchors does
+-- HealthBarsContainer:SetHeight(setupOptions.healthBarHeight). So the height is
+-- a value with two writers, like the colour, and it is re-asserted on the same
+-- post-hook.
+--
+-- THE BASE COMES FROM BLIZZARD'S OPTIONS TABLE, NOT FROM THE FRAME. Reading the
+-- frame's current height and multiplying would be correct only if the hook fired
+-- just after a layout pass. It does not: CompactUnitFrame_SetUnit is also called
+-- from ClearUnit, and CompactUnitFrame_UpdateHealth and UpdateHealthColor are on
+-- the same hook list and fire on every health change with no layout at all. The
+-- second fire would scale our own value again, and the bar would reach
+-- MINIMUM_BAR_PIXELS within a few health ticks. Taking the base from Blizzard's
+-- field makes the write IDEMPOTENT: the target depends on Blizzard's setting and
+-- the user's percentage, never on what is on the frame.
+--
+-- It is a READ of a Blizzard table, which rule 2 does not forbid; writing that
+-- field is what rule 2 forbids, and Phase 14 section 6.1 declines it.
+
+local BAR_HEIGHT_OPTION = "healthBarHeight"
+
+-- Blizzard's base height for every plate, or nil when it cannot be read.
+local function blizzardBarHeight()
+    local options = _G.NamePlateSetupOptions
+    if type(options) ~= "table" then
+        return nil, "NamePlateSetupOptions is missing on this client"
+    end
+    local kind, value = ClientRead.Field(options, BAR_HEIGHT_OPTION, "number")
+    if kind ~= PLAIN or not value or value <= 0 then
+        return nil, "the client would not show its own nameplate bar height"
+    end
+    return value
+end
+
+local function wantedBarHeight(base)
+    local wanted = base * state.barHeightFraction
+    if wanted < ns.MINIMUM_BAR_PIXELS then
+        return ns.MINIMUM_BAR_PIXELS
+    end
+    return wanted
+end
+
+-- Brings one plate's bar to the configured share of Blizzard's height. O(1), and
+-- idempotent: firing this a hundred times writes the same value once.
+local function reassertBarHeight(plate)
+    if state.barHeightFraction >= 1 or not plate.container then
+        return
+    end
+
+    local base, reason = blizzardBarHeight()
+    if not base then
+        bump(state.counters, "barHeightBaseWithheld")
+        ns.Log.Once("plates:nobarbase", format(
+            "%s, so the health bar height setting does nothing", tostring(reason)))
+        return
+    end
+
+    local wanted = wantedBarHeight(base)
+
+    -- The comparison is an optimisation: the hook fires on every health change,
+    -- and a bar already at the wanted height needs no write. A height that will
+    -- not read does not stop the write, because `wanted` does not depend on it.
+    local kind, current = ClientRead.Call(plate.container.GetHeight, "number", plate.container)
+    if kind == PLAIN then
+        if current == wanted then
+            bump(state.counters, "barHeightUnchanged")
+            return
+        end
+    else
+        bump(state.counters, "barHeightCompareWithheld")
+    end
+
+    if pcall(plate.container.SetHeight, plate.container, wanted) then
+        bump(state.counters, "barHeightWrites")
+        state.lastBarHeight = wanted
+        state.lastBarBase = base
+    else
+        bump(state.counters, "barHeightRefused")
+    end
+end
+
+-- Puts every tracked plate back to Blizzard's own height. Blizzard restores it
+-- by itself on the next layout pass, so this only makes it immediate.
+local function restoreBarHeights()
+    local base = blizzardBarHeight()
+    if not base then
+        return 0
+    end
+    local restored = 0
+    for _, plate in pairs(state.plates) do
+        if plate.container and pcall(plate.container.SetHeight, plate.container, base) then
+            restored = restored + 1
+        end
+    end
+    state.lastBarHeight = nil
+    return restored
 end
 
 -- Styling ---------------------------------------------------------------------
@@ -376,11 +486,12 @@ local function trackPlate(unitToken)
         untrackPlate(frame)
     end
 
-    local unitFrame, healthBar = resolveParts(frame)
+    local unitFrame, healthBar, container = resolveParts(frame)
     local plate = {
         frame = frame,
         unitFrame = unitFrame,
         healthBar = healthBar,
+        container = container,
         unitToken = unitToken,
         scope = classifyScope(unitToken, frame),
         styleApplied = false,
@@ -396,6 +507,13 @@ local function trackPlate(unitToken)
     if state.plateCount > (state.counters.maxTrackedPlates or 0) then
         state.counters.maxTrackedPlates = state.plateCount
     end
+
+    -- Applied here as well as on the hook: Blizzard's driver and our event
+    -- handler both run on NAME_PLATE_UNIT_ADDED and the order between them is
+    -- not ours to choose, so a plate that was laid out before we tracked it
+    -- would otherwise keep Blizzard's height until its next layout pass. The
+    -- write is idempotent, so doing it twice costs one comparison.
+    reassertBarHeight(plate)
 
     if plate.scope == SCOPE.UNREACHABLE then
         ns.Log.Once("plates:unreachable",
@@ -498,6 +616,11 @@ end
 -- Everything one plate needs re-asserted, with no classification. Cheap enough
 -- to run from Blizzard's own update path.
 local function reassertPlate(plate)
+    -- Height first, and outside the scope guard: it applies to every nameplate,
+    -- friendly ones included, because a bar that were short on enemies and tall
+    -- on friends would read as a defect rather than a setting (section 5.4).
+    reassertBarHeight(plate)
+
     if plate.scope ~= SCOPE.IN or not plate.styleApplied then
         return
     end
@@ -612,7 +735,6 @@ local HOOK_CANDIDATES = {
     "CompactUnitFrame_UpdateHealth",
     "CompactUnitFrame_UpdateAll",
     "CompactUnitFrame_SetUnit",
-    "DefaultCompactNamePlateFrameSetup",
 }
 
 local function installReassertHook()
@@ -775,6 +897,11 @@ local function disable()
     stopTicker()
     stopContesting()
 
+    -- Before the plates are untracked, while their containers are still to hand.
+    -- Blizzard would restore these itself on its next layout pass; this only
+    -- makes it immediate (section 5.5).
+    restoreBarHeights()
+
     for frame in pairs(state.plates) do
         untrackPlate(frame)
     end
@@ -801,6 +928,17 @@ local function onConfigChanged(config, changedKey)
     if changedKey == "sweepInterval" then
         stopTicker()
         startTicker()
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    if changedKey == "barHeightFraction" then
+        if state.barHeightFraction >= 1 then
+            restoreBarHeights()
+        else
+            for _, plate in pairs(state.plates) do
+                reassertBarHeight(plate)
+            end
+        end
         return ns.CONFIG_RESULT.APPLIED
     end
 
@@ -844,6 +982,9 @@ defaultSettings.aggroColouring = true
 -- colour on the one plate you are attacking.
 defaultSettings.yieldSelectedTarget = false
 defaultSettings.sweepInterval = 0.25
+-- Phase 14: a fraction of Blizzard's own bar height. 1.0 writes nothing, so an
+-- existing user sees no change until they move the slider.
+defaultSettings.barHeightFraction = 1.0
 
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
@@ -859,8 +1000,18 @@ ns.Registry.Register(FEATURE_ID, {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour nameplates", order = 1,
             description = "Red: it is attacking you. Orange: you are about to pull it. Grey: tagged by a player outside your group. Green: attacking your group or pet. Yellow: neutral. White: hostile, attacking neither.",
         },
+        -- Phase 14. A percentage of the game's own height, not a pixel count: the
+        -- game's base depends on the Style and Global Scale the user chose, so a
+        -- stored pixel count would be half the bar on one Style and a third on
+        -- another, and would not follow Global Scale (section 5.1).
+        barHeightFraction = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Health bar height", order = 2,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
+            description = "As a share of the game's own height. Everything else on the nameplate stays the game's, so a shorter bar lowers the name with it.",
+            minimum = 0.3, maximum = 1.0, step = 0.05,
+        },
         yieldSelectedTarget = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 2,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 3,
             description = "Stops contesting the bar colour on the unit you have selected. Turn this on if that plate flickers.",
         },
         colourOnPlayer = {
@@ -934,6 +1085,15 @@ ns.Nameplates = {
 
         return {
             tracked = state.plateCount,
+            -- Phase 14. barHeightFraction of 1 means the feature is inert.
+            barHeightFraction = state.barHeightFraction,
+            barHeightBase = state.lastBarBase,
+            barHeightWritten = state.lastBarHeight,
+            barHeightWrites = counters.barHeightWrites or 0,
+            barHeightUnchanged = counters.barHeightUnchanged or 0,
+            barHeightBaseWithheld = counters.barHeightBaseWithheld or 0,
+            barHeightCompareWithheld = counters.barHeightCompareWithheld or 0,
+            barHeightRefused = counters.barHeightRefused or 0,
             inScope = inScope,
             outOfScope = outOfScope,
             unreachable = unreachable,
