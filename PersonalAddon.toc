@@ -3,7 +3,9 @@
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
 ## Version: 1.4.0
-## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics
+# PersonalAddonSpikeLog is spike G's report, written so it survives a reload.
+# TEMPORARY: it leaves this line with Spikes/GuildNameProbe.lua.
+## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics, PersonalAddonSpikeLog
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their
 # stacks, so they survive a reload (Architecture/20260924-Patch01Implementation.md
 # section 4.4). Bounded at 16 records; /pa blocked clear empties it.
@@ -51,5 +53,10 @@ Features\Toasts.lua
 Features\AutoSortBags.lua
 Features\AutoSellJunk.lua
 Features\SettingsPanel.lua
+
+# Spike G (Architecture/20261009-RoadmapProposal03.md section 4.3). TEMPORARY:
+# this line and Spikes/GuildNameProbe.lua are deleted once Phase 15 records the
+# results. Off by default; calls nothing until /pa probe guild is typed.
+Spikes\GuildNameProbe.lua
 
 

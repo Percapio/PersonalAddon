@@ -839,6 +839,13 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
+    elseif command == "probe" then
+        -- Spike G only. Deleted with Spikes/GuildNameProbe.lua.
+        if string.lower(tostring(words[2] or "")) == "guild" and ns.GuildNameProbe then
+            ns.GuildNameProbe.Route(words[3])
+        else
+            ns.Log.Warn("/pa probe guild [read | draw | clear]")
+        end
     elseif command == "preview" then
         reportPreview(words[2])
     elseif command == "threat" then
