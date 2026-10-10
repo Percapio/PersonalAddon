@@ -95,6 +95,42 @@ check("H9 the redundant fires are counted as unchanged",
     ns.Nameplates.Inspect().barHeightUnchanged > 0,
     ns.Nameplates.Inspect().barHeightUnchanged)
 
+-- H9a: a LOSSY container, which is what the live client turned out to be ---------
+-- The stub above returns exactly what was written, so it could never reproduce
+-- the defect four play sessions found: a height set through SetHeight does not
+-- read back equal through GetHeight, so == never matched and every hook fire
+-- rewrote the bar. barHeightUnchanged stayed at zero against 6,800 writes.
+-- This container rounds down a little, as the client appears to, and the
+-- comparison must still recognise its own work.
+local lossy = addPlate("nameplate8", 13)
+function lossy:SetHeight(value)
+    -- Written, then reported a shade lower, the way a real widget does.
+    self.height = value - 0.02
+    self.writes = self.writes + 1
+end
+-- The plate was already written exactly, before the lossy setter was installed.
+-- Put it back to the base so one write goes through the lossy setter and leaves
+-- the inexact value the comparison then has to recognise.
+lossy.height = 13
+CompactUnitFrame_UpdateHealthColor(HARNESS.plates["nameplate8"].UnitFrame)
+HARNESS.frame()
+check("H9c the lossy setter ran", lossy.height ~= 13 and lossy.height ~= 6.5,
+    tostring(lossy.height))
+local lossyWrites = lossy.writes
+for _ = 1, 10 do
+    CompactUnitFrame_UpdateHealthColor(HARNESS.plates["nameplate8"].UnitFrame)
+end
+HARNESS.frame()
+check("H9a a lossy read-back is still recognised as our own work",
+    lossy.writes == lossyWrites, lossy.writes .. " vs " .. lossyWrites)
+check("H9b and Blizzard's base is still recognised as a reset",
+    (function()
+        lossy.height = 13
+        CompactUnitFrame_UpdateHealthColor(HARNESS.plates["nameplate8"].UnitFrame)
+        HARNESS.frame()
+        return lossy.writes == lossyWrites + 1
+    end)(), lossy.writes .. " vs " .. (lossyWrites + 1))
+
 -- H10: the base changes under us (a Style change) -------------------------------
 NamePlateSetupOptions.healthBarHeight = 20
 CompactUnitFrame_SetUnit(HARNESS.plates["nameplate1"].UnitFrame, "nameplate1")

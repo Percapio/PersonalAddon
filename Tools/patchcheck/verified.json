@@ -1,13 +1,13 @@
 {
- "acceptedAt": 1791606049.4941888,
+ "acceptedAt": 1791657271.8916252,
  "acceptedBy": "Accepted",
  "client": {
-  "binaryModifiedAt": 1791599385.9554334,
-  "build": "1.60.1.70334"
+  "binaryModifiedAt": 1791645441.4638898,
+  "build": "1.60.1.70338"
  },
  "exportDigest": "62705aa5d4d8fbf56ce79a417a31b76e8b730b9a3a4169130f5187342baa35d7",
- "exportedAt": 1791604812.8280582,
- "report": "2026-10-09-1.60.1.70334.md",
+ "exportedAt": 1791656877.3115072,
+ "report": "2026-10-10-1.60.1.70338.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
@@ -554,6 +554,9 @@
   ],
   "lua NUM_BAG_SLOTS": [
    "Blizzard_FrameXMLBase/Constants.lua"
+  ],
+  "lua NamePlateSetupOptions": [
+   "Blizzard_NamePlates/Blizzard_NamePlateFrameOptions.lua"
   ],
   "lua NumberFontNormal": [
    "Blizzard_Fonts_Shared/Shared/FontStyles.xml"
@@ -1849,6 +1852,9 @@
   "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "d314e6b29f184aebc82247382acd1c3ddc6d8bb8ebeb218ab0f1c75bc7d4d669",
   "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "187b1fe25a05bb428381a23561bb389c1acc5776c9f0f30c5e26c09376066ab6",
   "Blizzard_GamepadSmartNavigation/Utility.lua": "fee22413d6ff69ba861bae59c2f43818a09bfaea52c88f3133e7c05f4a986011",
+  "Blizzard_NamePlates/Blizzard_NamePlateBase.lua": "3221e4b6d770dbfbeb58d2a0707341a205531b13654516cf76b5b271ded65729",
+  "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua": "f8249a9482680c366c2ca0e8f4add9d2473487d5988cd3c7be972c110ce17d72",
+  "Blizzard_NamePlates/Blizzard_NamePlates.xml": "f7bc75866a5c24b4ad9cc237836d62608b0bd9c966e4561c8d87adcfea5834fd",
   "Blizzard_Settings_Shared/Blizzard_Settings.lua": "76ab19d14675e4e3dcf4fb1b02af35898e253e254da3cfce0ef655eab475e293",
   "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua": "27f6db7d502104ad26d2893519fd810b4769616398a0ebb3fb08632f7745f4a7",
   "Blizzard_SharedXMLBase/FrameUtil.lua": "61de9061104e83dbd7e704ca129e9784143bade0437b2acbd337a604656bfdd1",

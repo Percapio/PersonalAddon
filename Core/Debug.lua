@@ -235,9 +235,13 @@ local function commandPlates()
     if (view.barHeightFraction or 1) >= 1 then
         ns.Log.Info("  bar height: the game's own (setting at 100%)")
     else
-        ns.Log.Info(format("  bar height: %d%% of the game's own; base=%s written=%s",
+        -- read is printed beside written because they did not match: a height
+        -- set through SetHeight does not come back equal from GetHeight, which
+        -- is what killed the skip-the-write branch (Features/Nameplates.lua).
+        ns.Log.Info(format("  bar height: %d%% of the game's own; base=%s written=%s read=%s (tolerance %s)",
             math.floor(view.barHeightFraction * 100 + 0.5),
-            tostring(view.barHeightBase), tostring(view.barHeightWritten)))
+            tostring(view.barHeightBase), tostring(view.barHeightWritten),
+            tostring(view.barHeightRead), tostring(view.barHeightTolerance)))
         ns.Log.Info(format("    writes=%d unchanged=%d baseWithheld=%d compareWithheld=%d refused=%d",
             view.barHeightWrites, view.barHeightUnchanged, view.barHeightBaseWithheld,
             view.barHeightCompareWithheld, view.barHeightRefused))

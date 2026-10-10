@@ -77,6 +77,8 @@ local state = {
     barHeightFraction = 1.0,
     lastBarBase = nil,
     lastBarHeight = nil,
+    -- What GetHeight last gave back, so /pa plates can show the round-trip.
+    lastBarRead = nil,
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
     -- enable binds it, so nothing here ever indexes nil.
     counters = {},
@@ -244,6 +246,28 @@ local function blizzardBarHeight()
     return value
 end
 
+-- A height written through SetHeight does not read back equal through GetHeight,
+-- so comparing with == meant the "already correct" branch never fired once in
+-- four play sessions: barHeightUnchanged stayed at zero against 6,800 writes,
+-- and every hook fire rewrote the bar. Phase 2 learned the same thing about
+-- colour and answered it with COLOUR_TOLERANCE; Phase 14 shipped == and lost the
+-- optimisation.
+--
+-- The tolerance has to separate "still ours" from "Blizzard reset it to base".
+-- The smallest gap between the two is base * (1 - fraction), which at the
+-- smallest base this client produces (8px, Classic at Small scale) and the
+-- largest fraction below 1 (0.95) is 0.4. So anything under 0.4 is safe by
+-- construction, and 0.1 leaves room for sub-pixel rounding.
+--
+-- If barHeightUnchanged is still zero after this, the discrepancy is larger than
+-- sub-pixel: /pa plates now prints the height last READ beside the one last
+-- written, and this constant moves to fit the evidence.
+local BAR_HEIGHT_TOLERANCE = 0.1
+
+local function barHeightsMatch(left, right)
+    return math.abs(left - right) <= BAR_HEIGHT_TOLERANCE
+end
+
 local function wantedBarHeight(base)
     local wanted = base * state.barHeightFraction
     if wanted < ns.MINIMUM_BAR_PIXELS then
@@ -274,7 +298,8 @@ local function reassertBarHeight(plate)
     -- not read does not stop the write, because `wanted` does not depend on it.
     local kind, current = ClientRead.Call(plate.container.GetHeight, "number", plate.container)
     if kind == PLAIN then
-        if current == wanted then
+        state.lastBarRead = current
+        if barHeightsMatch(current, wanted) then
             bump(state.counters, "barHeightUnchanged")
             return
         end
@@ -327,8 +352,15 @@ end
 --    still the wrong thing to verify.
 --
 -- What both have in common: the addon could confirm its own write and could not
--- confirm the effect. Nothing here sizes a plate now. What this feature does is
--- colour, which is verifiable by looking at it.
+-- confirm the effect. Confirming the call was insufficient and confirming the
+-- stored value was also insufficient; the only sufficient check was a person
+-- looking at a nameplate.
+--
+-- PHASE 14 FOUND THE THIRD MECHANISM, and it works: the bar's height is written
+-- on its CONTAINER, which carries both its anchors at the bottom, so a height of
+-- ours is not recomputed away. See the bar-height section above. Neither of the
+-- two attempts recorded here became possible; a frame neither of them touched
+-- did.
 
 local COLOUR_TOLERANCE = 0.01
 
@@ -1089,6 +1121,8 @@ ns.Nameplates = {
             barHeightFraction = state.barHeightFraction,
             barHeightBase = state.lastBarBase,
             barHeightWritten = state.lastBarHeight,
+            barHeightRead = state.lastBarRead,
+            barHeightTolerance = BAR_HEIGHT_TOLERANCE,
             barHeightWrites = counters.barHeightWrites or 0,
             barHeightUnchanged = counters.barHeightUnchanged or 0,
             barHeightBaseWithheld = counters.barHeightBaseWithheld or 0,
