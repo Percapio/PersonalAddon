@@ -3,12 +3,14 @@
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
 ## Version: 1.3.0
-## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics
+## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics, PersonalAddonSpikeLog
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their
 # stacks, so they survive a reload (Architecture/20260924-Patch01Implementation.md
 # section 4.4). Bounded at 16 records; /pa blocked clear empties it.
 # PersonalAddonDiagnostics holds counters and fault notes from the last five
 # sessions (Architecture/20261002-Phase09.md section 3); /pa diag clear empties it.
+# PersonalAddonSpikeLog is spike N's report, written so it survives a reload.
+# TEMPORARY: it leaves this line with Spikes/BarHeightProbe.lua.
 ## X-License: Artistic License 2.0
 ## X-Phase: 13
 

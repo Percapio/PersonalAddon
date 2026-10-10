@@ -66,7 +66,48 @@ end
 
 -- Commands ----------------------------------------------------------------------
 
--- N1 and N2: what the probe can see before it writes anything.
+-- The report survives a reload, because chat history does not. The saved variable
+-- and this function go with the probe.
+local function recordRun(label, rows, summary)
+    local log = _G.PersonalAddonSpikeLog
+    if type(log) ~= "table" then
+        log = { runs = {} }
+        _G.PersonalAddonSpikeLog = log
+    end
+    if type(log.runs) ~= "table" then
+        log.runs = {}
+    end
+    log.runs[#log.runs + 1] = {
+        label = label,
+        at = (type(time) == "function" and time()) or 0,
+        clientBuild = select(2, GetBuildInfo()),
+        summary = summary,
+        plates = rows,
+    }
+    -- Bounded: a spike that fills a saved variable is a spike that gets deleted
+    -- for the wrong reason.
+    while #log.runs > 12 do
+        table.remove(log.runs, 1)
+    end
+end
+
+-- Is this the plate of the unit the player has targeted? The question exists
+-- because the first run reported that only the target's bar changed, and a value
+-- this client hides for every other unit would explain it (rule 10).
+local function describePlate(plate)
+    local tokenKind, token = ClientRead.Field(plate, "unitToken", "string")
+    local row = { tokenReadable = (tokenKind == PLAIN) }
+    if tokenKind == PLAIN then
+        row.token = token
+        local kind, isTarget = ClientRead.Call(_G.UnitIsUnit, "boolean", token, "target")
+        row.isTarget = (kind == PLAIN) and isTarget or nil
+        row.targetReadable = (kind == PLAIN)
+    end
+    return row
+end
+
+-- N1 and N2: what the probe can see before it writes anything. The readability of
+-- each plate's height is the thing to look at.
 local function commandLook()
     local plates, reason = currentPlates()
     if not plates then
@@ -75,28 +116,42 @@ local function commandLook()
     end
 
     local seen, resolved, readable = 0, 0, 0
+    local rows = {}
     for _, plate in pairs(plates) do
         seen = seen + 1
+        local row = describePlate(plate)
         local container = resolveContainer(plate)
         if container then
             resolved = resolved + 1
             local kind, height = readHeight(container)
+            row.heightKind = kind
             if kind == PLAIN then
                 readable = readable + 1
-                ns.Log.Info(format("  plate %d: container height %s", seen, tostring(height)))
+                row.height = height
+                ns.Log.Info(format("  plate %d%s: container height %s", seen,
+                    row.isTarget and " (your target)" or "", tostring(height)))
             else
-                ns.Log.Warn(format("  plate %d: height not readable (%s)", seen, tostring(height)))
+                row.heightReason = tostring(height)
+                ns.Log.Warn(format("  plate %d%s: height NOT readable (%s)", seen,
+                    row.isTarget and " (your target)" or "", tostring(height)))
             end
         else
+            row.noContainer = true
             ns.Log.Warn(format("  plate %d: no HealthBarsContainer", seen))
         end
+        rows[#rows + 1] = row
     end
 
-    ns.Log.Info(format("N1/N2: %d plate(s), %d with a container, %d readable height(s)",
-        seen, resolved, readable))
+    local summary = format("%d plate(s), %d with a container, %d readable height(s)",
+        seen, resolved, readable)
+    ns.Log.Info("N1/N2: " .. summary)
+    recordRun("look", rows, summary)
     if seen == 0 then
-        ns.Log.Warn("no nameplates on screen; target something first")
+        ns.Log.Warn("no nameplates on screen; get some mobs in view first")
+    elseif readable < resolved then
+        ns.Log.Warn("a height this client will not show cannot be recorded, so it must not be written: that is why only some plates change")
     end
+    ns.Log.Info("saved to PersonalAddonSpikeLog, so it survives /reload")
 end
 
 -- N3: write a DIFFERENT height to every plate on screen, recording each original
@@ -116,17 +171,29 @@ local function commandSet(rawHeight)
     end
 
     local wrote, skippedSame, skippedUnreadable, refused = 0, 0, 0, 0
+    local rows = {}
     for _, plate in pairs(plates) do
+        local row = describePlate(plate)
+        rows[#rows + 1] = row
         local container = resolveContainer(plate)
+        if not container then
+            row.noContainer = true
+        end
         if container then
             local kind, original = readHeight(container)
+            row.heightKind = kind
             if kind ~= PLAIN then
+                row.disposition = "skipped: height not readable"
+                row.heightReason = tostring(original)
                 skippedUnreadable = skippedUnreadable + 1
             elseif original == wanted then
+                row.disposition = "skipped: already that height"
+                row.height = original
                 -- The Phase 2 error, refused outright: writing a value back to
                 -- itself proves only that the call is permitted.
                 skippedSame = skippedSame + 1
             else
+                row.height = original
                 local held = state.held[container]
                 if not held then
                     held = { original = original, plate = plate }
@@ -135,16 +202,20 @@ local function commandSet(rawHeight)
                 end
                 if pcall(container.SetHeight, container, wanted) then
                     held.wrote = wanted
+                    row.disposition = format("wrote %s over %s", tostring(wanted), tostring(original))
                     wrote = wrote + 1
                 else
+                    row.disposition = "refused by the client"
                     refused = refused + 1
                 end
             end
         end
     end
 
-    ns.Log.Info(format("N3: wrote %spx to %d plate(s); %d already that height, %d unreadable, %d refused",
-        tostring(wanted), wrote, skippedSame, skippedUnreadable, refused))
+    local summary = format("wrote %spx to %d plate(s); %d already that height, %d unreadable, %d refused",
+        tostring(wanted), wrote, skippedSame, skippedUnreadable, refused)
+    ns.Log.Info("N3: " .. summary)
+    recordRun(format("set %s", tostring(wanted)), rows, summary)
     if skippedSame > 0 then
         ns.Log.Warn("a plate already at that height was left alone: writing a value back to itself tests nothing")
     end
