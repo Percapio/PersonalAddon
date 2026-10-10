@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.4.0-phase14"
+ns.VERSION = "1.5.0-phase15"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -181,3 +181,21 @@ ns.SKILL_TEXT_MINIMUM = 44
 -- produce (8px, the Classic style at Small scale) is 2.4px, which is a line and
 -- not a bar (section 5.3).
 ns.MINIMUM_BAR_PIXELS = 4
+
+-- Phase 15 (Architecture/20261010-Phase15.md) ---------------------------------
+
+-- One guild label per nameplate, from our own pool. Bounded by the client's
+-- nameplate cap, which Phase 2 already assumes bounds the tracked set; the
+-- threat panel's row pool is sized the same way. Exhaustion means the cap is
+-- wrong and is reported, never absorbed (section 4.6).
+ns.GUILD_LABEL_POOL_CAPACITY = 48
+-- The guild line's size, in points. Absolute rather than a share of Blizzard's,
+-- because the widget is ours and nothing else writes it (section 4.4).
+ns.GUILD_FONT_MINIMUM = 6
+ns.GUILD_FONT_MAXIMUM = 16
+ns.GUILD_FONT_DEFAULT = 10
+-- Pixels between the health bar's bottom edge and the guild line.
+ns.GUILD_LABEL_GAP = 1
+-- The guild line is secondary, and the faded white is what says so -- which is
+-- why there are no brackets around the name (section 4.3).
+ns.GUILD_LABEL_ALPHA = 0.7

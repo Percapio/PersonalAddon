@@ -4,7 +4,7 @@ APIs, then runs one test file per session, each in a fresh runtime.
 Sessions: Phase 7's nameplate checks (tests.lua, "main" and "withheld"), Phase 8's
 checks (tests8.lua, four variants), Phase 9's (tests9.lua, four variants),
 Phase 10's (tests10.lua), Phase 11's (tests11.lua, three variants), Phase 12's
-(tests12.lua, two variants) Phase 13's (tests13.lua, two variants) and Phase 14's (tests14.lua). The static secret-read lint (Tools/lint) runs first;
+(tests12.lua, two variants) Phase 13's (tests13.lua, two variants) Phase 14's (tests14.lua) and Phase 15's (tests15.lua). The static secret-read lint (Tools/lint) runs first;
 --no-lint skips it. Moved from c:\\tmp\\PersonalAddonHarness by
 Architecture/20261002-Phase10.md section 2.
 
@@ -45,6 +45,7 @@ SESSIONS = [
     ("phase13", "tests13.lua"),
     ("phase13-refused", "tests13.lua"),
     ("phase14", "tests14.lua"),
+    ("phase15", "tests15.lua"),
 ]
 
 # A chat line naming one of these alongside "raised" or "faulted" is an error.

@@ -2,17 +2,15 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 1.4.0
-# PersonalAddonSpikeLog is spike G's report, written so it survives a reload.
-# TEMPORARY: it leaves this line with Spikes/GuildNameProbe.lua.
-## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics, PersonalAddonSpikeLog
+## Version: 1.5.0
+## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their
 # stacks, so they survive a reload (Architecture/20260924-Patch01Implementation.md
 # section 4.4). Bounded at 16 records; /pa blocked clear empties it.
 # PersonalAddonDiagnostics holds counters and fault notes from the last five
 # sessions (Architecture/20261002-Phase09.md section 3); /pa diag clear empties it.
 ## X-License: Artistic License 2.0
-## X-Phase: 14
+## X-Phase: 15
 
 # Interface number follows Blizzard's major*10000 + minor*100 + patch
 # convention for the stated client version 1.60.1. If the beta reports a
@@ -54,9 +52,5 @@ Features\AutoSortBags.lua
 Features\AutoSellJunk.lua
 Features\SettingsPanel.lua
 
-# Spike G (Architecture/20261009-RoadmapProposal03.md section 4.3). TEMPORARY:
-# this line and Spikes/GuildNameProbe.lua are deleted once Phase 15 records the
-# results. Off by default; calls nothing until /pa probe guild is typed.
-Spikes\GuildNameProbe.lua
 
 

@@ -280,3 +280,10 @@ statement = "Only the nameplate's base frame has an OnSizeChanged script; the he
 source = "Phase 14 section 6.3"
 consequence = "A SetHeight of ours runs a Blizzard size handler inside our execution (rule 9)"
 check = { kind = "Watch", files = ["Blizzard_NamePlates/Blizzard_NamePlateBase.lua", "Blizzard_NamePlates/Blizzard_NamePlates.xml", "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua"] }
+
+[[premise]]
+id = "GUILD-INFO-UNDOCUMENTED"
+statement = "GetGuildInfo is absent from the generated documentation, so no secret or restriction flag certifies it"
+source = "Phase 15 section 3.1; spike G"
+consequence = "A guild read may begin returning secrets, or be restricted, with no flag to warn us (Features/Nameplates.lua)"
+check = { kind = "Watch", files = ["Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"] }

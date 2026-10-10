@@ -246,6 +246,20 @@ local function commandPlates()
             view.barHeightWrites, view.barHeightUnchanged, view.barHeightBaseWithheld,
             view.barHeightCompareWithheld, view.barHeightRefused))
     end
+    -- Phase 15.
+    if view.guildNames then
+        ns.Log.Info(format("  guild names: on, size %s; labels %d of %d pooled",
+            tostring(view.guildFontSize), view.guildLabels, view.guildPoolCapacity))
+        ns.Log.Info(format("    reads: plain=%d noGuild=%d withheld=%d unavailable=%d  refreshes=%d",
+            view.guildReadsPlain, view.guildReadsNoGuild, view.guildReadsWithheld,
+            view.guildReadsUnavailable, view.guildRefreshes))
+        if view.guildPoolExhausted > 0 then
+            ns.Log.Warn(format("    the label pool was exhausted %d time(s): the cap is wrong",
+                view.guildPoolExhausted))
+        end
+    else
+        ns.Log.Info("  guild names: off")
+    end
     ns.Log.Info(format("  ledger: widgets=%d restored=%d widgetGone=%d writeRefused=%d",
         view.ledgerWidgets, view.ledgerRestored, view.ledgerWidgetGone,
         view.ledgerWriteRefused))
@@ -839,13 +853,6 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
-    elseif command == "probe" then
-        -- Spike G only. Deleted with Spikes/GuildNameProbe.lua.
-        if string.lower(tostring(words[2] or "")) == "guild" and ns.GuildNameProbe then
-            ns.GuildNameProbe.Route(words[3])
-        else
-            ns.Log.Warn("/pa probe guild [read | draw | clear]")
-        end
     elseif command == "preview" then
         reportPreview(words[2])
     elseif command == "threat" then

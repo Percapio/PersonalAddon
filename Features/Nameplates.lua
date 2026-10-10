@@ -77,6 +77,10 @@ local state = {
     barHeightFraction = 1.0,
     lastBarBase = nil,
     lastBarHeight = nil,
+    -- Phase 15. Off by default: it puts text on every player's nameplate.
+    guildNames = false,
+    guildFontSize = 10,
+    guildPool = nil,
     -- What GetHeight last gave back, so /pa plates can show the round-trip.
     lastBarRead = nil,
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
@@ -104,6 +108,8 @@ local function readSettings(config)
     end
     state.sweepInterval = settings.sweepInterval or state.sweepInterval
     state.barHeightFraction = settings.barHeightFraction or state.barHeightFraction
+    state.guildNames = (settings.guildNames == true)
+    state.guildFontSize = settings.guildFontSize or state.guildFontSize
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
     state.palette = Threat.PaletteFrom(settings)
@@ -208,6 +214,226 @@ local function verdictFor(plate, allies, allyCount)
         noteWithheldThreat()
     end
     return Threat.ResolveVerdict(aggro, Threat.Disposition(unitToken, counters))
+end
+
+-- Guild names (Phase 15) ------------------------------------------------------
+--
+-- Blizzard's nameplate name cannot be measured, let alone moved or extended
+-- (Phase 2 section 4.7: GetPoint on it fails with "Can't measure restricted
+-- regions"), and the plate carries no guild font string to borrow. So the text
+-- is OURS: a frame per plate under UIParent, anchored to the plate's health bar
+-- container and never parented to it (rule 6).
+--
+-- A guild name is player-chosen text delivered by the server, so it crosses a
+-- trust boundary on its way to a font string. EscapeGuard.Neutralize is applied
+-- at that crossing, every time. This is the consumer Phase 2 section 13 said
+-- EscapeGuard was waiting for.
+--
+-- NOTHING RE-ASSERTS IT. The label is ours and Blizzard never writes it, which is
+-- what makes this phase smaller than the colour or the height. The guild is read
+-- when a plate attaches, and again when the client says a guild changed.
+
+local GUILD_READING = {
+    PLAIN = "Plain",
+    NO_GUILD = "NoGuild",
+    WITHHELD = "Withheld",
+    UNAVAILABLE = "Unavailable",
+}
+
+-- The guild name for one unit. UnitIsPlayer is asked first because two thirds of
+-- the plates in a city have no guild and six in ten of those are NPCs, and it is
+-- the cheaper question (section 3.3).
+local function readGuild(unitToken)
+    local fn = _G.GetGuildInfo
+    if type(fn) ~= "function" then
+        return GUILD_READING.UNAVAILABLE, "GetGuildInfo is missing from this client"
+    end
+
+    local playerKind, isPlayer = ClientRead.Call(_G.UnitIsPlayer, "boolean", unitToken)
+    if playerKind == WITHHELD then
+        -- "Could not tell whether this is a player" is not grounds for asking
+        -- about its guild.
+        return GUILD_READING.WITHHELD
+    end
+    if playerKind ~= PLAIN or isPlayer ~= true then
+        return GUILD_READING.NO_GUILD
+    end
+
+    local kind, name = ClientRead.Call(fn, "string", unitToken)
+    -- ABSENT is a READABLE nil: this player has no guild. WITHHELD is "could not
+    -- tell", and rule 10 forbids reading it as "no".
+    if kind == ClientRead.ABSENT then
+        return GUILD_READING.NO_GUILD
+    end
+    if kind == WITHHELD then
+        return GUILD_READING.WITHHELD
+    end
+    if kind ~= PLAIN or name == "" then
+        return GUILD_READING.NO_GUILD
+    end
+    return GUILD_READING.PLAIN, name
+end
+
+local function countGuildReading(reading)
+    if reading == GUILD_READING.PLAIN then
+        bump(state.counters, "guildReadsPlain")
+    elseif reading == GUILD_READING.NO_GUILD then
+        bump(state.counters, "guildReadsNoGuild")
+    elseif reading == GUILD_READING.WITHHELD then
+        bump(state.counters, "guildReadsWithheld")
+    else
+        bump(state.counters, "guildReadsUnavailable")
+    end
+end
+
+local function ensureGuildPool()
+    if state.guildPool then
+        return state.guildPool
+    end
+    state.guildPool = ns.FramePool.Create({
+        poolName = "guildLabels",
+        capacity = ns.GUILD_LABEL_POOL_CAPACITY,
+        dropPolicy = ns.DROP_POLICY.SURFACE_AND_FAIL,
+        factory = function()
+            -- UIParent, never the plate: SmartNavigation post-hooks CreateFrame
+            -- and rebuilds a panel's navigation, in whoever's code is running,
+            -- when a new frame's parent chain reaches a panel it tracks
+            -- (Patch 01 section 0.2). A child of ours under a nameplate would
+            -- put our taint there.
+            local frame = CreateFrame("Frame", nil, _G.UIParent)
+            frame:EnableMouse(false)
+            frame.text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            frame.text:SetAllPoints(frame)
+            frame.text:SetJustifyH("CENTER")
+            frame.text:SetWordWrap(false)
+            frame.text:SetAlpha(ns.GUILD_LABEL_ALPHA)
+            frame:Hide()
+            return frame
+        end,
+        reset = function(frame)
+            frame:Hide()
+            frame:ClearAllPoints()
+            frame.text:SetText("")
+        end,
+    })
+    return state.guildPool
+end
+
+-- Both halves of the size matter: the font so the text is the chosen size, and
+-- the frame so a larger size is not clipped by the box it sits in.
+local function sizeGuildLabel(label)
+    local points = state.guildFontSize
+    label:SetHeight(points + 2)
+    label.text:SetTextHeight(points)
+end
+
+local function releaseGuildLabel(plate)
+    if not plate.label then
+        return
+    end
+    ns.FramePool.Release(state.guildPool, plate.label)
+    plate.label = nil
+end
+
+local function attachGuildLabel(plate, guildName)
+    if not plate.container then
+        return false
+    end
+    if not plate.label then
+        local label, poolError = ns.FramePool.Acquire(ensureGuildPool())
+        if not label then
+            bump(state.counters, "guildPoolExhausted")
+            ns.Log.OnceError("plates:guildpool", format(
+                "the guild label pool was exhausted (%s); the cap is wrong",
+                tostring(poolError)))
+            return false
+        end
+        plate.label = label
+    end
+
+    local label = plate.label
+    sizeGuildLabel(label)
+    local widthKind, width = ClientRead.Call(plate.container.GetWidth, "number", plate.container)
+    label:SetWidth((widthKind == PLAIN and width and width > 0) and width or 120)
+    label:ClearAllPoints()
+    label:SetPoint("TOP", plate.container, "BOTTOM", 0, -ns.GUILD_LABEL_GAP)
+    -- Player-chosen text, so every pipe is doubled before it reaches the font
+    -- string: that is what makes the escape codes inert.
+    label.text:SetText(ns.EscapeGuard.Neutralize(guildName))
+    label:Show()
+    bump(state.counters, "guildLabelsAttached")
+    return true
+end
+
+-- Brings one plate's label to whatever its guild reads as now. The one place the
+-- guild is read, so attach and refresh cannot drift apart.
+local function applyGuild(plate)
+    if not state.guildNames or not plate.unitToken then
+        releaseGuildLabel(plate)
+        plate.guild = nil
+        return
+    end
+
+    local reading, value = readGuild(plate.unitToken)
+    countGuildReading(reading)
+
+    if reading == GUILD_READING.UNAVAILABLE then
+        ns.Log.Once("plates:noguildapi", format(
+            "%s, so guild names cannot be shown", tostring(value)))
+        releaseGuildLabel(plate)
+        plate.guild = nil
+        return
+    end
+
+    if reading ~= GUILD_READING.PLAIN then
+        releaseGuildLabel(plate)
+        plate.guild = nil
+        return
+    end
+
+    if plate.guild == value and plate.label then
+        return
+    end
+    plate.guild = value
+    attachGuildLabel(plate, value)
+end
+
+-- PLAYER_GUILD_UPDATE: a player can join, leave or be kicked from a guild while
+-- their plate is on screen, so a label read only at attach would go stale. The
+-- event names a unit, but as a UnitTokenVariant that need not be the nameplateN
+-- token our records are keyed by, and matching it would cost a read per plate
+-- anyway, so every tracked plate is re-read. Bounded by the plate cap.
+local function refreshGuildLabels()
+    bump(state.counters, "guildRefreshes")
+    if not state.guildNames then
+        return 0
+    end
+    local touched = 0
+    for _, plate in pairs(state.plates) do
+        applyGuild(plate)
+        touched = touched + 1
+    end
+    return touched
+end
+
+local function releaseAllGuildLabels()
+    if not state.guildPool then
+        return
+    end
+    for _, plate in pairs(state.plates) do
+        releaseGuildLabel(plate)
+        plate.guild = nil
+    end
+end
+
+-- Every label the pool has built, free and live alike: the live ones so the
+-- slider is visibly live, the free ones so a label released and re-acquired does
+-- not come back at the old size (Phase 14 section 14 learned this about rows).
+local function applyGuildFontSize()
+    if not state.guildPool then
+        return
+    end
+    ns.FramePool.ForEach(state.guildPool, sizeGuildLabel)
 end
 
 -- Bar height (Phase 14) -------------------------------------------------------
@@ -496,6 +722,10 @@ local function untrackPlate(frame)
         return false
     end
     unstylePlate(plate)
+    -- Before the record goes, while the label is still reachable: a label left on
+    -- a recycled plate would show the previous unit's guild.
+    releaseGuildLabel(plate)
+    plate.guild = nil
     if plate.unitFrame then
         state.byUnitFrame[plate.unitFrame] = nil
     end
@@ -546,6 +776,10 @@ local function trackPlate(unitToken)
     -- would otherwise keep Blizzard's height until its next layout pass. The
     -- write is idempotent, so doing it twice costs one comparison.
     reassertBarHeight(plate)
+    -- Phase 15. Outside the scope guard, like the height: a guild name belongs on
+    -- every player's plate, friendly or hostile, and NPCs are excluded by having
+    -- no guild rather than by scope.
+    applyGuild(plate)
 
     if plate.scope == SCOPE.UNREACHABLE then
         ns.Log.Once("plates:unreachable",
@@ -813,6 +1047,10 @@ end
 
 -- Signals ---------------------------------------------------------------------
 
+local function onGuildUpdate()
+    refreshGuildLabels()
+end
+
 local function onPlateAdded(unitToken)
     if unitToken then
         trackPlate(unitToken)
@@ -863,6 +1101,11 @@ local SIGNALS = {
       lost = "a unit changing attackability is missed until its plate is replaced" },
     { event = "PLAYER_ENTERING_WORLD", handler = onEnteringWorld, required = false,
       lost = "stale plates are released by the interval sweep instead" },
+    -- Phase 15. Not required: without it a guild label is correct when the plate
+    -- attaches and stale only if that unit's guild changes before the plate
+    -- recycles.
+    { event = "PLAYER_GUILD_UPDATE", handler = onGuildUpdate, required = false,
+      lost = "a guild name is not refreshed if it changes while the plate is in view" },
 }
 
 -- Lifecycle -------------------------------------------------------------------
@@ -934,6 +1177,8 @@ local function disable()
     -- makes it immediate (section 5.5).
     restoreBarHeights()
 
+    releaseAllGuildLabels()
+
     for frame in pairs(state.plates) do
         untrackPlate(frame)
     end
@@ -960,6 +1205,22 @@ local function onConfigChanged(config, changedKey)
     if changedKey == "sweepInterval" then
         stopTicker()
         startTicker()
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    if changedKey == "guildNames" then
+        if state.guildNames then
+            for _, plate in pairs(state.plates) do
+                applyGuild(plate)
+            end
+        else
+            releaseAllGuildLabels()
+        end
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    if changedKey == "guildFontSize" then
+        applyGuildFontSize()
         return ns.CONFIG_RESULT.APPLIED
     end
 
@@ -1017,6 +1278,9 @@ defaultSettings.sweepInterval = 0.25
 -- Phase 14: a fraction of Blizzard's own bar height. 1.0 writes nothing, so an
 -- existing user sees no change until they move the slider.
 defaultSettings.barHeightFraction = 1.0
+-- Phase 15: off by default, because it puts text on every player's nameplate.
+defaultSettings.guildNames = false
+defaultSettings.guildFontSize = ns.GUILD_FONT_DEFAULT
 
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
@@ -1042,8 +1306,20 @@ ns.Registry.Register(FEATURE_ID, {
             description = "As a share of the game's own height. Everything else on the nameplate stays the game's, so a shorter bar lowers the name with it.",
             minimum = 0.3, maximum = 1.0, step = 0.05,
         },
+        -- Phase 15. A guild name encodes nothing, unlike the six colours below,
+        -- so it gets no colour of its own: one faded white is the right amount
+        -- of emphasis for a label.
+        guildNames = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show guild names", order = 3,
+            description = "Under the health bar, for every player who has one. Nothing is shown for a player with no guild, or for a monster.",
+        },
+        guildFontSize = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Guild name size", order = 4,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = ns.GUILD_FONT_MINIMUM, maximum = ns.GUILD_FONT_MAXIMUM, step = 1,
+        },
         yieldSelectedTarget = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 3,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 5,
             description = "Stops contesting the bar colour on the unit you have selected. Turn this on if that plate flickers.",
         },
         colourOnPlayer = {
@@ -1123,6 +1399,23 @@ ns.Nameplates = {
             barHeightWritten = state.lastBarHeight,
             barHeightRead = state.lastBarRead,
             barHeightTolerance = BAR_HEIGHT_TOLERANCE,
+            guildNames = state.guildNames,
+            guildFontSize = state.guildFontSize,
+            guildLabels = (function()
+                local count = 0
+                for _, plate in pairs(state.plates) do
+                    if plate.label then count = count + 1 end
+                end
+                return count
+            end)(),
+            guildPoolCapacity = ns.GUILD_LABEL_POOL_CAPACITY,
+            guildReadsPlain = counters.guildReadsPlain or 0,
+            guildReadsNoGuild = counters.guildReadsNoGuild or 0,
+            guildReadsWithheld = counters.guildReadsWithheld or 0,
+            guildReadsUnavailable = counters.guildReadsUnavailable or 0,
+            guildLabelsAttached = counters.guildLabelsAttached or 0,
+            guildPoolExhausted = counters.guildPoolExhausted or 0,
+            guildRefreshes = counters.guildRefreshes or 0,
             barHeightWrites = counters.barHeightWrites or 0,
             barHeightUnchanged = counters.barHeightUnchanged or 0,
             barHeightBaseWithheld = counters.barHeightBaseWithheld or 0,

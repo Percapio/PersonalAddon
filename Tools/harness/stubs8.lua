@@ -28,6 +28,13 @@ function regionMethods:Show() self.shown = true end
 function regionMethods:Hide() self.shown = false end
 function regionMethods:IsShown() return self.shown end
 function regionMethods:SetText(text) self.text = text end
+-- Phase 15 needs these: without them the frame metatable turns an unknown
+-- PascalCase method into a silent no-op, so a check for the font size would
+-- read nil and pass for the wrong reason.
+function regionMethods:SetTextHeight(value) self.textHeight = value end
+function regionMethods:GetTextHeight() return self.textHeight end
+function regionMethods:SetWordWrap(value) self.wordWrap = value end
+function regionMethods:SetJustifyH(value) self.justifyH = value end
 function regionMethods:GetText() return self.text end
 function regionMethods:SetTextColor(r, g, b) self.textColor = { r, g, b } end
 function regionMethods:GetTextColor() return self.textColor[1], self.textColor[2], self.textColor[3] end

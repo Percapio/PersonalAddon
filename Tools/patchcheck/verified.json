@@ -1,5 +1,5 @@
 {
- "acceptedAt": 1791657271.8916252,
+ "acceptedAt": 1791662952.3193498,
  "acceptedBy": "Accepted",
  "client": {
   "binaryModifiedAt": 1791645441.4638898,
@@ -175,6 +175,9 @@
    "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
   ],
   "SimpleFontStringAPI:SetTextColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:SetTextHeight": [
    "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
   ],
   "SimpleFontStringAPI:SetWordWrap": [
@@ -354,6 +357,9 @@
   "UnitIsDead": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
+  "UnitIsPlayer": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
   "UnitIsTapDenied": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
@@ -440,6 +446,9 @@
   ],
   "event PLAYER_ENTERING_WORLD": [
    "Blizzard_APIDocumentationGenerated/SystemDocumentation.lua"
+  ],
+  "event PLAYER_GUILD_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/GuildInfoDocumentation.lua"
   ],
   "event PLAYER_LOGIN": [
    "Blizzard_APIDocumentationGenerated/SystemDocumentation.lua"
@@ -1023,6 +1032,11 @@
    "SecretArguments": "\"AllowedWhenTainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
   },
+  "SimpleFontStringAPI:SetTextHeight": {
+   "Arguments.height.Nilable": "false",
+   "Arguments.height.Type": "\"uiUnit\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "SimpleFontStringAPI:SetWordWrap": {
    "Arguments.wrap.Nilable": "false",
    "Arguments.wrap.Type": "\"bool\"",
@@ -1498,6 +1512,15 @@
    "Returns.result.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "UnitIsPlayer": {
+   "Arguments.partyIndex.Nilable": "true",
+   "Arguments.partyIndex.Type": "\"luaIndex\"",
+   "Arguments.unit.Nilable": "true",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "UnitIsTapDenied": {
    "Arguments.unit.Nilable": "false",
    "Arguments.unit.Type": "\"UnitToken\"",
@@ -1783,6 +1806,11 @@
    "Payload.isReloadingUi.Type": "\"bool\"",
    "SynchronousEvent": "true"
   },
+  "event PLAYER_GUILD_UPDATE": {
+   "Payload.unitTarget.Nilable": "false",
+   "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
+   "SynchronousEvent": "true"
+  },
   "event PLAYER_LOGIN": {
    "SynchronousEvent": "true"
   },
@@ -1841,6 +1869,7 @@
   }
  },
  "watchedHashes": {
+  "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua": "e62816d9f8edc63ac3b80c5a50540a62caba77586fcc4827f684fd74e0257c1e",
   "Blizzard_FrameXML/Mainline/AlertFrames.lua": "cbb1013acd8beed871e50009fc659654b8ba3f03600aff74a5729c6919b2a43f",
   "Blizzard_Game/Shared/EventImplementation.lua": "9314fccf86511c4dc21f48d4aa9cc37134c7b503eb66946db591593b062bafc7",
   "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "4d40713f327cf0e102a6b3997e2e57800d1cf2861a9589d0889bf57e223cd810",
