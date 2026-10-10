@@ -823,6 +823,13 @@ local function handler(input)
         commandPlates()
     elseif command == "dps" then
         commandDps()
+    elseif command == "probe" then
+        -- Spike N only. Deleted with Spikes/BarHeightProbe.lua.
+        if string.lower(tostring(words[2] or "")) == "barheight" and ns.BarHeightProbe then
+            ns.BarHeightProbe.Route(words[3], words[4])
+        else
+            ns.Log.Warn("/pa probe barheight [look | set <px> | check | restore]")
+        end
     elseif command == "preview" then
         reportPreview(words[2])
     elseif command == "threat" then

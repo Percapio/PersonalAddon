@@ -52,3 +52,9 @@ Features\AutoSortBags.lua
 Features\AutoSellJunk.lua
 Features\SettingsPanel.lua
 
+# Spike N (Architecture/20261009-RoadmapProposal03.md section 3.3). TEMPORARY:
+# this line and Spikes/BarHeightProbe.lua are deleted once Phase 14 records the
+# results. The probe is an internal feature, off by default, and calls nothing
+# until /pa probe barheight is typed.
+Spikes\BarHeightProbe.lua
+
