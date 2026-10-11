@@ -205,8 +205,12 @@ function ConfigStore.Set(featureId, key, value)
     -- Bounds, where the key declares them. The type check above accepted
     -- maximumRows = 9999 quite happily, which is how a setting can be the right
     -- kind and still absurd (Phase 6 section 5.1).
+    -- The feature's own stored values go with the candidate, because a Text key
+    -- can declare distinctFrom and the schema cannot reach the store (Phase 16
+    -- section 3).
     if ns.ConfigSchema then
-        local accepted, violation, reason = ns.ConfigSchema.Validate(featureId, key, value)
+        local accepted, violation, reason =
+            ns.ConfigSchema.Validate(featureId, key, value, featureConfig.settings)
         if accepted == nil then
             return false, format("'%s.%s' %s (%s)",
                 featureId, tostring(key), tostring(reason), tostring(violation))

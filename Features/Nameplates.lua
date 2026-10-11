@@ -69,6 +69,7 @@ local state = {
     sweepCount = 0,
     enabled = false,
     hookInstalled = false,
+    hookTargets = nil,
     tokens = {},
     palette = {},
     colouringWanted = true,
@@ -1036,8 +1037,9 @@ local function installReassertHook()
 
     if #installed > 0 then
         state.hookInstalled = true
-        ns.Log.Info(format("nameplate re-assert hooks installed on %s",
-            table.concat(installed, ", ")))
+        -- Which hooks took is in /pa plates, which is where someone looking for it
+        -- would look. Saying it in chat at every login is noise.
+        state.hookTargets = table.concat(installed, ", ")
         return
     end
 
@@ -1429,6 +1431,7 @@ ns.Nameplates = {
             standingCapability = Threat.StandingCapability(),
             sweeps = state.sweepCount,
             hookInstalled = state.hookInstalled,
+            hookTargets = state.hookTargets,
             colouringActive = colouringActive(),
             reassertPending = state.reassertPending,
             contested = (function()

@@ -9,6 +9,7 @@ change it.
 
 Usage: python Tools/patchcheck/tests/test_patch_check.py
 """
+import dataclasses
 import os
 import pathlib
 import re
@@ -379,7 +380,11 @@ class RealExportTests(unittest.TestCase):
 
     def test_t18_the_phase11_premises_hold_on_the_current_export(self):
         register = premises.load_register(patch_check.default_paths().register)
-        self.assertEqual(len(register), 29)
+        # The count guards against a premise being dropped, so it is exact and has
+        # to be bumped by whichever phase adds one. It had rotted: Phases 13, 14 and
+        # 15 took the register from 29 to 36 without touching this line, so T18 was
+        # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2).
+        self.assertEqual(len(register), 55)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -399,6 +404,44 @@ class RealExportTests(unittest.TestCase):
                            "SUBCATEGORY-SECURE"):
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+
+    def test_t20_the_phase16_macro_premises_hold_on_the_current_export(self):
+        # Architecture/20261011-Phase16.md section 12.2. These are the register's
+        # first FlagEquals checks on an EVENT entry rather than a function, which
+        # Phase 12 section 11 deferred to whichever phase built Part B.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        for premise_id in ("SLOT-CHANGED-SYNCHRONOUS", "PAGEUNIT-REPICKS-ON-SLOT-CHANGE",
+                           "MACROS-SYNCHRONOUS", "MACRO-WINDOW-LISTENS-WHILE-SHOWN",
+                           "MACRO-WINDOW-SAVES-ON-HIDE", "CASTSEQUENCE-TAKES-ITEMS",
+                           "CASTSEQUENCE-RESETS-AFTER-COMBAT", "TOOLTIP-UPDATE-UNIQUE",
+                           "BANDAGE-SUBCLASS", "USE-PARSES-TARGET", "PAGEUNIT-NAMED-GLOBAL",
+                           "MACRO-WINDOW-NAMED-GLOBAL", "FOODDRINK-SUBCLASS",
+                           "RESTORE-WORDS-ARE-GLOBALS", "RANGE-CHECK-SYNCHRONOUS",
+                           "ACTION-BUTTONS-RANGE-LISTEN", "RUNMACROTEXT-RESTRICTED",
+                           "CLICK-REFUSES-OUR-FRAMES", "ACTIVEBAR-WRITE-IS-CONDITIONAL"):
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+
+    def test_t20_event_flag_checks_tell_a_carried_flag_from_a_missing_one(self):
+        # The event-entry FlagEquals above would pass vacuously if a missing flag
+        # read as a match, so the three outcomes are exercised on one real entry.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        carried = by_id["SLOT-CHANGED-SYNCHRONOUS"]
+        self.assertEqual(premises.evaluate_premise(carried, current, None).status, premises.HOLDS)
+
+        wrong_value = dataclasses.replace(
+            carried, check=dict(carried.check, value="false"))
+        self.assertNotEqual(
+            premises.evaluate_premise(wrong_value, current, None).status, premises.HOLDS)
+
+        absent_flag = dataclasses.replace(
+            carried, check=dict(carried.check, flag="UniqueEvent"))
+        self.assertNotEqual(
+            premises.evaluate_premise(absent_flag, current, None).status, premises.HOLDS)
 
     def test_t15_every_file_in_running_stacks_is_in_the_load_set(self):
         loaded = {name.lower() for name in load_set.resolve_load_set(paths.EXPORT).files}

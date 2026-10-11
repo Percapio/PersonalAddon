@@ -287,3 +287,142 @@ statement = "GetGuildInfo is absent from the generated documentation, so no secr
 source = "Phase 15 section 3.1; spike G"
 consequence = "A guild read may begin returning secrets, or be restricted, with no flag to warn us (Features/Nameplates.lua)"
 check = { kind = "Watch", files = ["Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"] }
+
+# Phase 16 (Architecture/20261011-Phase16.md section 9). Premises 37-47.
+#
+# Phase 12 section 11 specified eight of these as 30-37 and never added them,
+# because Part B went on hold. They are renumbered here to follow the register's
+# 36 existing entries, and three more are added for facts Phase 16 newly relies on.
+
+[[premise]]
+id = "SLOT-CHANGED-SYNCHRONOUS"
+statement = "A slot change can arrive inside the call that caused it"
+source = "Phase 16 sections 2.1 and 5.1"
+consequence = "Re-read section 5.1; spike S1's answer may change (Features/ConsumableMacros.lua)"
+check = { kind = "FlagEquals", entry = "event ACTIONBAR_SLOT_CHANGED", flag = "SynchronousEvent", value = "true" }
+
+[[premise]]
+id = "PAGEUNIT-REPICKS-ON-SLOT-CHANGE"
+statement = "The Gamepad page unit chooses its active bar again on every slot change, writing activeBar"
+source = "Phase 16 section 2.1"
+consequence = "Section 5.1's hazard may be gone or moved; run spike S1 again before relaxing anything"
+check = { kind = "Pattern", file = "Blizzard_GamepadActionBars/PageUnit.lua", regex = '"ACTIONBAR_SLOT_CHANGED"\) then\s*\n\s*self:RefreshActionBarVisibilities\(\)', expect = "Present" }
+
+[[premise]]
+id = "MACROS-SYNCHRONOUS"
+statement = "UPDATE_MACROS can arrive inside the call that caused it"
+source = "Phase 16 section 5.2"
+consequence = "Section 5.2's reason for not subscribing after login; re-read it"
+check = { kind = "FlagEquals", entry = "event UPDATE_MACROS", flag = "SynchronousEvent", value = "true" }
+
+[[premise]]
+id = "MACRO-WINDOW-LISTENS-WHILE-SHOWN"
+statement = "The Macros window registers UPDATE_MACROS when it is shown"
+source = "Phase 16 section 5.4"
+consequence = "The listener check may stop seeing the window; add an explicit check of it (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_MacroUI/Blizzard_MacroUI.lua", regex = 'function MacroFrameMixin:OnShow\(\)[^\n]*\n[^\n]*\n\s*self:RegisterEvent\("UPDATE_MACROS"\)', expect = "Present" }
+
+[[premise]]
+id = "MACRO-WINDOW-SAVES-ON-HIDE"
+statement = "Closing the Macros window saves its edit box into the selected macro"
+source = "Phase 16 section 5.4"
+consequence = "Re-read section 5.4's reason for waiting while the window is open"
+check = { kind = "Pattern", file = "Blizzard_MacroUI/Blizzard_MacroUI.lua", regex = 'function MacroFrameMixin:OnHide\(\)[\s\S]{0,200}?self:SaveMacro\(\)', expect = "Present" }
+
+[[premise]]
+id = "CASTSEQUENCE-TAKES-ITEMS"
+statement = "/castsequence accepts item entries"
+source = "Phase 16 section 4.4"
+consequence = "The two-item healing body fails; it becomes /use of the first item (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_ChatFrameBase/Shared/CastSequenceManager.lua", regex = 'C_Item\.GetItemInfo\(action\)', expect = "Present" }
+
+[[premise]]
+id = "CASTSEQUENCE-RESETS-AFTER-COMBAT"
+statement = "A reset=combat sequence restarts when combat ends"
+source = "Phase 16 section 4.4"
+consequence = "The healing macro stays on the potion after a fight; re-read section 4.4"
+check = { kind = "Pattern", file = "Blizzard_ChatFrameBase/Shared/CastSequenceManager.lua", regex = '"PLAYER_REGEN_ENABLED" \) then\s*\n\s*reset = "combat"', expect = "Present" }
+
+[[premise]]
+id = "TOOLTIP-UPDATE-UNIQUE"
+statement = "A tooltip data update never arrives inside the call that caused it"
+source = "Phase 16 section 4.1"
+consequence = "Reading an item tooltip could run GameTooltip's handler in our execution; repeat spike S5's window"
+check = { kind = "FlagEquals", entry = "event TOOLTIP_DATA_UPDATE", flag = "UniqueEvent", value = "true" }
+
+[[premise]]
+id = "BANDAGE-SUBCLASS"
+statement = "A bandage's consumable subclass is 7"
+source = "Phase 16 section 4.1"
+consequence = "The bandage signal breaks silently and no bandage is ever found; fall back to the use-spell name (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/ItemConstantsDocumentation.lua", regex = '\{ Name = "Bandage", Type = "ItemConsumableSubclass", EnumValue = 7 \}', expect = "Present" }
+
+[[premise]]
+id = "USE-PARSES-TARGET"
+statement = "/use resolves a target conditional and passes the unit to the item use"
+source = "Phase 16 section 4.4"
+consequence = "The bandage macro's [help,nodead][@player] stops redirecting and it bandages the current target only"
+check = { kind = "Pattern", file = "Blizzard_ChatFrameBase/Shared/SlashCommands.lua", regex = 'local action, target = SecureCmdOptionParse\(msg\);[\s\S]{0,200}?SecureCmdUseItem\(name, bag, slot, target\)', expect = "Present" }
+
+[[premise]]
+id = "PAGEUNIT-NAMED-GLOBAL"
+statement = "The Gamepad page unit is reachable as the named global GamepadMainActionBarFramePageUnit"
+source = "Phase 16 section 2.3"
+consequence = "Spike S9's instrument has no target; the spike falls back to CallWindow.Capture alone (Spikes/MacroProbe.lua)"
+check = { kind = "Pattern", file = "Blizzard_GamepadActionBars/MainActionBarFrame.xml", regex = 'name="\$parentPageUnit" parentKey="PageUnit"', expect = "Present" }
+
+[[premise]]
+id = "MACRO-WINDOW-NAMED-GLOBAL"
+statement = "The Macros window is the named global MacroFrame, parented to UIParent, in a LoadOnDemand addon"
+source = "Phase 16 sections 2.7 and 5.4, decision D12"
+consequence = "The write gate has nothing to ask. Falling back to the UPDATE_MACROS listener check is not an option: a third-party addon can hold it shut for a whole session, which is what Terminal did (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_MacroUI/Blizzard_MacroUI.xml", regex = '<Frame name="MacroFrame" mixin="MacroFrameMixin"[^>]*parent="UIParent"', expect = "Present" }
+
+[[premise]]
+id = "FOODDRINK-SUBCLASS"
+statement = "Food and drink share consumable subclass 5"
+source = "Phase 16 section 2.8, decision D14"
+consequence = "No food or water is ever found. The use-spell name cannot stand in: S5 showed Forever's food uses 'Nutritious Food', not spell 433's name (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/ItemConstantsDocumentation.lua", regex = '\{ Name = "Fooddrink", Type = "ItemConsumableSubclass", EnumValue = 5 \}', expect = "Present" }
+
+[[premise]]
+id = "RESTORE-WORDS-ARE-GLOBALS"
+statement = "HEALTH and MANA are global strings the client localizes, which Blizzard labels its own character pane with"
+source = "Phase 16 section 2.8, decision D14"
+consequence = "Food and water can no longer be told apart: both are subclass 5, and the restore line is what separates them. Without the words, a subclass-5 item reads CouldNotTell and is left out (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_UIPanels_Game/Camelot/PaperDollFrame.lua", regex = 'PaperDollFrame_SetLabelAndText\(statFrame, (HEALTH|MANA),', expect = "Present" }
+
+[[premise]]
+id = "RANGE-CHECK-SYNCHRONOUS"
+statement = "An action range check update can arrive inside the call that caused it"
+source = "Phase 16 section 2.9; spike S1"
+consequence = "Half of what S1 measured. If this stops holding, re-run S1: a macro body rewrite may no longer run Blizzard's action buttons inside our call (Features/ConsumableMacros.lua)"
+check = { kind = "FlagEquals", entry = "event ACTION_RANGE_CHECK_UPDATE", flag = "SynchronousEvent", value = "true" }
+
+[[premise]]
+id = "ACTION-BUTTONS-RANGE-LISTEN"
+statement = "Blizzard's action buttons register the action range check update"
+source = "Phase 16 section 2.9; spike S1"
+consequence = "The second listener S1 found may be gone. Re-run S1 before relaxing the on-a-bar refusal (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_ActionBar/Shared/ActionButton.lua", regex = 'self:RegisterEvent\("ACTION_RANGE_CHECK_UPDATE"\)', expect = "Present" }
+
+[[premise]]
+id = "RUNMACROTEXT-RESTRICTED"
+statement = "C_Macro.RunMacroText is refused from tainted code"
+source = "Phase 16 section 6; spike S6"
+consequence = "The click path's healing and bandage buttons send macrotext through this function. If the flag goes, S6's risk goes with it and those two kinds are safe; while it holds, S6 must pass before they are built (Spikes/MacroProbe.lua)"
+check = { kind = "FlagEquals", entry = "C_Macro.RunMacroText", flag = "HasRestrictions", value = "true" }
+
+[[premise]]
+id = "CLICK-REFUSES-OUR-FRAMES"
+statement = "/click refuses a button with access constraints or the ScriptedInput forbidden aspect"
+source = "Phase 16 section 6.1, decision D16; spike S6"
+consequence = "If these gates go, the click path becomes possible again and a macro body need never change: re-read section 6 before accepting the edit path's residual risk (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_ChatFrameBase/Shared/SlashCommands.lua", regex = 'not button:HasAccessConstraints\(\) and not button:HasAnyForbiddenAspects\(Enum\.ForbiddenAspect\.ScriptedInput\)', expect = "Present" }
+
+[[premise]]
+id = "ACTIVEBAR-WRITE-IS-CONDITIONAL"
+statement = "The page unit writes activeBar only when it has a bar to activate"
+source = "Phase 16 section 2.9, decision D16"
+consequence = "The write guard's premise is gone: a slot change would then always taint activeBar, and the edit path has to be given up for whatever section 6 can be made to do (Features/ConsumableMacros.lua)"
+check = { kind = "Pattern", file = "Blizzard_GamepadActionBars/PageUnit.lua", regex = 'if \(actionBarToActivate\) then\s*\n\s*self:SetActiveActionBar\(actionBarToActivate', expect = "Present" }

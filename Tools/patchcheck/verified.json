@@ -1,13 +1,13 @@
 {
- "acceptedAt": 1791662952.3193498,
+ "acceptedAt": 1791737243.7552059,
  "acceptedBy": "Accepted",
  "client": {
   "binaryModifiedAt": 1791645441.4638898,
   "build": "1.60.1.70338"
  },
  "exportDigest": "62705aa5d4d8fbf56ce79a417a31b76e8b730b9a3a4169130f5187342baa35d7",
- "exportedAt": 1791656877.3115072,
- "report": "2026-10-10-1.60.1.70338.md",
+ "exportedAt": 1791736761.090258,
+ "report": "2026-10-11-1.60.1.70338.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"

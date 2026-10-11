@@ -31,6 +31,7 @@ ConfigSchema.VIOLATION = {
     ABOVE_MAXIMUM = "AboveMaximum",
     NOT_A_CHOICE = "NotAChoice",
     NOT_A_COLOUR = "NotAColour",
+    NOT_DISTINCT = "NotDistinct",
     NO_SCHEMA = "NoSchema",
 }
 
@@ -76,6 +77,10 @@ function ConfigSchema.Declare(featureId, keySchemas)
             maximum = declaration.maximum,
             step = declaration.step,
             choices = declaration.choices,
+            -- Text bounds (Phase 16 section 3). distinctFrom names sibling keys
+            -- this one may not equal, which is how four macro names are kept apart.
+            maximumLength = declaration.maximumLength,
+            distinctFrom = declaration.distinctFrom,
             curated = (declaration.curated ~= false),
             unit = declaration.unit or UNIT.PLAIN,
             order = declaration.order,
@@ -199,7 +204,44 @@ end
 -- Returns the value on success, or nil plus a violation and a human reason. The
 -- reason names the bound, because "invalid value" tells the user nothing they did
 -- not already know.
-function ConfigSchema.Validate(featureId, key, candidate)
+-- A macro name, and anything else a feature declares as Text (Phase 16 section 3).
+-- `current` is the feature's own stored values, which is what distinctFrom compares
+-- against; the caller holds them, so they are passed in rather than fetched. An
+-- empty table is fine and means "nothing to collide with".
+--
+-- Line breaks are refused because a name holding one cannot be found again by
+-- GetMacroIndexByName and cannot be typed back. The comparison is
+-- case-insensitive because the client's own lookup is: two names differing only in
+-- case would collide at the client even though Lua says they differ.
+local function validateText(candidate, declaration, current)
+    if type(candidate) ~= "string" then
+        return nil, VIOLATION.WRONG_KIND, "expects text"
+    end
+    if candidate:find("[\r\n]") then
+        return nil, VIOLATION.WRONG_KIND, "must be one line"
+    end
+    if #candidate < 1 then
+        return nil, VIOLATION.BELOW_MINIMUM, "must be at least 1 character"
+    end
+    local maximum = declaration.maximumLength
+    if maximum and #candidate > maximum then
+        return nil, VIOLATION.ABOVE_MAXIMUM, format("must be at most %d characters", maximum)
+    end
+    local others = declaration.distinctFrom
+    if others and current then
+        local folded = candidate:lower()
+        for index = 1, #others do
+            local other = others[index]
+            local held = current[other]
+            if type(held) == "string" and held:lower() == folded then
+                return nil, VIOLATION.NOT_DISTINCT, format("must differ from %s", other)
+            end
+        end
+    end
+    return candidate
+end
+
+function ConfigSchema.Validate(featureId, key, candidate, current)
     local declaration = ConfigSchema.For(featureId, key)
     if not declaration then
         -- A key with no schema is not an error: the store's type check still
@@ -208,6 +250,10 @@ function ConfigSchema.Validate(featureId, key, candidate)
     end
 
     local kind = declaration.kind
+
+    if kind == KIND.TEXT then
+        return validateText(candidate, declaration, current)
+    end
 
     if kind == KIND.TOGGLE then
         if type(candidate) ~= "boolean" then
@@ -270,6 +316,10 @@ function ConfigSchema.DescribeBounds(featureId, key)
             names[#names + 1] = tostring(declaration.choices[index].value)
         end
         return table.concat(names, " / ")
+    end
+    if declaration.kind == KIND.TEXT then
+        local maximum = declaration.maximumLength
+        return maximum and format("1 to %d characters", maximum) or "text"
     end
     if declaration.kind == KIND.TOGGLE then
         return "true / false"

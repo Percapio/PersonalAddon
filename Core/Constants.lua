@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.5.0-phase15"
+ns.VERSION = "1.6.0-phase16"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -199,3 +199,88 @@ ns.GUILD_LABEL_GAP = 1
 -- The guild line is secondary, and the faded white is what says so -- which is
 -- why there are no brackets around the name (section 4.3).
 ns.GUILD_LABEL_ALPHA = 0.7
+
+-- Phase 16 (Architecture/20261011-Phase16.md) ---------------------------------
+
+-- The macro kinds, and the order a name collision is settled in: the first kind
+-- here that holds a name keeps it (section 5.5). Heal leads because it is the one
+-- that matters in a fight.
+ns.MACRO_KIND = {
+    HEAL = "HealMacro",
+    BANDAGE = "BandageMacro",
+    FOOD = "FoodMacro",
+    WATER = "WaterMacro",
+}
+ns.MACRO_KIND_ORDER = {
+    ns.MACRO_KIND.HEAL,
+    ns.MACRO_KIND.BANDAGE,
+    ns.MACRO_KIND.FOOD,
+    ns.MACRO_KIND.WATER,
+}
+
+-- What a bag item can be. Only these five reach a macro body (section 4.1).
+ns.CONSUMABLE_KIND = {
+    FOOD = "Food",
+    DRINK = "Drink",
+    HEALING_POTION = "HealingPotion",
+    HEALTHSTONE = "Healthstone",
+    BANDAGE = "Bandage",
+}
+
+-- The spells whose localized names identify an item's use effect. The IDs are
+-- ours; every name comes from the client, so the classifier works in any locale
+-- (section 4.1).
+ns.CONSUMABLE_REFERENCE_SPELLS = {
+    food = 433,
+    drink = 430,
+    healingPotion = 439,
+    wellFed = 19705,
+}
+
+-- The 15 Classic healthstones. Matched by ID because their use spells carry a
+-- different name at each tier, and because they count as summoned by kind.
+ns.HEALTHSTONE_ITEMS = {
+    [5512] = true, [19004] = true, [19005] = true,
+    [5511] = true, [19006] = true, [19007] = true,
+    [5509] = true, [19008] = true, [19009] = true,
+    [5510] = true, [19010] = true, [19011] = true,
+    [9421] = true, [19012] = true, [19013] = true,
+}
+
+-- Consumable-class items only, and emptied rather than evicted one at a time: a
+-- scan sees about 100 slots, so overflow means something unusual is carried, not
+-- that the cache is the wrong size (Phase 12 audit finding 4).
+ns.CLASSIFICATION_CACHE_CAPACITY = 128
+
+-- How long after entering the world the feature waits for the client to report
+-- this character's macros before giving up and maintaining only what it finds by
+-- name (section 5.3).
+ns.MACROS_KNOWN_TIMEOUT = 60
+
+-- Added to a cooldown's remaining time before re-planning, so the timer fires
+-- after the client has cleared it rather than on the same tick (section 5.7).
+ns.COOLDOWN_TIMER_SLACK = 0.2
+
+-- Retries back off without jitter: one client, and nothing contends for the
+-- write (section 5.2).
+ns.MACRO_RETRY_FIRST_DELAY = 2
+ns.MACRO_RETRY_MAXIMUM_DELAY = 30
+ns.MACRO_RETRY_LIMIT = 20
+
+-- A macro name the client will accept. 16 pending spike S7 (section 7).
+ns.MACRO_NAME_MAXIMUM = 16
+
+-- The question-mark icon the Macros window itself defaults to. With #showtooltip
+-- the button shows the chosen item anyway (section 4.4).
+ns.MACRO_DEFAULT_ICON = 134400
+
+-- A macro body is at most this long (Blizzard_MacroUI.xml:123). The longest body
+-- this feature plans is under 80, so the bound is a guard, not a budget.
+ns.MACRO_BODY_MAXIMUM = 255
+
+-- Action slots to look through when asking whether a macro sits on a bar
+-- (Phase 16 section 2.9). Six pages of twelve, plus the override and special
+-- ranges, is 120 on this client: NUM_ACTIONBAR_PAGES * NUM_ACTIONBAR_BUTTONS
+-- (ActionButtonUtil.lua:2-5) covers the pages, and the conventional total covers
+-- the rest. Read out of combat only, once per rebuild, like the bag scan.
+ns.ACTION_SLOT_MAXIMUM = 120

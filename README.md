@@ -12,7 +12,8 @@ to match the game's own look. It is built for, and tested with, Blizzard's Gamep
 3. Start the game and make sure the addon is enabled in the AddOns list.
 
 Every feature can be switched on or off and adjusted in **Options > AddOns > PersonalAddon**,
-on its pages **Combat**, **Nameplates** and **Bags & loot**, or with `/pa` commands (below).
+on its pages **Combat**, **Nameplates**, **Bags & loot** and **Consumables**, or with `/pa`
+commands (below).
 Each feature's options sit indented under its switch, sliders show their value, and each
 page's Defaults resets only that page.
 
@@ -81,6 +82,40 @@ page's Defaults resets only that page.
   own Sell All Junk, with no confirmation popup, and a toast reports what it earned. If
   toasts are off, the summary goes to chat.
 
+**Consumables**
+
+- **Consumable macros.** Four character macros that always use the best thing you carry:
+
+  | Macro | What it presses |
+  |---|---|
+  | `PA Heal` | A healthstone, then a healing potion on the next press. Whichever is off cooldown leads, and the sequence restarts when the fight ends |
+  | `PA Bandage` | A bandage, on a living friendly target if you have one, otherwise on you |
+  | `PA Food` | Food: conjured first, then the highest level you can use |
+  | `PA Water` | The same for water. Only on characters that use mana |
+
+  They change **only out of combat**, and only when the body would actually change — if
+  you are already carrying the best thing, nothing is written at all. Put them on your bar
+  with the action bar editor; the addon never places them for you. Each one can be
+  switched off separately, and switching one off leaves its macro alone rather than
+  deleting it, because deleting a macro clears its slot on your bar. The names are
+  settings: change them with `/pa set`. A macro of the same name that is
+  **account-wide** is left alone — these are per character, and one shared body cannot
+  name the right item for each of them. `/pa consumables` says what each macro will use,
+  and for any it is not keeping, why.
+
+  There is a switch for never using food that grants **Well Fed**, and it is **off**:
+  on this client almost all food grants it as part of eating, so leaving it on would
+  mean the food macro never picked anything.
+
+  **Rewriting a macro that sits on your action bar is watched, not avoided.** The game
+  runs some of its own action-bar code inside ours when that happens, and the thing that
+  would actually hurt is the pad's action bar recording this addon as the last writer of
+  which bar is active — a later button press is then refused in this addon's name. That
+  variable is checked after every macro write: if it ever comes back blamed on this
+  addon, the macros stop being maintained for the rest of the session and say so, and a
+  `/reload` clears it. `/pa consumables` shows the reading and which slot each macro is
+  on.
+
 **Other**
 
 - **Show all windows for adjusting.** A switch at the top of the settings menu's General
@@ -103,6 +138,7 @@ page's Defaults resets only that page.
 | `/pa skills` | What the skills panel shows, row by row |
 | `/pa toasts`, `/pa toasts test` | Toast counts; show one of each toast |
 | `/pa bags`, `/pa vend` | The last sort or sale, and why any was skipped |
+| `/pa consumables` | What each of the four macros will use, and for any it is not keeping, why |
 | `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | State of the damage breakdown, threat panel, nameplates and five-second rule |
 | `/pa preview [on\|off\|threat\|dps]` | Show every window with sample contents while you adjust; which window each place is showing |
 | `/pa panel` | How the settings pages built. It does not open Options: that call is restricted |
@@ -172,6 +208,10 @@ build-specific, which is what makes that column worth carrying.
 | Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon | [Phase 8](Architecture/20260927-Phase08.md), client of 2026-09-24 |
 | Raid markers on the threat panel | The client always hides them | [Phase 11](Architecture/20261005-Phase11.md), build 1.60.1.70235 |
 | Greying out a feature's options while it is off | It needs a modify predicate, a function Blizzard calls on every draw (rule 1). The options are indented under their switch instead | [Phase 12](Architecture/20261006-Phase12.md) §3.4, build 1.60.1.70291 |
+| Ranking consumables by how much they restore | On Forever a consumable's restore amount is only in its tooltip text, in three different forms, and in every locale. So the macros rank by the highest required level you can use — which on this client can pick the weaker of two items, because Forever's recipes do not keep restore rate in step with required level | [Phase 16](Architecture/20261011-Phase16.md) §4.5, build 1.60.1.70338 |
+| Pointing a macro at a hidden button of ours, so its body never changes | `/click` will not reach an addon's frame on this client: the handler refuses any button with access constraints or the `ScriptedInput` forbidden aspect, which is exactly a button of ours driven from a macro. Nothing happens, with no error. So there is no way to keep a macro's body constant and re-point it instead | [Phase 16](Architecture/20261011-Phase16.md) §6.1, build 1.60.1.70338 |
+| Checking First Aid before naming a bandage | No item API gives a bandage's required First Aid rank, so the macro can name a tier you have the level for but not the skill for. Pressing it then gives the game's own message | [Phase 16](Architecture/20261011-Phase16.md) §4.4, build 1.60.1.70338 |
+| Putting the macros on your bar for you | `PlaceAction` from this addon's code raises slot changes inside our own execution, which is the Gamepad action bar's taint carrier. The action bar editor places macros | [Phase 12](Architecture/20261006-Phase12.md) §1.3, build 1.60.1.70291 |
 
 ## Planned
 
@@ -238,6 +278,14 @@ by number, so the numbers stay fixed.
    - `C_Container.SortBags` delivers `ITEM_LOCK_CHANGED` and `ITEM_LOCKED` inside the
      call, so tidy bags checks nothing is listening before every sort.
    - `C_MerchantFrame.SellAllJunkItems` delivers nothing inside the call.
+   - `CreateMacro` delivers `UPDATE_MACROS` only, and leaves the Gamepad action bar's
+     `activeBar` secure (spike S, 2026-10-11).
+   - `EditMacro` on a macro that **sits on an action slot** delivers
+     `ACTION_RANGE_CHECK_UPDATE` and `ACTIONBAR_SLOT_CHANGED` inside the call. Both are
+     synchronous and both have Blizzard listeners: the Gamepad page unit re-picks its
+     active bar and writes `activeBar`, and the action buttons run their range check. So
+     consumable macros never rewrite a macro that is on a bar
+     ([Phase 16](Architecture/20261011-Phase16.md) §2.9).
 10. **A value from the client may be secret.** A successful call is not a readable
     answer. On addon-restricted maps such as dungeons and raids, and in combat, many
     functions return secret values, and comparing, testing or doing arithmetic on one

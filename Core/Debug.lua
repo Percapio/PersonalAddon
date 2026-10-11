@@ -11,6 +11,7 @@ local Debug = {}
 ns.Debug = Debug
 
 local format, tostring, tonumber = string.format, tostring, tonumber
+local concat = table.concat
 local RESULT = ns.CONFIG_RESULT
 
 -- Probe features ------------------------------------------------------------
@@ -146,8 +147,10 @@ local function commandGet(featureId)
     end
 end
 
+-- rawValue is everything after the key, so it can hold spaces. An empty string
+-- means nothing was given at all, which is a usage error rather than a value.
 local function commandSet(featureId, key, rawValue)
-    if not featureId or not key or rawValue == nil then
+    if not featureId or not key or rawValue == nil or rawValue == "" then
         ns.Log.Error("usage: /pa set <feature> <key> <value>")
         return
     end
@@ -265,7 +268,8 @@ local function commandPlates()
         view.ledgerWriteRefused))
     ns.Log.Info(format("  capability: barRecolourable=%s standing=%s hook=%s",
         tostring(view.barRecolourable), tostring(view.standingCapability),
-        tostring(view.hookInstalled)))
+        tostring(view.hookInstalled)
+        .. (view.hookTargets and (" on " .. view.hookTargets) or "")))
     -- Phase 9 section 4.5: aggro comes from threat, so these replace the old
     -- "no nameplate target has ever resolved" warning.
     ns.Log.Info(format("  threat: plain=%d absent=%d withheld=%d  faults=%d  restricted map now=%s",
@@ -429,6 +433,51 @@ local function commandVend()
         .. (view.lastSkip and (" (last: " .. view.lastSkip .. ")") or ""))
     ns.Log.Info("  last sale: " .. (view.lastSummary or "none yet")
         .. (view.lastPosted and (" [" .. view.lastPosted .. "]") or ""))
+end
+
+-- Phase 16 section 8: the write path, what each macro is planned to hold, and for
+-- a kind that is not maintained, why in words.
+local function commandConsumables()
+    if not ns.ConsumableMacros then
+        ns.Log.Error("consumable macros did not load")
+        return
+    end
+    local view = ns.ConsumableMacros.Inspect()
+    ns.Log.Info(format("enabled=%s path=%s phase=%s macros=%s%s",
+        tostring(view.enabled), view.writePath, view.phase, view.known,
+        view.inCombat and (" (" .. view.inCombat .. ")") or ""))
+    if view.faultReason then
+        ns.Log.Error("  faulted: " .. ns.EscapeGuard.Neutralize(view.faultReason))
+    end
+    for _, macro in ipairs(view.macros) do
+        if not macro.on then
+            ns.Log.Info(format("  %s: off", macro.label))
+        else
+            ns.Log.Info(format("  %s '%s': %s%s%s", macro.label,
+                ns.EscapeGuard.Neutralize(macro.name),
+                macro.exists and "exists" or "not created",
+                macro.actionSlot and (", on action slot " .. tostring(macro.actionSlot)) or "",
+                macro.outcome and (" [" .. tostring(macro.outcome) .. "]") or ""))
+            if macro.chosen then
+                ns.Log.Info("    uses: " .. macro.chosen)
+            end
+            if macro.reason then
+                ns.Log.Info("    why: " .. ns.EscapeGuard.Neutralize(macro.reason))
+            end
+        end
+    end
+    ns.Log.Info(format("  could not tell: %d  retries: %d  cooldown re-plan pending: %s",
+        view.couldNotTell or 0, view.retryCount or 0, tostring(view.cooldownPending)))
+    -- The harm the write guard watches for (Phase 16 section 2.9).
+    ns.Log.Info("  Gamepad activeBar: " .. tostring(view.activeBar))
+    if view.lastDefer then
+        ns.Log.Info("  last deferral: " .. view.lastDefer)
+    end
+    ns.Log.Info("  Macros window: " .. tostring(view.macroWindow))
+    ns.Log.Info("  inside the last write: " .. (view.lastInline or "nothing yet"))
+    -- Not the write gate since D12, but it is what the first in-game run tripped on,
+    -- so it stays visible.
+    ns.Log.Info("  listening for UPDATE_MACROS: " .. ns.EscapeGuard.Neutralize(tostring(view.listenersNow)))
 end
 
 local function commandPanel()
@@ -762,6 +811,8 @@ local function commandHelp()
     ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each toast")
     ns.Log.Info("/pa bags                tidy bags: sorts, skips, and who listens")
     ns.Log.Info("/pa vend                sell junk: the last sale and any skips")
+    ns.Log.Info("/pa consumables         the four macros: what each will use, and why not")
+    ns.Log.Info("/pa probe macros        spike S: what a macro write delivers (temporary)")
     ns.Log.Info("/pa panel               how the settings pages built, and where to find them")
     ns.Log.Info("/pa blocked             refusals the client blamed on this addon, with their paths")
     ns.Log.Info("/pa blocked stack <n>   one record's stored stack")
@@ -840,7 +891,11 @@ local function handler(input)
     elseif command == "get" then
         commandGet(words[2])
     elseif command == "set" then
-        commandSet(words[2], words[3], words[4])
+        -- Everything after the key, not just the next word. Phase 16's macro names
+        -- are the first settings whose values contain spaces, and `/pa set` is the
+        -- only way to change them (section 7 keeps text fields out of Settings), so
+        -- taking words[4] alone would have made every default name unsettable.
+        commandSet(words[2], words[3], concat(words, " ", 4, #words))
     elseif command == "fsr" then
         commandFsr()
     elseif command == "fault" then
@@ -865,6 +920,20 @@ local function handler(input)
         commandBags()
     elseif command == "vend" then
         commandVend()
+    elseif command == "consumables" then
+        commandConsumables()
+    -- Spike S's route. Deleted with Spikes/MacroProbe.lua once Phase 16 section 2.6
+    -- records the answers.
+    elseif command == "probe" then
+        if not ns.MacroProbe then
+            ns.Log.Error("no probe is loaded")
+        elseif string.lower(words[2] or "") == "consumables" then
+            ns.MacroProbe.Consumables()
+        elseif string.lower(words[2] or "") == "macros" then
+            ns.MacroProbe.Run(words[3])
+        else
+            ns.MacroProbe.Run(nil)
+        end
     elseif command == "panel" then
         commandPanel()
     elseif command == "blocked" then
