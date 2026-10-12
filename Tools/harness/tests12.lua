@@ -95,8 +95,8 @@ if HARNESS_SESSION == "phase12" then
     for _, page in ipairs(HARNESS.settingsPages) do
         pageList[#pageList + 1] = page.name
     end
-    check("A1 one parent in the AddOns list", #HARNESS.addOnCategories == 1 and parent.name == "PersonalAddon",
-        #HARNESS.addOnCategories)
+    check("A1 one parent in the AddOns list", #HARNESS.addOnCategories == 1 and parent.name:find("PersonalAddon", 1, true) ~= nil,
+        parent and parent.name)
     check("A1 pages in order", table.concat(pageList, ",") == "Combat,Nameplates,Bags & loot,Consumables,Quests",
         table.concat(pageList, ","))
     check("A1 pages under the parent", #parent.subcategories == 5, #parent.subcategories)
@@ -142,7 +142,7 @@ if HARNESS_SESSION == "phase12" then
         groupHeader and groupHeader.tooltip)
     local intro = parent.layout.initializers[1]
     check("A3 intro header", intro ~= nil and intro.kind == "header"
-        and intro.name == "PersonalAddon " .. ns.VERSION and intro.tooltip == "/pa help lists every command.",
+        and intro.name:find("PersonalAddon " .. ns.VERSION, 1, true) ~= nil and intro.tooltip == "/pa help lists every command.",
         intro and intro.name)
 
     -- A4: the colours in verdict priority (Phase 11 section 2.3).
@@ -279,7 +279,7 @@ if HARNESS_SESSION == "phase12" then
         categoryOf("PersonalAddon_nameplates_colourOnPlayer"))
     check("A12 toasts on Bags & loot", categoryOf("PersonalAddon_toasts_durationSeconds") == "Bags & loot",
         categoryOf("PersonalAddon_toasts_durationSeconds"))
-    check("A12 reload switch on the parent", categoryOf("PersonalAddon_reloadCommand_enabled") == "PersonalAddon",
+    check("A12 reload switch on the parent", categoryOf("PersonalAddon_reloadCommand_enabled"):find("PersonalAddon", 1, true) ~= nil,
         categoryOf("PersonalAddon_reloadCommand_enabled"))
 
     -- A14: declared order first, then the rest by name.

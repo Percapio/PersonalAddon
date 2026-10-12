@@ -3,6 +3,7 @@
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
 ## Version: 1.8.0
+## IconTexture: Interface\AddOns\PersonalAddon\Images\logo.png
 ## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics, PersonalAddonSpikeLog
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their
 # stacks, so they survive a reload (Architecture/20260924-Patch01Implementation.md

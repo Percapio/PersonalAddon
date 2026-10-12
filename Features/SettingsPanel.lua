@@ -59,7 +59,8 @@ local CHECKBOX, SLIDER, PERCENT_SLIDER, COLOUR_SWATCH, CHOICE_CHECKBOX =
     "Checkbox", "Slider", "PercentSlider", "ColourSwatch", "ChoiceCheckbox"
 
 local PAGE = ns.SETTINGS_PAGE
-local PARENT_LABEL = "PersonalAddon"
+local LOGO_TEXTURE = "Interface\\AddOns\\PersonalAddon\\Images\\logo.png"
+local PARENT_LABEL = format("|T%s:16:16:0:0|t PersonalAddon", LOGO_TEXTURE)
 
 -- The subcategories, in the order they appear under the parent (section 3.1). The
 -- category list keeps registration order for subcategories.
@@ -740,7 +741,7 @@ local function buildPanel()
         return nil, "registering the category was refused"
     end
     local parent = newPage(PAGE.GENERAL, PARENT_LABEL, category, layout)
-    addHeader(controls, parent, format("PersonalAddon %s", tostring(ns.VERSION)),
+    addHeader(controls, parent, format("|T%s:32:32:0:-4|t PersonalAddon %s", LOGO_TEXTURE, tostring(ns.VERSION)),
         "/pa help lists every command.")
     -- Before the feature sections: it is about adjusting all of them.
     if not buildPreviewToggle(controls, parent) then
