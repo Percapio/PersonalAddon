@@ -480,6 +480,69 @@ local function commandConsumables()
     ns.Log.Info("  listening for UPDATE_MACROS: " .. ns.EscapeGuard.Neutralize(tostring(view.listenersNow)))
 end
 
+-- Phase 17 section 6: what the data provider is doing, and why a tooltip or a
+-- marker is absent. The only place a QuestRejection is ever shown (D10).
+local function commandQuests()
+    local bridge = ns.QuestieDBBridge and ns.QuestieDBBridge.Inspect()
+    if not bridge then
+        ns.Log.Error("the QuestieDB bridge did not load")
+        return
+    end
+    ns.Log.Info("QuestieDB: " .. ns.EscapeGuard.Neutralize(tostring(bridge.described)))
+    ns.Log.Info(format("  reads=%d cacheHits=%d cached: %d NPCs, %d quests, %d target lists",
+        bridge.reads or 0, bridge.hits or 0, bridge.cachedNpcs or 0,
+        bridge.cachedQuests or 0, bridge.cachedTargets or 0))
+
+    if ns.NPCQuests then
+        local view = ns.NPCQuests.Inspect()
+        ns.Log.Info(format("tooltips: enabled=%s registered=%s (there is no way to unregister)",
+            tostring(view.enabled), tostring(view.registered)))
+        ns.Log.Info(format("  player: level=%s raceMask=%s classMask=%s",
+            tostring(view.playerLevel), tostring(view.playerRaceMask),
+            tostring(view.playerClassMask)))
+        if view.lastNpcId then
+            ns.Log.Info(format("  last hovered: %d %s", view.lastNpcId,
+                tostring(view.lastNpcName or "<no name>")))
+            ns.Log.Info("    offered: " .. (#view.offered > 0
+                and table.concat(view.offered, ", ") or "none"))
+            if #view.rejected > 0 then
+                ns.Log.Info("    not offered: " .. table.concat(view.rejected, ", "))
+            end
+        else
+            ns.Log.Info("  nothing hovered yet")
+        end
+    end
+
+    if ns.QuestMarkers then
+        local view = ns.QuestMarkers.Inspect()
+        ns.Log.Info(format("markers: enabled=%s capability=%s%s",
+            tostring(view.enabled), tostring(view.capability),
+            view.capabilityReason and (" -- " .. tostring(view.capabilityReason)) or ""))
+        ns.Log.Info(format("  targets: %d NPC ids from %d of %d quests%s",
+            view.npcCount or 0, view.questsSeen or 0, view.questsExpected or 0,
+            view.complete == false and "  (SHORT: a collapsed header may be hiding some)" or ""))
+        ns.Log.Info(format("  plates attached=%d carrying a marker=%d  scale=%.2f offsetY=%d",
+            view.attached or 0, view.markers or 0,
+            view.markerScale or 1, view.markerOffsetY or 0))
+        -- The two lists side by side: if a mob you expect a marker on shows up in
+        -- "seen" but not in "targets", the quest's objectives are the problem; if it
+        -- is in neither, the plate never reached us.
+        local named = {}
+        for _, npcId in ipairs(view.targetIds or {}) do
+            local npcName = ns.QuestieDBBridge and ns.QuestieDBBridge.NpcName(npcId)
+            named[#named + 1] = npcName
+                and format("%d (%s)", npcId, ns.EscapeGuard.Neutralize(npcName))
+                or tostring(npcId)
+        end
+        ns.Log.Info("  wanted: " .. (#named > 0 and table.concat(named, ", ") or "none"))
+        ns.Log.Info("  npc ids seen on plates: " .. (#(view.seenIds or {}) > 0
+            and table.concat(view.seenIds, ", ") or "none"))
+        if view.nameplatesOn == false then
+            ns.Log.Warn("  nameplates are off, so no plate is ever offered and no marker is drawn")
+        end
+    end
+end
+
 local function commandPanel()
     if not ns.SettingsPanel then
         ns.Log.Error("the settings panel did not load")
@@ -812,7 +875,9 @@ local function commandHelp()
     ns.Log.Info("/pa bags                tidy bags: sorts, skips, and who listens")
     ns.Log.Info("/pa vend                sell junk: the last sale and any skips")
     ns.Log.Info("/pa consumables         the four macros: what each will use, and why not")
+    ns.Log.Info("/pa quests              QuestieDB's state, offered quests, and marker targets")
     ns.Log.Info("/pa probe macros        spike S: what a macro write delivers (temporary)")
+    ns.Log.Info("/pa probe quests        Phase 17's two spike questions (temporary)")
     ns.Log.Info("/pa panel               how the settings pages built, and where to find them")
     ns.Log.Info("/pa blocked             refusals the client blamed on this addon, with their paths")
     ns.Log.Info("/pa blocked stack <n>   one record's stored stack")
@@ -922,10 +987,18 @@ local function handler(input)
         commandVend()
     elseif command == "consumables" then
         commandConsumables()
+    elseif command == "quests" then
+        commandQuests()
     -- Spike S's route. Deleted with Spikes/MacroProbe.lua once Phase 16 section 2.6
     -- records the answers.
     elseif command == "probe" then
-        if not ns.MacroProbe then
+        if string.lower(words[2] or "") == "quests" then
+            if ns.QuestProbe then
+                ns.QuestProbe.Run(words[3])
+            else
+                ns.Log.Error("the quest probe did not load")
+            end
+        elseif not ns.MacroProbe then
             ns.Log.Error("no probe is loaded")
         elseif string.lower(words[2] or "") == "consumables" then
             ns.MacroProbe.Consumables()

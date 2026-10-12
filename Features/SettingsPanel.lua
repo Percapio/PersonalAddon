@@ -29,8 +29,9 @@
 -- panelValues in step through the two Reflect functions at the bottom.
 --
 -- Since Phase 12 (Architecture/20261006-Phase12.md section 3) the controls are
--- spread over pages: the parent page, then Combat, Nameplates, Bags & loot and
--- Consumables, each a subcategory with its own "These settings" Defaults. Each
+-- spread over pages: the parent page, then Combat, Nameplates, Bags & loot,
+-- Consumables and Quests, each a subcategory with its own "These settings"
+-- Defaults. Each
 -- feature names its page; its options are indented under its switch; sliders show
 -- their value through Blizzard's own pass-through label. Everything added for this
 -- is still registration-time data: strings, Blizzard's own formatter, parent links
@@ -67,6 +68,7 @@ local PAGE_ORDER = {
     { page = PAGE.NAMEPLATES, label = "Nameplates" },
     { page = PAGE.BAGS_AND_LOOT, label = "Bags & loot" },
     { page = PAGE.CONSUMABLES, label = "Consumables" },
+    { page = PAGE.QUESTS, label = "Quests" },
 }
 
 local KNOWN_PAGES = { [PAGE.GENERAL] = true }

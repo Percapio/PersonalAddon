@@ -727,6 +727,11 @@ local function untrackPlate(frame)
     -- a recycled plate would show the previous unit's guild.
     releaseGuildLabel(plate)
     plate.guild = nil
+    -- Phase 17 section 4.1. Same moment and same reason as the guild label: a
+    -- marker left on a recycled plate would sit over the wrong mob.
+    if ns.QuestMarkers then
+        ns.QuestMarkers.OnPlateDetached(plate)
+    end
     if plate.unitFrame then
         state.byUnitFrame[plate.unitFrame] = nil
     end
@@ -787,6 +792,17 @@ local function trackPlate(unitToken)
             "at least one nameplate frame is unreachable on this client; those plates are skipped")
         return
     end
+
+    -- Phase 17 section 4.1. Outside the scope check for the same reason the guild
+    -- label is: SCOPE.IN/OUT classifies a plate for the COLOUR feature, from a
+    -- damage dealer's point of view, and a quest mob is often neutral -- which
+    -- classifyScope makes SCOPE.OUT. Inside the guard this would silently drop
+    -- markers from every neutral quest mob. After the UNREACHABLE return, because
+    -- such a plate has no container to anchor to.
+    if ns.QuestMarkers then
+        ns.QuestMarkers.OnPlateAttached(plate)
+    end
+
     styleIfInScope(plate)
 end
 
@@ -1364,6 +1380,18 @@ ns.Registry.Register(FEATURE_ID, {
 })
 
 ns.Nameplates = {
+    -- Phase 17 section 4.1. The plate records currently tracked, for a decoration
+    -- that enabled after some plates were already up and so never saw their attach
+    -- call-out. Read-only by contract: the table is ours and the caller must not
+    -- hold it past the call.
+    TrackedPlates = function()
+        local out = {}
+        for _, plate in pairs(state.plates) do
+            out[#out + 1] = plate
+        end
+        return out
+    end,
+
     Inspect = function()
         local inScope, outOfScope, unreachable, coloured = 0, 0, 0, 0
         local verdicts = {}

@@ -384,7 +384,7 @@ class RealExportTests(unittest.TestCase):
         # to be bumped by whichever phase adds one. It had rotted: Phases 13, 14 and
         # 15 took the register from 29 to 36 without touching this line, so T18 was
         # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2).
-        self.assertEqual(len(register), 55)
+        self.assertEqual(len(register), 63)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -442,6 +442,19 @@ class RealExportTests(unittest.TestCase):
             carried, check=dict(carried.check, flag="UniqueEvent"))
         self.assertNotEqual(
             premises.evaluate_premise(absent_flag, current, None).status, premises.HOLDS)
+
+    def test_t21_the_phase17_quest_premises_hold_on_the_current_export(self):
+        # Architecture/20261011-Phase17.md section 10.2. Premise 59 is the register's
+        # first FlagEquals on SecretWhenUnitIdentityRestricted.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        for premise_id in ("TOOLTIP-POSTCALL-ISOLATES", "TOOLTIP-POSTCALL-BEFORE-SHOW",
+                           "TOOLTIP-SETUNIT-ROUTED", "UNITGUID-IDENTITY-RESTRICTED",
+                           "QUEST-LOG-UPDATE-UNIQUE", "QUEST-ACCEPTED-SYNCHRONOUS",
+                           "LOG-INDEX-GIVES-QUESTID", "DIFFICULTY-COLOUR-IS-RAW"):
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
 
     def test_t15_every_file_in_running_stacks_is_in_the_load_set(self):
         loaded = {name.lower() for name in load_set.resolve_load_set(paths.EXPORT).files}

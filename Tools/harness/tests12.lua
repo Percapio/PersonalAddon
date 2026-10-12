@@ -88,18 +88,18 @@ local function pageNamed(name)
 end
 
 if HARNESS_SESSION == "phase12" then
-    -- A1: one parent, four pages in order. Consumables joined them in Phase 16,
-    -- which put consumableMacros on it; before that it was registered only when a
-    -- feature was placed there, and no feature was.
+    -- A1: one parent, five pages in order. Consumables joined in Phase 16 and
+    -- Quests in Phase 17: a page is registered only when a feature is placed on it,
+    -- so this line moves with each phase that adds one.
     local pageList = {}
     for _, page in ipairs(HARNESS.settingsPages) do
         pageList[#pageList + 1] = page.name
     end
     check("A1 one parent in the AddOns list", #HARNESS.addOnCategories == 1 and parent.name == "PersonalAddon",
         #HARNESS.addOnCategories)
-    check("A1 pages in order", table.concat(pageList, ",") == "Combat,Nameplates,Bags & loot,Consumables",
+    check("A1 pages in order", table.concat(pageList, ",") == "Combat,Nameplates,Bags & loot,Consumables,Quests",
         table.concat(pageList, ","))
-    check("A1 pages under the parent", #parent.subcategories == 4, #parent.subcategories)
+    check("A1 pages under the parent", #parent.subcategories == 5, #parent.subcategories)
 
     -- A2: every feature on its page, in its declared order.
     local combat, plates, bags = pageNamed("Combat"), pageNamed("Nameplates"), pageNamed("Bags & loot")

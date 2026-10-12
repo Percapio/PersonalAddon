@@ -12,8 +12,8 @@ to match the game's own look. It is built for, and tested with, Blizzard's Gamep
 3. Start the game and make sure the addon is enabled in the AddOns list.
 
 Every feature can be switched on or off and adjusted in **Options > AddOns > PersonalAddon**,
-on its pages **Combat**, **Nameplates**, **Bags & loot** and **Consumables**, or with `/pa`
-commands (below).
+on its pages **Combat**, **Nameplates**, **Bags & loot**, **Consumables** and **Quests**,
+or with `/pa` commands (below).
 Each feature's options sit indented under its switch, sliders show their value, and each
 page's Defaults resets only that page.
 
@@ -49,6 +49,13 @@ page's Defaults resets only that page.
   height depends on the Style and Global Scale you chose, and a fixed number would be half
   the bar under one and a third under another. Everything else on the plate stays the
   game's, so a shorter bar brings the name down with it.
+- **Quest markers.** A marker above the nameplate of any monster an active quest names.
+  It means *"a quest you are on names this mob"* — not *"you still need this one"*: it stays
+  up until the quest leaves your log, because reading each objective's progress would mean
+  a check per quest on every kill. It needs enemy nameplates on and the **QuestieDB** addon
+  enabled, and it **switches itself off in dungeons and raids**, where the game will not
+  tell an addon which monster a nameplate belongs to — there, a missing marker would mean
+  nothing at all, which is worse than none. `/pa quests` says what it is doing.
 - **Threat panel.** In combat, the mobs fighting you or your group are listed in the
   damage breakdown's place above the player frame:
   - their health as a bar, in the nameplate colours;
@@ -116,6 +123,14 @@ page's Defaults resets only that page.
   `/reload` clears it. `/pa consumables` shows the reading and which slot each macro is
   on.
 
+**Quests**
+
+- **Available quests on NPC tooltips.** Mousing over an NPC adds the quests it has for you,
+  with each one's level in the game's own difficulty colours. Only quests you can accept
+  right now are listed — nothing you are too low for, have already done, or are already on.
+  It needs the **QuestieDB** addon enabled; Questie itself is not needed and can stay off.
+  `/pa quests` says which quests an NPC had and, for any it did not list, why.
+
 **Other**
 
 - **Show all windows for adjusting.** A switch at the top of the settings menu's General
@@ -139,6 +154,7 @@ page's Defaults resets only that page.
 | `/pa toasts`, `/pa toasts test` | Toast counts; show one of each toast |
 | `/pa bags`, `/pa vend` | The last sort or sale, and why any was skipped |
 | `/pa consumables` | What each of the four macros will use, and for any it is not keeping, why |
+| `/pa quests` | What QuestieDB is doing, which quests an NPC offered, and the marker targets |
 | `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | State of the damage breakdown, threat panel, nameplates and five-second rule |
 | `/pa preview [on\|off\|threat\|dps]` | Show every window with sample contents while you adjust; which window each place is showing |
 | `/pa panel` | How the settings pages built. It does not open Options: that call is restricted |
@@ -208,6 +224,8 @@ build-specific, which is what makes that column worth carrying.
 | Blizzard's own loot toasts | Its loot alerts never fire for ordinary loot, in either UI mode. The toasts here are drawn by this addon | [Phase 8](Architecture/20260927-Phase08.md), client of 2026-09-24 |
 | Raid markers on the threat panel | The client always hides them | [Phase 11](Architecture/20261005-Phase11.md), build 1.60.1.70235 |
 | Greying out a feature's options while it is off | It needs a modify predicate, a function Blizzard calls on every draw (rule 1). The options are indented under their switch instead | [Phase 12](Architecture/20261006-Phase12.md) §3.4, build 1.60.1.70291 |
+| Quest markers in dungeons and raids | On a restricted map the game withholds a unit's GUID, so the monster behind a nameplate cannot be identified. Marking only the plates that happened to answer would make a missing marker meaningless, so the feature switches off there instead | [Phase 17](Architecture/20261011-Phase17.md) §4.3, build 1.60.1.70338 |
+| A quest marker that counts 7/10 | It would need each objective's progress read per quest and every visible plate swept on every kill. The marker says "an active quest names this mob" and stays until the quest leaves your log | [Phase 17](Architecture/20261011-Phase17.md) §4.2, build 1.60.1.70338 |
 | Ranking consumables by how much they restore | On Forever a consumable's restore amount is only in its tooltip text, in three different forms, and in every locale. So the macros rank by the highest required level you can use — which on this client can pick the weaker of two items, because Forever's recipes do not keep restore rate in step with required level | [Phase 16](Architecture/20261011-Phase16.md) §4.5, build 1.60.1.70338 |
 | Pointing a macro at a hidden button of ours, so its body never changes | `/click` will not reach an addon's frame on this client: the handler refuses any button with access constraints or the `ScriptedInput` forbidden aspect, which is exactly a button of ours driven from a macro. Nothing happens, with no error. So there is no way to keep a macro's body constant and re-point it instead | [Phase 16](Architecture/20261011-Phase16.md) §6.1, build 1.60.1.70338 |
 | Checking First Aid before naming a bandage | No item API gives a bandage's required First Aid rank, so the macro can name a tier you have the level for but not the skill for. Pressing it then gives the game's own message | [Phase 16](Architecture/20261011-Phase16.md) §4.4, build 1.60.1.70338 |
@@ -311,6 +329,14 @@ Known exceptions, kept on purpose:
 - The settings page: Blizzard's Settings API stores our controls' initializer data and
   callback handles in its own tables when we register them. Every addon with a settings
   page does this.
+- The NPC quest tooltip block is added inside Blizzard's tooltip build, not a frame later
+  (rule 5). It has to be: the callback runs after the tooltip's lines are built and
+  **before** it is shown and sized, which is what makes an added line appear at the right
+  size. Deferring a frame would draw into a tooltip already on screen, or the next unit's.
+  Blizzard's own callback registry wraps ours in `forceinsecure`, stores it in a file-local
+  table behind a forbidden frame, and dispatches it under `securecallfunction` — so the
+  isolation rule 5 exists to provide is provided here by the client's own construction
+  rather than by our deferral. In place from Phase 17.
 - The nameplate re-assert runs inside Blizzard's call, not a frame later (rule 5). Both
   the bar colour and the bar height are values Blizzard writes on its own schedule, and a
   `hooksecurefunc` post-hook on the function that does the writing corrects them in the

@@ -426,3 +426,65 @@ statement = "The page unit writes activeBar only when it has a bar to activate"
 source = "Phase 16 section 2.9, decision D16"
 consequence = "The write guard's premise is gone: a slot change would then always taint activeBar, and the edit path has to be given up for whatever section 6 can be made to do (Features/ConsumableMacros.lua)"
 check = { kind = "Pattern", file = "Blizzard_GamepadActionBars/PageUnit.lua", regex = 'if \(actionBarToActivate\) then\s*\n\s*self:SetActiveActionBar\(actionBarToActivate', expect = "Present" }
+
+# Phase 17 (Architecture/20261011-Phase17.md section 7). Premises 56-63.
+#
+# Nothing here is about QuestieDB. It is a third-party addon, not Blizzard's code,
+# and this register is for facts about the client (Phase 10 section 4). QuestieDB's
+# equivalent is the two runtime gates of section 2.3, checked every UI load.
+
+[[premise]]
+id = "TOOLTIP-POSTCALL-ISOLATES"
+statement = "An insecure tooltip callback is wrapped in forceinsecure and inserted through a forbidden delegate"
+source = "Phase 17 section 3.1"
+consequence = "The tooltip hook stops being rule 1-clean: our callback would run without forceinsecure and its taint could reach the tooltip's execution. Re-read section 3.1 before shipping anything on that hook (Features/NPCQuests.lua)"
+check = { kind = "Pattern", file = "Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua", regex = 'local function InsecureCallback\(\.\.\.\)\s*\n\s*forceinsecure\(\);', expect = "Present" }
+
+[[premise]]
+id = "TOOLTIP-POSTCALL-BEFORE-SHOW"
+statement = "Tooltip post-calls run before the tooltip is shown"
+source = "Phase 17 section 3.1"
+consequence = "Lines added from a post-call would land after the tooltip is sized, so the block would be clipped or invisible. Re-read section 3.1 (Features/NPCQuests.lua)"
+check = { kind = "Pattern", file = "Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua", regex = 'ProcessTooltipPostCalls\(tooltipType, self, tooltipData\);\s*\n\s*self:Show\(\)', expect = "Present" }
+
+[[premise]]
+id = "TOOLTIP-SETUNIT-ROUTED"
+statement = "SetUnit is generated from the accessor map, so a unit tooltip reaches the data processor"
+source = "Phase 17 section 3.1"
+consequence = "A unit tooltip would no longer reach the processor and the feature would draw nothing; find what replaced it (Features/NPCQuests.lua)"
+check = { kind = "Pattern", file = "Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua", regex = 'SetUnit = "GetUnit"', expect = "Present" }
+
+[[premise]]
+id = "UNITGUID-IDENTITY-RESTRICTED"
+statement = "A unit's GUID can be withheld when unit identity is restricted"
+source = "Phase 17 sections 3.2 and 4.3, decision D9"
+consequence = "A GUID would no longer be withheld, so the markers' stand-down on restricted maps could be relaxed and they could work in dungeons. The one premise here whose breaking is good news (Features/QuestMarkers.lua)"
+check = { kind = "FlagEquals", entry = "UnitGUID", flag = "SecretWhenUnitIdentityRestricted", value = "true" }
+
+[[premise]]
+id = "QUEST-LOG-UPDATE-UNIQUE"
+statement = "A quest log update never arrives inside the call that caused it"
+source = "Phase 17 section 4.2"
+consequence = "The marker's only trigger could arrive inside a Blizzard call, which rule 1 forbids. Re-read section 4.2 (Features/QuestMarkers.lua)"
+check = { kind = "FlagEquals", entry = "event QUEST_LOG_UPDATE", flag = "UniqueEvent", value = "true" }
+
+[[premise]]
+id = "QUEST-ACCEPTED-SYNCHRONOUS"
+statement = "Accepting a quest raises a synchronous event"
+source = "Phase 17 section 4.2"
+consequence = "The reason section 4.2 does not subscribe to it. If it became unique it would be a cheaper trigger than QUEST_LOG_UPDATE (Features/QuestMarkers.lua)"
+check = { kind = "FlagEquals", entry = "event QUEST_ACCEPTED", flag = "SynchronousEvent", value = "true" }
+
+[[premise]]
+id = "LOG-INDEX-GIVES-QUESTID"
+statement = "A quest log index resolves to a quest id, and only for quests rather than headers"
+source = "Phase 17 section 4.2"
+consequence = "The quest log cannot be enumerated by index, so no kill-target set can be built. Re-read section 4.2 (Features/QuestMarkers.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua", regex = 'Name = "GetQuestIDForLogIndex",[\s\S]{0,200}?Documentation = \{ "Only returns a questID for actual quests, not headers" \}', expect = "Present" }
+
+[[premise]]
+id = "DIFFICULTY-COLOUR-IS-RAW"
+statement = "A quest difficulty colour is a plain r/g/b table with no colour-mixin methods"
+source = "Phase 17 section 3.4"
+consequence = "A difficulty colour has gained methods, so tooltip:AddLine with components may be the wrong call and GameTooltip_AddColoredLine may have become the right one. Re-read section 3.4 (Features/NPCQuests.lua)"
+check = { kind = "Pattern", file = "Blizzard_FrameXMLBase/Constants.lua", regex = 'QuestDifficultyColors = \{\s*\n\s*\["impossible"\]\s*= \{ r = ', expect = "Present" }

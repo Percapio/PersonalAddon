@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.6.0-phase16"
+ns.VERSION = "1.7.0-phase17"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -114,6 +114,7 @@ ns.SETTINGS_PAGE = {
     NAMEPLATES = "Nameplates",
     BAGS_AND_LOOT = "BagsAndLoot",
     CONSUMABLES = "Consumables",
+    QUESTS = "Quests",
 }
 -- After every declared settingsOrder, so an unplaced feature sorts last, in
 -- registration order.
@@ -284,3 +285,55 @@ ns.MACRO_BODY_MAXIMUM = 255
 -- (ActionButtonUtil.lua:2-5) covers the pages, and the conventional total covers
 -- the rest. Read out of combat only, once per rebuild, like the bag scan.
 ns.ACTION_SLOT_MAXIMUM = 120
+
+-- Phase 17 (Architecture/20261011-Phase17.md) ---------------------------------
+
+-- Shared empty list, returned where a caller must get a table it may read but
+-- never keep. One table rather than one per miss.
+ns.EMPTY_LIST = {}
+
+-- The QuestieDB contract this addon is written against, and the only data flavour
+-- its answers mean anything for (section 2.3). RequireContract is a range check, so
+-- asking for 3 keeps working as QuestieDB adds to it; the flavour gate is the one
+-- RequireContract cannot do, and seven flavour TOCs sit in that folder.
+ns.QUESTIE_REQUIRED_CONTRACT = 3
+ns.QUESTIE_REQUIRED_FLAVOR = "Forever"
+
+-- Entities cached per id for the UI load. QuestieDB's data is baked into a TOC and
+-- static for the session, so nothing is invalidated; the cap is there because a
+-- session can hover a lot of NPCs (section 2.4).
+ns.QUEST_BRIDGE_CACHE_CAPACITY = 256
+
+-- The tooltip block's header. The client's own AVAILABLE_QUEST is preferred, so the
+-- header is in the player's locale like every other string this addon draws; this is
+-- what it falls back to when that global is not readable (section 3.4).
+ns.NPC_QUESTS_HEADER_FALLBACK = "Available Quests"
+
+-- At most this many quest lines on one tooltip, then "+n more". A data defect
+-- cannot grow a tooltip without bound (section 3.4).
+ns.NPC_QUEST_LINE_CAPACITY = 10
+
+-- The marker above a nameplate (section 4.4). A frame with one anchor and no size
+-- is 0x0 and draws nothing, so the size is explicit.
+ns.QUEST_MARKER_SIZE = 16
+-- Settled by spike SQ1 (section 10.4): all five candidates resolved to real file
+-- IDs on this client, so the question was which one MEANS it rather than which one
+-- exists. This is the icon the gossip frame puts on an NPC that has a quest for
+-- you, which is the same thing a marker says about a mob.
+-- The question-mark fallback it replaced is Interface\Icons\INV_Misc_QuestionMark,
+-- file ID 134400, still drawn by Features/Toasts.lua.
+ns.QUEST_MARKER_TEXTURE = "Interface\\GossipFrame\\AvailableQuestIcon"
+-- One marker per plate, sized as the guild label's pool and for the same reason:
+-- the client's nameplate cap bounds the tracked set, so exhaustion means the cap
+-- assumption is wrong and is reported rather than absorbed.
+ns.QUEST_MARKER_POOL_CAPACITY = 48
+
+-- At most this many NPC ids from one quest. A widely-dropped quest item can name
+-- a lot of creatures through ItemDB.npcDrops, and one quest should not be able to
+-- fill the marker set on its own (section 4.2).
+ns.QUEST_TARGETS_PER_QUEST_MAXIMUM = 64
+
+-- Action slots are not involved here; this is the quest log's own index space
+-- (section 4.2). GetNumQuestLogEntries' first return bounds it, and its second
+-- return is how a short read is noticed.
+ns.QUEST_LOG_INDEX_MAXIMUM = 150
