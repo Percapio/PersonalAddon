@@ -320,13 +320,53 @@ local function ensureGuildPool()
     return state.guildPool
 end
 
--- Both halves of the size matter: the font so the text is the chosen size, and
--- the frame so a larger size is not clipped by the box it sits in.
-local function sizeGuildLabel(label)
+-- Phase 18 section 2. SetTextHeight changes the height and nothing else, so there
+-- is no outline in it to turn on: the flag lives in SetFont's third argument,
+-- which means the font's FILE has to be supplied along with it. The file comes
+-- from GetFont, whose fontFile is documented Nilable, and SetFont requires a valid
+-- font asset -- so a nil file is never passed on.
+--
+-- SetFont REPORTS REFUSAL BY RETURN VALUE (success: bool) rather than by raising,
+-- and carries SecretArguments = "AllowedWhenUntainted", so it can refuse when our
+-- execution is tainted. Reading "did not raise" as success is how a silently
+-- unstyled label would be reported as outlined, which is the same defect shape as
+-- the cache in Core/QuestieDBBridge.lua: a non-answer read as an answer.
+--
+-- The two calls go to two different objects. The pool hands out a Frame carrying
+-- the height, with its font string at frame.text carrying the font.
+local function styleGuildLabel(label)
     local points = state.guildFontSize
+    -- The size first, and unconditionally: the label is readable whether or not
+    -- the outline lands.
     label:SetHeight(points + 2)
     label.text:SetTextHeight(points)
+
+    local fontKind, fontFile = ClientRead.Call(label.text.GetFont, "string", label.text)
+    if fontKind ~= ClientRead.PLAIN or fontFile == nil then
+        bump(state.counters, "guildOutlineFallbacks")
+        ns.Log.Once("plates:guildoutline", format(
+            "the guild label's font file could not be read (%s), so the name is drawn without an outline",
+            tostring(fontKind)))
+        return
+    end
+
+    local ok, applied = pcall(label.text.SetFont, label.text,
+        fontFile, points, ns.GUILD_LABEL_OUTLINE_FLAG)
+    if not ok or applied ~= true then
+        bump(state.counters, "guildOutlineFallbacks")
+        ns.Log.Once("plates:guildoutline", format(
+            "this client would not set an outline on the guild label (%s), so the name is drawn without one",
+            ok and "SetFont returned false" or "SetFont raised"))
+        return
+    end
+    bump(state.counters, "guildOutlined")
 end
+
+-- Kept as the old name so every existing call site reads the same. Styling lives
+-- in the sizing path deliberately: it runs on every attach and on every font-size
+-- change, so a one-off refusal is retried the next time the label is used rather
+-- than leaving that plate plain for the session.
+local sizeGuildLabel = styleGuildLabel
 
 local function releaseGuildLabel(plate)
     if not plate.label then
@@ -1446,6 +1486,10 @@ ns.Nameplates = {
             guildLabelsAttached = counters.guildLabelsAttached or 0,
             guildPoolExhausted = counters.guildPoolExhausted or 0,
             guildRefreshes = counters.guildRefreshes or 0,
+            -- Phase 18 section 2: all fallbacks and no outlines is how a client
+            -- that will not accept the OUTLINE flag shows up.
+            guildOutlined = counters.guildOutlined or 0,
+            guildOutlineFallbacks = counters.guildOutlineFallbacks or 0,
             barHeightWrites = counters.barHeightWrites or 0,
             barHeightUnchanged = counters.barHeightUnchanged or 0,
             barHeightBaseWithheld = counters.barHeightBaseWithheld or 0,

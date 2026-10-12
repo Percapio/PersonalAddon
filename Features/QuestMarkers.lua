@@ -60,7 +60,11 @@ local state = {
     capability = CAPABILITY.CAPABLE,
     capabilityReason = nil,
 
-    settings = { markerScale = 1.0, markerOffsetY = 0 },
+    settings = {
+        markerScale = 1.0,
+        markerOffsetX = ns.QUEST_MARKER_OFFSET_X,
+        markerOffsetY = ns.QUEST_MARKER_OFFSET_Y,
+    },
 }
 
 local function counters()
@@ -270,9 +274,23 @@ local function attachMarker(plate)
     -- The container, not UnitFrame: Phase 14 made the bar's height a setting, and
     -- the container is the frame whose height follows it (premise
     -- PLATE-BAR-CONTAINER-HEIGHT). A marker on UnitFrame would drift as the bar
-    -- shrinks. The guild label anchors to the same container on its other side.
-    local offset = state.settings.markerOffsetY / state.settings.markerScale
-    marker:SetPoint("BOTTOM", plate.container, "TOP", 0, offset)
+    -- shrinks, and the container's left edge is also where the bar's left edge
+    -- actually is. The guild label hangs below the same container.
+    --
+    -- Phase 18 section 3: the marker's RIGHT edge against the container's LEFT, so
+    -- the default sits a few pixels clear of the plate rather than on top of it.
+    -- markerOffsetY is therefore measured from the bar's vertical CENTRE, not its
+    -- top, which is why its range is symmetric now. Phase 17's centred-above
+    -- placement is not reachable from these two sliders -- re-centring would need
+    -- about +68px on a 120px bar, past the slider and dependent on a plate width we
+    -- do not read -- and section 3.1 says so rather than implying otherwise.
+    --
+    -- Each offset is divided by the scale so the numbers stay screen pixels at any
+    -- marker size (Phase 12 section 4's rule).
+    local scale = state.settings.markerScale
+    local offsetX = state.settings.markerOffsetX / scale
+    local offsetY = state.settings.markerOffsetY / scale
+    marker:SetPoint("RIGHT", plate.container, "LEFT", offsetX, offsetY)
     marker:Show()
     return READING.SHOWN
 end
@@ -378,10 +396,15 @@ end
 local function readSettings(config)
     local settings = config and config.settings
     if settings then
-        if settings.markerScale then
+        -- Compared against nil, not truthiness: every one of these is a number a
+        -- player can legitimately set to 0, and an offset of 0 is a position.
+        if settings.markerScale ~= nil then
             state.settings.markerScale = settings.markerScale
         end
-        if settings.markerOffsetY then
+        if settings.markerOffsetX ~= nil then
+            state.settings.markerOffsetX = settings.markerOffsetX
+        end
+        if settings.markerOffsetY ~= nil then
             state.settings.markerOffsetY = settings.markerOffsetY
         end
     end
@@ -452,18 +475,28 @@ ns.Registry.Register(FEATURE_ID, {
     settingsOrder = 20,
     settings = {
         markerScale = 1.0,
-        markerOffsetY = 0,
+        markerOffsetX = ns.QUEST_MARKER_OFFSET_X,
+        markerOffsetY = ns.QUEST_MARKER_OFFSET_Y,
     },
     schema = {
-        markerScale = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Marker size", order = 1,
-            unit = ns.ConfigSchema.UNIT.FRACTION,
-            minimum = 0.8, maximum = 1.5, step = 0.05,
+        -- The two offsets read together, above the size, in the order a player
+        -- scans them. Neither label says "above the bar": Phase 18 moved the
+        -- anchor to the container's left edge, which makes that false for the
+        -- vertical offset and meaningless for the horizontal one.
+        markerOffsetX = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Marker offset, left and right", order = 1,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = -ns.QUEST_MARKER_OFFSET_LIMIT, maximum = ns.QUEST_MARKER_OFFSET_LIMIT, step = 1,
         },
         markerOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Marker height above the bar", order = 2,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Marker offset, up and down", order = 2,
             unit = ns.ConfigSchema.UNIT.PIXELS,
-            minimum = -20, maximum = 40, step = 1,
+            minimum = -ns.QUEST_MARKER_OFFSET_LIMIT, maximum = ns.QUEST_MARKER_OFFSET_LIMIT, step = 1,
+        },
+        markerScale = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Marker size", order = 3,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
+            minimum = 0.8, maximum = 1.5, step = 0.05,
         },
     },
 }, {
@@ -511,6 +544,7 @@ ns.QuestMarkers = {
             complete = set and set.complete,
             builtAt = set and set.builtAt or nil,
             markerScale = state.settings.markerScale,
+            markerOffsetX = state.settings.markerOffsetX,
             markerOffsetY = state.settings.markerOffsetY,
             poolStats = state.pool and ns.FramePool.Stats(state.pool) or nil,
             targetIds = (function()

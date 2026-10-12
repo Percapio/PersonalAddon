@@ -631,21 +631,13 @@ end
 check("the command reports the bridge", said)
 check("the command reports the markers", saidMarkers)
 
--- The probe's report survives to disk ---------------------------------------------------------
-
-if ns.QuestProbe then
-    slash("probe quests clear")
-    slash("probe quests log")
-    check("the quest probe saves its report, because chat is not a record",
-        type(PersonalAddonSpikeLog) == "table" and #PersonalAddonSpikeLog.lines > 0,
-        PersonalAddonSpikeLog and #PersonalAddonSpikeLog.lines)
-    local sawCounts = false
-    for _, line in ipairs(PersonalAddonSpikeLog.lines) do
-        if tostring(line):find("numShownEntries", 1, true) then sawCounts = true end
-    end
-    check("and SQ2's report carries both quest-log counts", sawCounts,
-        table.concat(PersonalAddonSpikeLog.lines, " | "))
-end
+-- The probe is gone, and SQ2 needs none (Phase 18 section 11.4) -------------------------------
+-- SQ1 was answered and applied in Phase 17 section 10.6. SQ2 -- whether a
+-- collapsed quest-log header hides its quests from GetQuestIDForLogIndex -- needs
+-- no probe at all: buildKillTargets already computes questsHidden from the two
+-- returns of GetNumQuestLogEntries, so collapsing a header and reading /pa quests
+-- answers it in ordinary play. That counter is checked above.
+check("the quest probe is gone", ns.QuestProbe == nil)
 
 -- Report ---------------------------------------------------------------------------------------
 

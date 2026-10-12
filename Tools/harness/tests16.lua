@@ -758,32 +758,23 @@ end
 check("the command reports the write path", said)
 check("the command reports what each macro uses", saidWhy)
 
--- The spike's route, and that its report survives to disk --------------------------------------------
-check("the probe is behind its own command", ns.MacroProbe == nil or type(ns.MacroProbe) == "table")
-
-if ns.MacroProbe then
-    slash("probe macros clear")
-    check("the probe starts with an empty saved report",
-        type(PersonalAddonSpikeLog) == "table" and #PersonalAddonSpikeLog.lines == 0)
-    slash("probe macros taint")
-    -- Chat is not a record: the first in-game run lost S1, S2 and S9 because
-    -- BetterForeverChat keeps only its own General-tab lines. The report has to be
-    -- somewhere readable after the client quits.
-    check("and a run leaves its report in PersonalAddonSpikeLog",
-        #PersonalAddonSpikeLog.lines > 0, #PersonalAddonSpikeLog.lines)
-    -- Whatever S9 answered. The harness now carries a page unit and a readable
-    -- issecurevariable (D16's guard needs both), so the verdict here is Secure;
-    -- an Unavailable reading would be recorded too, never read as a pass (§2.5).
-    local sawVerdict = false
-    for _, line in ipairs(PersonalAddonSpikeLog.lines) do
-        if tostring(line):find("S9", 1, true) then sawVerdict = true end
-    end
-    check("the saved report carries S9's verdict", sawVerdict,
-        table.concat(PersonalAddonSpikeLog.lines, " | "))
-    check("and it reads the real activeBar rather than skipping it",
-        table.concat(PersonalAddonSpikeLog.lines, " "):find("activeBar secure", 1, true) ~= nil,
-        table.concat(PersonalAddonSpikeLog.lines, " | "))
+-- The spike's route is gone (Phase 18 section 11.4) ------------------------------------------------
+-- Spike S answered every question Phase 16 section 2.6 records, so the probe and
+-- its route went with the design that needed them. Checked as an absence rather
+-- than deleted outright: a probe that came back would be a spike feature shipping
+-- to a player, and the old block here was conditional on ns.MacroProbe, so it
+-- would have gone quiet instead of failing.
+check("the macro probe is gone", ns.MacroProbe == nil)
+-- /pa help is the route's only advertisement, so its absence there is the check.
+local helpMark = #HARNESS.chat
+slash("help")
+-- "/pa probe" only. The fault and failed-enable probes are substrate and stay
+-- listed; it is the spike route that went.
+local offeredProbe = false
+for index = helpMark + 1, #HARNESS.chat do
+    if tostring(HARNESS.chat[index]):find("/pa probe", 1, true) then offeredProbe = true end
 end
+check("and /pa help no longer offers a probe route", not offeredProbe)
 
 -- Report --------------------------------------------------------------------------------------------
 local errors = {}

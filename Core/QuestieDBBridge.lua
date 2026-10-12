@@ -226,14 +226,39 @@ end
 -- A list of ids, copied into a table we own. QuestieDB handed us a fresh deep copy
 -- and we do not keep it: an id list we retain cannot then be reached, or corrupted,
 -- through a later read of theirs.
+-- Returns the id list AND whether the read answered at all (Phase 18 section 5.1).
+--
+-- The second return is the distinction the Phase 17 cache defect collapsed. Four
+-- situations used to come back as the same bare {}:
+--
+--   the getter is absent          -- not an answer
+--   the getter raised             -- not an answer
+--   the getter returned nil       -- AN ANSWER: "this entity has none of these",
+--                                    and the commonest one QuestieDB gives
+--   the getter returned an empty
+--     or unusable table           -- an answer, emptily
+--
+-- Callers must cache the answers and must not cache the non-answers. Caching a
+-- non-answer is what kept the quest markers empty until a relog; NOT caching the
+-- nil answer would re-read QuestieDB on every mouseover of every guard, vendor and
+-- critter in the world, which is the cache bypass Phase 17's audit finding 18
+-- required negative caching to prevent. Both halves matter.
 local function copyIdList(entity, getterName, id)
     local getter = entity[getterName]
     if type(getter) ~= "function" then
-        return {}
+        return {}, false
     end
     local ok, value = pcall(getter, id)
-    if not ok or ClientRead.Classify(value, "table") ~= ClientRead.PLAIN then
-        return {}
+    if not ok then
+        return {}, false
+    end
+    -- A genuine nil is QuestieDB saying "none", which is an answer worth caching.
+    if value == nil then
+        return {}, true
+    end
+    if ClientRead.Classify(value, "table") ~= ClientRead.PLAIN then
+        -- Withheld or the wrong shape: the getter ran but told us nothing usable.
+        return {}, false
     end
     local out = {}
     for index = 1, #value do
@@ -242,7 +267,11 @@ local function copyIdList(entity, getterName, id)
             out[#out + 1] = entry
         end
     end
-    return out
+    return out, true
+end
+
+local function noteReadFailed()
+    ns.Diagnostics.Bump(counters(), "readFailed")
 end
 
 -- Which quests one NPC starts. A negative answer is cached too: most of the world's
@@ -259,7 +288,13 @@ function QuestieDBBridge.QuestsStartedBy(npcId)
     end
     noteRead()
     roomFor("startsByNpc", "startsCount", ns.QUEST_BRIDGE_CACHE_CAPACITY)
-    local list = copyIdList(_G.NpcDB, "questStarts", npcId)
+    local list, answered = copyIdList(_G.NpcDB, "questStarts", npcId)
+    if not answered then
+        -- Nothing cached, so the next hover asks again. An empty ANSWER still
+        -- caches below -- that is the common case and the cache's whole point.
+        noteReadFailed()
+        return list
+    end
     state.startsByNpc[npcId] = list
     state.startsCount = state.startsCount + 1
     return list
@@ -282,8 +317,18 @@ function QuestieDBBridge.QuestFacts(questId)
 
     local quests = _G.QuestDB
     local nameKind, name
+    local nameAnswered = false
     if type(quests.name) == "function" then
         nameKind, name = ClientRead.Call(quests.name, "string", questId)
+        -- PLAIN is an answer. So is a call that ran and returned nothing usable
+        -- for a quest id QuestieDB simply does not carry -- but a WITHHELD read
+        -- caused by the call failing is not, and ClientRead distinguishes the two
+        -- by its reason. Only CALL_FAILED and UNAVAILABLE mean "did not answer".
+        if nameKind == ClientRead.PLAIN then
+            nameAnswered = true
+        elseif name ~= ClientRead.CALL_FAILED and name ~= ClientRead.UNAVAILABLE then
+            nameAnswered = true
+        end
     end
     local facts = {
         questId = questId,
@@ -299,7 +344,18 @@ function QuestieDBBridge.QuestFacts(questId)
     }
     -- A quest QuestieDB does not know has no name and no level at all. Cached as
     -- false so the next lookup is a hit rather than another miss.
+    --
+    -- Phase 18 section 5.1: this test alone cannot tell an unknown quest from an
+    -- unreadable one, because a failed read produces exactly the same three
+    -- values -- scalar() falls back to 0 and name is nil whenever the read was not
+    -- PLAIN. So false is cached only when the name read ANSWERED. Otherwise
+    -- nothing is cached and the next lookup asks again, which is what the markers
+    -- needed and did not have before a relog.
     if facts.name == nil and facts.questLevel == 0 and facts.requiredLevel == 0 then
+        if not nameAnswered then
+            noteReadFailed()
+            return nil
+        end
         state.factsByQuest[questId] = false
         state.factsCount = state.factsCount + 1
         return nil
@@ -356,9 +412,27 @@ function QuestieDBBridge.KillTargetsForQuest(questId)
         end
     end
 
+    -- Phase 18 section 5: whether BOTH sources answered. The targets for a quest
+    -- are the union of the two getters below, so one of them failing leaves an
+    -- incomplete union -- which must not be cached, because this cache is never
+    -- invalidated (Phase 17 section 2.4). Caching an incomplete union is what kept
+    -- the markers empty until the user logged out and back in.
+    local answered = true
+
     local getter = _G.QuestDB and _G.QuestDB.objectives
-    if type(getter) == "function" then
+    if type(getter) ~= "function" then
+        answered = false
+    else
         local ok, objectives = pcall(getter, questId)
+        if not ok then
+            answered = false
+        elseif objectives ~= nil
+            and ClientRead.Classify(objectives, "table") ~= ClientRead.PLAIN then
+            -- Ran, but handed back something unusable. A genuine nil is an answer
+            -- ("this quest has no objectives"); a withheld or wrong-shaped value
+            -- is not.
+            answered = false
+        end
         if ok and ClientRead.Classify(objectives, "table") == ClientRead.PLAIN then
             -- Slot 1: {npcId, text, count}
             local creatures = objectives[1]
@@ -415,8 +489,16 @@ function QuestieDBBridge.KillTargetsForQuest(questId)
     -- holds references and whose "monster" references are npc ids. This is how a
     -- quest names a creature that none of the ordinary objective slots mentions.
     local extraGetter = _G.QuestDB and _G.QuestDB.extraObjectives
-    if type(extraGetter) == "function" then
+    if type(extraGetter) ~= "function" then
+        answered = false
+    else
         local extraOk, extras = pcall(extraGetter, questId)
+        if not extraOk then
+            answered = false
+        elseif extras ~= nil
+            and ClientRead.Classify(extras, "table") ~= ClientRead.PLAIN then
+            answered = false
+        end
         if extraOk and ClientRead.Classify(extras, "table") == ClientRead.PLAIN then
             for index = 1, #extras do
                 local row = extras[index]
@@ -433,6 +515,16 @@ function QuestieDBBridge.KillTargetsForQuest(questId)
         end
     end
     -- The objectives tuple is dropped here and never read again for this quest.
+    --
+    -- Cached only if both sources answered. An ANSWERED-EMPTY list is cached, and
+    -- deliberately: "this quest names no creature" is a true answer for an escort,
+    -- a delivery or a talk-to quest, and re-reading those on every rebuild is what
+    -- the cache exists to avoid. A non-answer caches nothing, so the next rebuild
+    -- asks again instead of waiting for a relog.
+    if not answered then
+        noteReadFailed()
+        return out
+    end
     state.targetsByQuest[questId] = out
     state.targetsCount = state.targetsCount + 1
     return out

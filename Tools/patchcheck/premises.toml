@@ -368,7 +368,7 @@ check = { kind = "Pattern", file = "Blizzard_ChatFrameBase/Shared/SlashCommands.
 id = "PAGEUNIT-NAMED-GLOBAL"
 statement = "The Gamepad page unit is reachable as the named global GamepadMainActionBarFramePageUnit"
 source = "Phase 16 section 2.3"
-consequence = "Spike S9's instrument has no target; the spike falls back to CallWindow.Capture alone (Spikes/MacroProbe.lua)"
+consequence = "The named global is how activeBarTaint() finds the carrier to read with issecurevariable, which is D16's gate on the macro write. Without it the gate cannot tell Secure from Tainted and must report Unreadable, which disables the feature rather than guessing (Features/ConsumableMacros.lua)"
 check = { kind = "Pattern", file = "Blizzard_GamepadActionBars/MainActionBarFrame.xml", regex = 'name="\$parentPageUnit" parentKey="PageUnit"', expect = "Present" }
 
 [[premise]]
@@ -410,7 +410,7 @@ check = { kind = "Pattern", file = "Blizzard_ActionBar/Shared/ActionButton.lua",
 id = "RUNMACROTEXT-RESTRICTED"
 statement = "C_Macro.RunMacroText is refused from tainted code"
 source = "Phase 16 section 6; spike S6"
-consequence = "The click path's healing and bandage buttons send macrotext through this function. If the flag goes, S6's risk goes with it and those two kinds are safe; while it holds, S6 must pass before they are built (Spikes/MacroProbe.lua)"
+consequence = "This is why the click path was abandoned for the edit path (Phase 16 section 6.1 and D16): a tainted caller cannot send macrotext. If the flag goes, a click path becomes possible again and is worth re-costing against the macro-editing one (Features/ConsumableMacros.lua)"
 check = { kind = "FlagEquals", entry = "C_Macro.RunMacroText", flag = "HasRestrictions", value = "true" }
 
 [[premise]]
@@ -488,3 +488,31 @@ statement = "A quest difficulty colour is a plain r/g/b table with no colour-mix
 source = "Phase 17 section 3.4"
 consequence = "A difficulty colour has gained methods, so tooltip:AddLine with components may be the wrong call and GameTooltip_AddColoredLine may have become the right one. Re-read section 3.4 (Features/NPCQuests.lua)"
 check = { kind = "Pattern", file = "Blizzard_FrameXMLBase/Constants.lua", regex = 'QuestDifficultyColors = \{\s*\n\s*\["impossible"\]\s*= \{ r = ', expect = "Present" }
+
+[[premise]]
+id = "GUILD-LABEL-FONT-TEMPLATE"
+statement = "The font the nameplate guild label inherits is still defined"
+source = "Phase 18 section 2"
+consequence = "Phase 15's guild label has no font to inherit, so there is nothing for the outline to read either. Re-read Phase 15 section 3 and Phase 18 section 2 (Features/Nameplates.lua)"
+check = { kind = "Defined", name = "GameFontHighlightSmall" }
+
+[[premise]]
+id = "FONTSTRING-GETFONT-NILABLE"
+statement = "A font string may answer with no font file at all"
+source = "Phase 18 section 2.1"
+consequence = "A font file became non-nilable, so the commonest fallback cause is gone and style_guild_label's nil arm could be simplified. The other causes -- a raise, a false return -- remain (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua", regex = 'Name = "GetFont",[\s\S]{0,300}?\{ Name = "fontFile", Type = "FontAsset", Nilable = true \}', expect = "Present" }
+
+[[premise]]
+id = "FONTSTRING-SETFONT-SHAPE"
+statement = "Setting a font string's font takes flags and reports whether it worked"
+source = "Phase 18 section 2.1"
+consequence = "Either SetFont no longer takes flags, so there is no outline to set and every label keeps PlainFallback for good; or it stopped reporting success, in which case style_guild_label is reading a return that no longer exists and must go back to \"did not raise\". Re-read section 2.1 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua", regex = 'Name = "SetFont",[\s\S]{0,400}?\{ Name = "flags", Type = "TBFFlags", Nilable = true \},[\s\S]{0,200}?\{ Name = "success", Type = "bool"', expect = "Present" }
+
+[[premise]]
+id = "SOFTTARGET-TOOLTIP-IS-GAMEPADS"
+statement = "The Gamepad UI owns the soft-target tooltip CVars and sets them to off"
+source = "Phase 18 section 4.2"
+consequence = "The one premise here whose breaking is good news. If the Gamepad UI stops disabling the soft-target tooltip, section 4.2's reason for rejecting the CVar route weakens and the route is worth re-examining. Sections 4.1 and 4.3 would still stand, so re-read all of section 4 rather than reinstating the feature"
+check = { kind = "Pattern", file = "Blizzard_Gamepad/Core.lua", regex = 'SetupTempCVar\("SoftTargetTooltipEnemy", 0\);\s*\n\s*SetupTempCVar\("SoftTargetTooltipFriend", 0\);', expect = "Present" }

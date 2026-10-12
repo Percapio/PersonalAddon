@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.7.0-phase17"
+ns.VERSION = "1.8.0-phase18"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -200,6 +200,13 @@ ns.GUILD_LABEL_GAP = 1
 -- The guild line is secondary, and the faded white is what says so -- which is
 -- why there are no brackets around the name (section 4.3).
 ns.GUILD_LABEL_ALPHA = 0.7
+-- Phase 18 section 2: the outline is what keeps the line legible at that alpha
+-- over a bright nameplate, so the two belong together rather than as two
+-- switches. THICKOUTLINE is not used: at GUILD_FONT_MINIMUM it leaves almost no
+-- letter. Whether this client's SetFont accepts the flag at all is an in-game
+-- fact -- the flags argument is typed TBFFlags and nothing in the UI export
+-- defines that type -- so SetFont's success return is read rather than assumed.
+ns.GUILD_LABEL_OUTLINE_FLAG = "OUTLINE"
 
 -- Phase 16 (Architecture/20261011-Phase16.md) ---------------------------------
 
@@ -327,6 +334,17 @@ ns.QUEST_MARKER_TEXTURE = "Interface\\GossipFrame\\AvailableQuestIcon"
 -- the client's nameplate cap bounds the tracked set, so exhaustion means the cap
 -- assumption is wrong and is reported rather than absorbed.
 ns.QUEST_MARKER_POOL_CAPACITY = 48
+
+-- Phase 18 section 3: the marker's default place, a few pixels to the LEFT of the
+-- health bar. The anchor is the marker's right edge against the container's left,
+-- so a negative offset moves it further out and 0 would butt it against the bar.
+-- Phase 17 put it centred above the bar; that placement is NOT reachable from
+-- these sliders, which is stated rather than papered over (section 3.1).
+ns.QUEST_MARKER_OFFSET_X = -4
+ns.QUEST_MARKER_OFFSET_Y = 0
+-- Symmetric, because the vertical anchor is now the bar's centre rather than its
+-- top. Phase 17's -20..40 encoded "above the bar", which the new anchor retires.
+ns.QUEST_MARKER_OFFSET_LIMIT = 40
 
 -- At most this many NPC ids from one quest. A widely-dropped quest item can name
 -- a lot of creatures through ItemDB.npcDrops, and one quest should not be able to

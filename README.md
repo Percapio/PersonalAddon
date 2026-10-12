@@ -43,7 +43,10 @@ page's Defaults resets only that page.
 - **Guild names.** Under the health bar, the guild of every player who has one, in a faded
   white so it reads as secondary. Nothing is shown for a player with no guild or for a
   monster. Its size is a setting, and it is off until you switch it on. A guild name is
-  text other players chose, so its escape codes are made inert before it is drawn.
+  text other players chose, so its escape codes are made inert before it is drawn. The
+  name is drawn with a black outline, so it stays legible against a bright nameplate at
+  the faded weight it is drawn in; if your client will not accept the outline the name is
+  still drawn, just without one, and `/pa plates` says so.
 - **Nameplate health bar height.** A slider sets the bar's height as a share of the game's
   own, from 30% to 100%. It is a share and not a number of pixels because the game's own
   height depends on the Style and Global Scale you chose, and a fixed number would be half
@@ -55,7 +58,9 @@ page's Defaults resets only that page.
   a check per quest on every kill. It needs enemy nameplates on and the **QuestieDB** addon
   enabled, and it **switches itself off in dungeons and raids**, where the game will not
   tell an addon which monster a nameplate belongs to — there, a missing marker would mean
-  nothing at all, which is worse than none. `/pa quests` says what it is doing.
+  nothing at all, which is worse than none. It sits a few pixels to the left of the health
+  bar by default, and two sliders in Settings move it around the plate. `/pa quests` says
+  what it is doing.
 - **Threat panel.** In combat, the mobs fighting you or your group are listed in the
   damage breakdown's place above the player frame:
   - their health as a bar, in the nameplate colours;
@@ -225,6 +230,7 @@ build-specific, which is what makes that column worth carrying.
 | Raid markers on the threat panel | The client always hides them | [Phase 11](Architecture/20261005-Phase11.md), build 1.60.1.70235 |
 | Greying out a feature's options while it is off | It needs a modify predicate, a function Blizzard calls on every draw (rule 1). The options are indented under their switch instead | [Phase 12](Architecture/20261006-Phase12.md) §3.4, build 1.60.1.70291 |
 | Quest markers in dungeons and raids | On a restricted map the game withholds a unit's GUID, so the monster behind a nameplate cannot be identified. Marking only the plates that happened to answer would make a missing marker meaningless, so the feature switches off there instead | [Phase 17](Architecture/20261011-Phase17.md) §4.3, build 1.60.1.70338 |
+| Locking the unit tooltip to the nameplate | The game has a "world cursor" tooltip that *can* sit on a nameplate, but it is the soft-target tooltip rather than the tooltip for the unit you have targeted, and the controller UI deliberately switches it off and re-applies that whenever the input mode changes. Moving the game's own tooltip instead is possible, but an addon that re-anchors it risks the tooltip **drawing no lines at all** — Blizzard warns about exactly that in its own source. Doing it properly means this addon drawing its own tooltip, which is a feature rather than a setting | [Phase 18](Architecture/20261011-Phase18.md) §4, build 1.60.1.70338 |
 | A quest marker that counts 7/10 | It would need each objective's progress read per quest and every visible plate swept on every kill. The marker says "an active quest names this mob" and stays until the quest leaves your log | [Phase 17](Architecture/20261011-Phase17.md) §4.2, build 1.60.1.70338 |
 | Ranking consumables by how much they restore | On Forever a consumable's restore amount is only in its tooltip text, in three different forms, and in every locale. So the macros rank by the highest required level you can use — which on this client can pick the weaker of two items, because Forever's recipes do not keep restore rate in step with required level | [Phase 16](Architecture/20261011-Phase16.md) §4.5, build 1.60.1.70338 |
 | Pointing a macro at a hidden button of ours, so its body never changes | `/click` will not reach an addon's frame on this client: the handler refuses any button with access constraints or the `ScriptedInput` forbidden aspect, which is exactly a button of ours driven from a macro. Nothing happens, with no error. So there is no way to keep a macro's body constant and re-point it instead | [Phase 16](Architecture/20261011-Phase16.md) §6.1, build 1.60.1.70338 |

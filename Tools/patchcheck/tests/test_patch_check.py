@@ -384,7 +384,7 @@ class RealExportTests(unittest.TestCase):
         # to be bumped by whichever phase adds one. It had rotted: Phases 13, 14 and
         # 15 took the register from 29 to 36 without touching this line, so T18 was
         # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2).
-        self.assertEqual(len(register), 63)
+        self.assertEqual(len(register), 67)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -453,6 +453,20 @@ class RealExportTests(unittest.TestCase):
                            "TOOLTIP-SETUNIT-ROUTED", "UNITGUID-IDENTITY-RESTRICTED",
                            "QUEST-LOG-UPDATE-UNIQUE", "QUEST-ACCEPTED-SYNCHRONOUS",
                            "LOG-INDEX-GIVES-QUESTID", "DIFFICULTY-COLOUR-IS-RAW"):
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+
+    def test_t22_the_phase18_premises_hold_on_the_current_export(self):
+        # Architecture/20261011-Phase18.md section 11.2. SOFTTARGET-TOOLTIP-IS-GAMEPADS
+        # is the register's first premise recording a REJECTION rather than something
+        # the addon relies on: section 4 declined to put the tooltip on the nameplate
+        # partly because Blizzard's Gamepad module sets those CVars to 0 itself, and a
+        # rejection nobody re-checks becomes folklore. Its breaking is good news.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        for premise_id in ("GUILD-LABEL-FONT-TEMPLATE", "FONTSTRING-GETFONT-NILABLE",
+                           "FONTSTRING-SETFONT-SHAPE", "SOFTTARGET-TOOLTIP-IS-GAMEPADS"):
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
 
