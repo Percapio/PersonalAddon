@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.8.0-phase18"
+ns.VERSION = "1.9.0-phase19"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -299,6 +299,15 @@ ns.ACTION_SLOT_MAXIMUM = 120
 -- never keep. One table rather than one per miss.
 ns.EMPTY_LIST = {}
 
+-- The same idea for the claim shape the bridge answers with (Phase 19 section 3).
+-- answered is false, so a caller that gets this one caches nothing.
+ns.EMPTY_CLAIM_SHAPE = {
+    claims = ns.EMPTY_LIST,
+    extraNpcIds = ns.EMPTY_LIST,
+    rowsBySlot = { [1] = 0, [2] = 0, [3] = 0, [4] = 0, [5] = 0, [6] = 0 },
+    answered = false,
+}
+
 -- The QuestieDB contract this addon is written against, and the only data flavour
 -- its answers mean anything for (section 2.3). RequireContract is a range check, so
 -- asking for 3 keeps working as QuestieDB adds to it; the flavour gate is the one
@@ -355,3 +364,115 @@ ns.QUEST_TARGETS_PER_QUEST_MAXIMUM = 64
 -- (section 4.2). GetNumQuestLogEntries' first return bounds it, and its second
 -- return is how a short read is noticed.
 ns.QUEST_LOG_INDEX_MAXIMUM = 150
+
+-- Phase 19: objective-aware markers (Architecture/20261016-Phase19.md section 2) --------
+
+-- QuestieDB's objectives tuple, by slot. Its Types/General.t.lua:46 types the tuple
+-- as {creature[], object[], item[], reputationPair, killCredit[], spell[]} -- slot 4
+-- is a SINGLE pair, not a list, which is why rowsBySlot counts it by shape rather
+-- than by length (section 3).
+ns.QUEST_OBJECTIVE_SLOT = {
+    CREATURE_KILL = 1,
+    OBJECT = 2,
+    ITEM = 3,
+    REPUTATION = 4,
+    KILL_CREDIT = 5,
+    SPELL = 6,
+}
+
+-- The order the slots appear in the client's objective list, by default. The
+-- published per-quest exceptions live in LibQuestieDB.ObjectiveFirst and move one
+-- slot to the front of this order (section 2.2).
+ns.QUEST_OBJECTIVE_SLOT_ORDER = { 1, 2, 3, 4, 5, 6 }
+
+-- Which LibQuestieDB.ObjectiveFirst set names which slot. eventObjectiveFirst is
+-- absent on purpose: it names a client objective QuestieDB models no row for, so
+-- such a quest must fail the count check rather than be reordered (section 2.2).
+ns.QUEST_OBJECTIVE_FIRST_FIELDS = {
+    { field = "objectObjectiveFirst", slot = 2 },
+    { field = "itemObjectiveFirst", slot = 3 },
+    { field = "killCreditObjectiveFirst", slot = 5 },
+    { field = "spellObjectiveFirst", slot = 6 },
+}
+
+-- The client's objective type string for each QuestieDB slot. THE UNVERIFIED TABLE
+-- of this phase: the UI export carries a consumer for "progressbar" only, so these
+-- five strings come from outside it and /pa quests prints what the client actually
+-- returned so one in-game run can correct them (section 2.2, in-game check 1).
+ns.CLIENT_OBJECTIVE_TYPE_FOR_SLOT = {
+    [1] = "monster",
+    [2] = "object",
+    [3] = "item",
+    [4] = "reputation",
+    [5] = "monster",
+    [6] = "spell",
+}
+
+-- Objective types we know of. A type in here that contradicts its slot is a
+-- TypeContradiction; a type that is not in here at all is an UnknownObjectiveType,
+-- and they are different diagnoses (section 2.2).
+ns.KNOWN_OBJECTIVE_TYPES = {
+    monster = true, object = true, item = true, reputation = true,
+    spell = true, event = true, player = true, progressbar = true,
+}
+
+-- The scope sentinel, as a scalar so a Lua table can be keyed by it: a claim with
+-- no client objective behind it is satisfied only by the quest's own completion
+-- (section 2.3, audit finding 2).
+ns.QUEST_CLAIM_QUEST_LEVEL = 0
+
+-- Phase 19: the rare and elite ring (section 4) ----------------------------------------
+
+-- One ring per plate, sized as the guild label's pool and for the same reason.
+ns.RARITY_RING_POOL_CAPACITY = 48
+
+-- The ring's width as a multiple of the level badge's MEASURED width. The badge is
+-- wider than it is tall, so a square ring sized from the width surrounds it and
+-- crosses the bar's top and bottom edges (decision D5); sizing from the height
+-- would instead track our own bar-height setting, which section 4.2 rejects.
+ns.RARITY_RING_WIDTH_FACTOR = 1.25
+
+ns.RARITY_RING_SIZE_MINIMUM = 0.6
+ns.RARITY_RING_SIZE_MAXIMUM = 2.0
+ns.RARITY_RING_SIZE_STEP = 0.05
+
+-- Tighter than the marker's +-40: the badge is 28 wide and a ring further out than
+-- this is no longer on it.
+ns.RARITY_RING_OFFSET_LIMIT = 24
+
+-- The ring must draw OVER the badge's own box, or its inner edge is hidden behind
+-- it. Our frames are UIParent children, so the plate's strata governs whether this
+-- is enough; it is the single knob if the in-game check fails (section 12).
+ns.RARITY_RING_STRATA = "HIGH"
+
+-- Blizzard's LEVEL_INDICATOR_WIDTH (Blizzard_NamePlateConstants.lua), used only
+-- when the badge's own GetWidth does not answer.
+ns.LEVEL_INDICATOR_WIDTH_FALLBACK = 28
+
+ns.RARITY_TIER = { BOSS = "Boss", SILVER = "Silver", GOLD = "Gold" }
+
+-- The artwork, from Camelot's own target frame
+-- (Blizzard_UnitFrame/Camelot/TargetFrameUtils.lua:9-19 via Mainline/TargetFrame.lua:423).
+-- Verified by use rather than by name: this client sets these three every time the
+-- player targets an elite. Rare and rare-elite share the silver surround because
+-- that file's ShouldUseSilverUnitFrame does (section 4.3).
+ns.RARITY_RING_ATLAS = {
+    Boss = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold-Winged",
+    Silver = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Silver-Winged",
+    Gold = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold",
+}
+
+-- The classification strings that earn a ring, mapped to their tier. "worldboss"
+-- is here as well as UnitIsBossMob because the two are not the same question and
+-- either one answering yes is a boss (section 4.5).
+ns.RARITY_TIER_FOR_CLASSIFICATION = {
+    worldboss = "Boss",
+    rare = "Silver",
+    rareelite = "Silver",
+    elite = "Gold",
+}
+
+-- A ring whose aspect could not be read is drawn square. The target-frame gold
+-- surround is very nearly square, so this is the right guess when GetAtlasInfo
+-- answers without usable numbers.
+ns.RARITY_RING_ASPECT_FALLBACK = 1.0

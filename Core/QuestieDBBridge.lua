@@ -51,8 +51,8 @@ local state = {
     startsCount = 0,
     factsByQuest = {},
     factsCount = 0,
-    targetsByQuest = {},
-    targetsCount = 0,
+    claimsByQuest = {},
+    claimsCount = 0,
 
     reads = 0,
     hits = 0,
@@ -365,7 +365,48 @@ function QuestieDBBridge.QuestFacts(questId)
     return facts
 end
 
--- The NPC ids one quest names as something to kill (section 4.2).
+-- Which slot of QuestieDB's objectives tuple comes FIRST for one quest
+-- (Phase 19 section 2.2).
+--
+-- LibQuestieDB.ObjectiveFirst is published API -- src/corrections/_end.lua:18, fed by
+-- src/corrections/compat.lua:39-45, whose own comment calls these "consumer hints
+-- about objective ordering, not entity data, so they are collected and published
+-- rather than merged into the database". The Forever flavour carries four
+-- (src/corrections/Forever/foreverQuestFixes.lua:15-18): quests 92682, 97277 and
+-- 97485 put their item objective first and 94489 its kill-credit objective.
+--
+-- eventObjectiveFirst is deliberately not consulted. It names a client objective
+-- QuestieDB models no row for, so a quest carrying it must fail the pairing's count
+-- check and fall back to quest-level completion rather than be reordered into a
+-- pairing that cannot be right.
+--
+-- Nothing here is a premise: the hints live in a third-party addon, which the patch
+-- check cannot see (Phase 19 section 8). An absent, renamed or unreadable hint table
+-- therefore answers nil, and the caller keeps the default slot order -- which is the
+-- behaviour this bridge had before the hints were found.
+function QuestieDBBridge.ObjectiveFirstSlot(questId)
+    if not QuestieDBBridge.IsAvailable() or type(questId) ~= "number" then
+        return nil
+    end
+    local hintsKind, hints = ClientRead.Field(_G.LibQuestieDB, "ObjectiveFirst", "table")
+    if hintsKind ~= ClientRead.PLAIN then
+        return nil
+    end
+    for index = 1, #ns.QUEST_OBJECTIVE_FIRST_FIELDS do
+        local entry = ns.QUEST_OBJECTIVE_FIRST_FIELDS[index]
+        local setKind, set = ClientRead.Field(hints, entry.field, "table")
+        if setKind == ClientRead.PLAIN then
+            local flagKind, flag = ClientRead.Field(set, questId, "boolean")
+            if flagKind == ClientRead.PLAIN and flag then
+                return entry.slot
+            end
+        end
+    end
+    return nil
+end
+
+-- The NPC ids one quest names as something to kill, each tagged with the objective
+-- row that named it (Phase 19 section 3; Phase 17 section 4.2 for the sources).
 --
 -- FOUR SOURCES, and the first in-game run is why. An earlier version took only the
 -- two that name a creature directly, and found three target ids for a whole quest
@@ -382,41 +423,84 @@ end
 --   extraObjectives                     {spawns, zone, text, icon, reference[]}
 --                    -> every reference of the form {"monster", npcId}
 --
--- Objects (slot 2) and spells (slot 6) are still ignored: an object genuinely has no
--- nameplate, and a spell objective names no creature to kill.
-function QuestieDBBridge.KillTargetsForQuest(questId)
+-- Objects (slot 2) and spells (slot 6) name no creature to kill, but their ROWS ARE
+-- STILL COUNTED: they occupy client objective indices, and a slot whose rows are not
+-- counted shifts every index after it (Phase 19 section 2.2).
+--
+-- SLOT 4 IS NOT A LIST. Types/General.t.lua:46 types the tuple as
+-- {creature[], object[], item[], reputationPair, killCredit[], spell[]} -- slot 4 is
+-- a single {factionId, amount} pair, so #objectives[4] is 2 and counting it that way
+-- would inflate the row total by one and turn every reputation quest into a
+-- CountMismatch (Phase 19 audit finding 5).
+--
+-- WHAT "ANSWERED" NOW COVERS. Phase 18 section 5 established that this cache may
+-- keep an answer and must not keep a non-answer, because nothing invalidates it. The
+-- item slot reaches a SECOND entity -- ItemDB.npcDrops -- and a failed read there is
+-- indistinguishable from "nothing drops this item", so it counts as a non-answer
+-- too. Caching it would hide the markers on every mob that drops a quest item until
+-- the user relogged, which is Phase 18's defect in a new place (audit finding 7).
+function QuestieDBBridge.KillClaimsForQuest(questId)
     if not QuestieDBBridge.IsAvailable() or type(questId) ~= "number" then
-        return ns.EMPTY_LIST
+        return ns.EMPTY_CLAIM_SHAPE
     end
-    local cached = state.targetsByQuest[questId]
+    local cached = state.claimsByQuest[questId]
     if cached then
         noteHit()
         return cached
     end
     noteRead()
-    roomFor("targetsByQuest", "targetsCount", ns.QUEST_BRIDGE_CACHE_CAPACITY)
+    roomFor("claimsByQuest", "claimsCount", ns.QUEST_BRIDGE_CACHE_CAPACITY)
 
-    local out = {}
-    local seen = {}
-    local function add(value)
-        if #out >= ns.QUEST_TARGETS_PER_QUEST_MAXIMUM then
-            -- One quest should not be able to fill the set on its own: a
-            -- widely-dropped item can name a great many creatures.
-            ns.Diagnostics.Bump(counters(), "questTargetsCapped")
-            return
-        end
-        if ClientRead.Classify(value, "number") == ClientRead.PLAIN
-            and not seen[value] then
-            seen[value] = true
-            out[#out + 1] = value
-        end
+    local SLOT = ns.QUEST_OBJECTIVE_SLOT
+    local claims, extraNpcIds = {}, {}
+    local rowsBySlot = { [1] = 0, [2] = 0, [3] = 0, [4] = 0, [5] = 0, [6] = 0 }
+    local claimed, extraSeen = {}, {}
+    local budget = ns.QUEST_TARGETS_PER_QUEST_MAXIMUM
+    local capped = false
+
+    -- claims and extraNpcIds share one budget, so one quest cannot fill the marker
+    -- set however its ids arrive (section 3).
+    local function spent()
+        return #claims + #extraNpcIds
     end
 
-    -- Phase 18 section 5: whether BOTH sources answered. The targets for a quest
-    -- are the union of the two getters below, so one of them failing leaves an
-    -- incomplete union -- which must not be cached, because this cache is never
-    -- invalidated (Phase 17 section 2.4). Caching an incomplete union is what kept
-    -- the markers empty until the user logged out and back in.
+    -- Distinct by (npcId, slot, row), NOT by npcId: a creature that must be killed
+    -- AND drops the quest's item is two claims, and collapsing them would drop its
+    -- marker as soon as the first of the two finished (audit finding 8).
+    local function addClaim(npcId, slot, row)
+        if ClientRead.Classify(npcId, "number") ~= ClientRead.PLAIN then
+            return
+        end
+        if spent() >= budget then
+            capped = true
+            return
+        end
+        local key = npcId .. ":" .. slot .. ":" .. row
+        if claimed[key] then
+            return
+        end
+        claimed[key] = true
+        claims[#claims + 1] = { npcId = npcId, slot = slot, row = row }
+    end
+
+    -- Distinct by npcId, and never an id a paired claim already covers: a
+    -- quest-level claim beside a paired one for the same mob could only keep a
+    -- satisfied marker alive (section 3).
+    local function addExtra(npcId)
+        if ClientRead.Classify(npcId, "number") ~= ClientRead.PLAIN then
+            return
+        end
+        if spent() >= budget then
+            capped = true
+            return
+        end
+        if extraSeen[npcId] then
+            return
+        end
+        extraSeen[npcId] = true
+        extraNpcIds[#extraNpcIds + 1] = npcId
+    end
+
     local answered = true
 
     local getter = _G.QuestDB and _G.QuestDB.objectives
@@ -428,66 +512,95 @@ function QuestieDBBridge.KillTargetsForQuest(questId)
             answered = false
         elseif objectives ~= nil
             and ClientRead.Classify(objectives, "table") ~= ClientRead.PLAIN then
-            -- Ran, but handed back something unusable. A genuine nil is an answer
-            -- ("this quest has no objectives"); a withheld or wrong-shaped value
-            -- is not.
             answered = false
         end
         if ok and ClientRead.Classify(objectives, "table") == ClientRead.PLAIN then
             -- Slot 1: {npcId, text, count}
-            local creatures = objectives[1]
+            local creatures = objectives[SLOT.CREATURE_KILL]
             if type(creatures) == "table" then
-                for index = 1, #creatures do
-                    local row = creatures[index]
-                    if type(row) == "table" then
-                        add(row[1])
-                    end
-                end
-            end
-            -- Slot 5: {npcId[], creditNpcId, text, count}
-            local credits = objectives[5]
-            if type(credits) == "table" then
-                for index = 1, #credits do
-                    local row = credits[index]
-                    if type(row) == "table" then
-                        local list = row[1]
-                        if type(list) == "table" then
-                            for position = 1, #list do
-                                add(list[position])
-                            end
-                        end
-                        add(row[2])
+                rowsBySlot[SLOT.CREATURE_KILL] = #creatures
+                for row = 1, #creatures do
+                    local entry = creatures[row]
+                    if type(entry) == "table" then
+                        addClaim(entry[1], SLOT.CREATURE_KILL, row)
                     end
                 end
             end
 
+            -- Slot 2: objects. No nameplate, so no claim -- but the rows count.
+            local objects = objectives[SLOT.OBJECT]
+            if type(objects) == "table" then
+                rowsBySlot[SLOT.OBJECT] = #objects
+            end
+
             -- Slot 3: {itemId, text, count}. The item has no nameplate; what drops
-            -- it does. ItemDB.npcDrops is the published way across (Types/Item.t.lua).
-            local items = objectives[3]
+            -- it does. ItemDB.npcDrops is the published way across
+            -- (Types/Item.t.lua), and its failure clears `answered`.
+            local items = objectives[SLOT.ITEM]
             if type(items) == "table" then
+                rowsBySlot[SLOT.ITEM] = #items
                 local drops = _G.ItemDB and _G.ItemDB.npcDrops
-                if type(drops) == "function" then
-                    for index = 1, #items do
-                        local row = items[index]
-                        if type(row) == "table"
-                            and ClientRead.Classify(row[1], "number") == ClientRead.PLAIN then
-                            local dropOk, droppers = pcall(drops, row[1])
-                            if dropOk
-                                and ClientRead.Classify(droppers, "table") == ClientRead.PLAIN then
+                for row = 1, #items do
+                    local entry = items[row]
+                    if type(entry) == "table"
+                        and ClientRead.Classify(entry[1], "number") == ClientRead.PLAIN then
+                        if type(drops) ~= "function" then
+                            answered = false
+                        else
+                            local dropOk, droppers = pcall(drops, entry[1])
+                            if not dropOk then
+                                answered = false
+                            elseif droppers ~= nil
+                                and ClientRead.Classify(droppers, "table") ~= ClientRead.PLAIN then
+                                -- A genuine nil is an answer -- nothing drops it --
+                                -- so only an unusable value clears `answered`.
+                                answered = false
+                            elseif droppers ~= nil then
                                 for position = 1, #droppers do
-                                    add(droppers[position])
+                                    addClaim(droppers[position], SLOT.ITEM, row)
                                 end
                             end
                         end
                     end
                 end
             end
+
+            -- Slot 4: a single {factionId, amount} pair. One row when it is there.
+            local reputation = objectives[SLOT.REPUTATION]
+            if type(reputation) == "table"
+                and ClientRead.Classify(reputation[1], "number") == ClientRead.PLAIN then
+                rowsBySlot[SLOT.REPUTATION] = 1
+            end
+
+            -- Slot 5: {npcId[], creditNpcId, text, count}
+            local credits = objectives[SLOT.KILL_CREDIT]
+            if type(credits) == "table" then
+                rowsBySlot[SLOT.KILL_CREDIT] = #credits
+                for row = 1, #credits do
+                    local entry = credits[row]
+                    if type(entry) == "table" then
+                        local list = entry[1]
+                        if type(list) == "table" then
+                            for position = 1, #list do
+                                addClaim(list[position], SLOT.KILL_CREDIT, row)
+                            end
+                        end
+                        addClaim(entry[2], SLOT.KILL_CREDIT, row)
+                    end
+                end
+            end
+
+            -- Slot 6: spells. No creature named, but the rows count.
+            local spells = objectives[SLOT.SPELL]
+            if type(spells) == "table" then
+                rowsBySlot[SLOT.SPELL] = #spells
+            end
         end
     end
 
     -- extraObjectives: Questie's own "hidden special objectives", whose fifth slot
-    -- holds references and whose "monster" references are npc ids. This is how a
-    -- quest names a creature that none of the ordinary objective slots mentions.
+    -- holds references and whose "monster" references are npc ids. These have NO
+    -- client objective, so they are never paired and always carry QUEST_LEVEL.
     local extraGetter = _G.QuestDB and _G.QuestDB.extraObjectives
     if type(extraGetter) ~= "function" then
         answered = false
@@ -507,26 +620,80 @@ function QuestieDBBridge.KillTargetsForQuest(questId)
                     for position = 1, #references do
                         local reference = references[position]
                         if type(reference) == "table" and reference[1] == "monster" then
-                            add(reference[2])
+                            addExtra(reference[2])
                         end
                     end
                 end
             end
         end
     end
-    -- The objectives tuple is dropped here and never read again for this quest.
-    --
-    -- Cached only if both sources answered. An ANSWERED-EMPTY list is cached, and
-    -- deliberately: "this quest names no creature" is a true answer for an escort,
-    -- a delivery or a talk-to quest, and re-reading those on every rebuild is what
-    -- the cache exists to avoid. A non-answer caches nothing, so the next rebuild
-    -- asks again instead of waiting for a relog.
+
+    if capped then
+        ns.Diagnostics.Bump(counters(), "questTargetsCapped")
+    end
+
+    -- An id a paired claim already covers is dropped from the extras: a QUEST_LEVEL
+    -- claim beside a paired one for the same mob could only keep a satisfied marker
+    -- alive (section 3).
+    if #extraNpcIds > 0 and #claims > 0 then
+        local pairedNpcIds = {}
+        for index = 1, #claims do
+            pairedNpcIds[claims[index].npcId] = true
+        end
+        local kept = {}
+        for index = 1, #extraNpcIds do
+            local npcId = extraNpcIds[index]
+            if not pairedNpcIds[npcId] then
+                kept[#kept + 1] = npcId
+            end
+        end
+        extraNpcIds = kept
+    end
+
+    local shape = {
+        claims = claims,
+        extraNpcIds = extraNpcIds,
+        rowsBySlot = rowsBySlot,
+        answered = answered,
+    }
+
+    -- Cached only if every source answered. An ANSWERED-EMPTY shape is cached, and
+    -- deliberately: "this quest names no creature" is a true answer for an escort, a
+    -- delivery or a talk-to quest, and re-reading those on every rebuild is what the
+    -- cache exists to avoid. A non-answer caches nothing, so the next rebuild asks
+    -- again instead of waiting for a relog (Phase 18 section 5).
     if not answered then
         noteReadFailed()
-        return out
+        return shape
     end
-    state.targetsByQuest[questId] = out
-    state.targetsCount = state.targetsCount + 1
+    state.claimsByQuest[questId] = shape
+    state.claimsCount = state.claimsCount + 1
+    return shape
+end
+
+-- The flat id list Phase 17 shipped, derived from the claims above.
+--
+-- Phase 19 section 3 said this accessor was replaced because QuestMarkers was its
+-- only caller. That was wrong: tests17 and tests18 call it too, and an earlier
+-- session that still passes is worth more than a deleted six-line accessor. The
+-- cache lives once, in the claims path; this only flattens it.
+function QuestieDBBridge.KillTargetsForQuest(questId)
+    local shape = QuestieDBBridge.KillClaimsForQuest(questId)
+    local out, seen = {}, {}
+    for index = 1, #shape.claims do
+        local npcId = shape.claims[index].npcId
+        if not seen[npcId] then
+            seen[npcId] = true
+            out[#out + 1] = npcId
+        end
+    end
+    for index = 1, #shape.extraNpcIds do
+        local npcId = shape.extraNpcIds[index]
+        if not seen[npcId] then
+            seen[npcId] = true
+            out[#out + 1] = npcId
+        end
+    end
     return out
 end
 
@@ -556,7 +723,7 @@ function QuestieDBBridge.Inspect()
         hits = state.hits,
         cachedNpcs = state.startsCount,
         cachedQuests = state.factsCount,
-        cachedTargets = state.targetsCount,
+        cachedTargets = state.claimsCount,
     }
 end
 
@@ -567,6 +734,6 @@ function QuestieDBBridge.Reset()
     state.contract, state.mode, state.flavor = nil, nil, nil
     state.startsByNpc, state.startsCount = {}, 0
     state.factsByQuest, state.factsCount = {}, 0
-    state.targetsByQuest, state.targetsCount = {}, 0
+    state.claimsByQuest, state.claimsCount = {}, 0
     state.reads, state.hits = 0, 0
 end

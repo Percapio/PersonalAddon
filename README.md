@@ -171,7 +171,9 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Nameplate Health Bar Height ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Scales nameplate bar height from 30% to 100% of Blizzard's base layout, automatically adapting to the player's selected UI Style and Global Scale.
 - **Quest Markers on Nameplates ([`Features/QuestMarkers.lua`](Features/QuestMarkers.lua)):**
-  Renders an indicator above nameplates naming active quest objectives. Requires QuestieDB and enemy nameplates enabled. **Automatically disabled in dungeons and raids** where the client withholds unit GUIDs to prevent misleading false negatives.
+  Renders an indicator beside the nameplates of monsters an active quest objective still wants. The marker **clears as soon as that objective is satisfied** — the kill count filled, or enough of the item collected — including on the creatures that drop a quest item rather than only on named kill targets. A setting keeps markers until the quest leaves the log instead, for farming a mob whose objective is already done. Requires QuestieDB and enemy nameplates enabled. **Automatically disabled in dungeons and raids** where the client withholds unit GUIDs to prevent misleading false negatives.
+- **Rare and Elite Rings on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
+  Encircles the nameplate level badge with the client's own target-frame surround: gold for an elite, silver for a rare or rare-elite, winged gold for a world boss. Drawn only on attackable units, and **off in dungeons and raids** where nearly every monster is elite and the ring would carry no information. Size and position are configurable; the artwork is resolved at runtime and the tier simply goes undrawn on a client that does not carry it.
 - **Threat Panel HUD ([`Features/ThreatPanel.lua`](Features/ThreatPanel.lua)):**
   During combat, dynamically summarizes all units engaged with the player or party:
   - Unit health bar rendered in threat-priority color palette.
@@ -216,6 +218,8 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
 - **Available Quests on NPC Tooltips ([`Features/NPCQuests.lua`](Features/NPCQuests.lua)):**
   Hooks unit tooltip pre-render calculations to display all currently available quests offered by the targeted NPC, styled with difficulty level coloration. Queries [`Core/QuestieDBBridge.lua`](Core/QuestieDBBridge.lua) without requiring the full Questie addon to be running.
+- **Objective-Aware Quest Markers ([`Features/QuestMarkers.lua`](Features/QuestMarkers.lua)):**
+  Pairs QuestieDB's typed objective rows against the client's own objective list, honoring QuestieDB's published per-quest ordering hints (`LibQuestieDB.ObjectiveFirst`). A quest whose rows cannot be paired — by row count or by objective type — falls back to whole-quest completion rather than guessing, and `/pa quests` reports which path every quest in the log took.
 
 ### Developer & Preview Tools
 
@@ -292,7 +296,7 @@ Architectural decisions and experiments evaluated across development phases and 
 | Reactive Control Greying | Requires runtime modify predicates called by Blizzard on each render pass; resolved by structural subcategory indentation | [Phase 12](Architecture/20261006-Phase12.md) §3.4, build 1.60.1.70291 |
 | Dungeon/Raid Quest Markers | Client withholds unit GUIDs on restricted maps; partial marker rendering would produce misleading false negatives | [Phase 17](Architecture/20261011-Phase17.md) §4.3, build 1.60.1.70338 |
 | Tooltip Anchored to Plates | Moving game tooltip risks triggering empty render loops warned by Blizzard source; requires full custom tooltip framework | [Phase 18](Architecture/20261011-Phase18.md) §4, build 1.60.1.70338 |
-| Objective Counter Markers | Tracking exact objective counts (e.g. 7/10) requires polling all log entries per unit death; marker signals active objective target | [Phase 17](Architecture/20261011-Phase17.md) §4.2, build 1.60.1.70338 |
+| Nameplate Rarity Icons via Client Feature | Client ships the whole feature (`NamePlateClassificationFrameMixin`) and this flavour disables it in two places: the enemy frame option is false and the settings checkbox is hidden. Enabling it requires writing Blizzard's option table, which Rule 2 forbids; the ring is drawn as an addon-owned frame instead | [Phase 19](Architecture/20261016-Phase19.md) §1.3, build 1.60.1.70450 |
 | Restoration-Ranked Consumables | Restore quantities exist only as localized tooltip strings; ranking relies on required level | [Phase 16](Architecture/20261011-Phase16.md) §4.5, build 1.60.1.70338 |
 | Hidden Action Button Indirection | `/click` fails against addon frames with `ScriptedInput` constraints; macros must name items directly | [Phase 16](Architecture/20261011-Phase16.md) §6.1, build 1.60.1.70338 |
 | Bandage First Aid Verification | Item APIs do not expose First Aid rank prerequisites; invalid usages report native error feedback | [Phase 16](Architecture/20261011-Phase16.md) §4.4, build 1.60.1.70338 |

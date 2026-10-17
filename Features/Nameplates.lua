@@ -43,6 +43,15 @@ local VERDICT = Threat.VERDICT
 
 local SCOPE = { IN = "InScope", OUT = "OutOfScope", UNREACHABLE = "Unreachable" }
 
+-- What happened to one plate's rarity ring (Phase 19 section 4.4).
+local RING = {
+    PLACED = "Placed",
+    BADGE_UNMEASURED = "BadgeUnmeasured",
+    NO_BADGE = "NoBadge",
+    NOT_RANKED = "NotRanked",
+    STOOD_DOWN = "StoodDown",
+}
+
 -- Blizzard re-sets plate geometry on its own schedule. The sweep re-asserts;
 -- a hook, where one is available, only makes it react sooner.
 local STALE_SWEEP_EVERY = 8
@@ -82,6 +91,18 @@ local state = {
     guildNames = false,
     guildFontSize = 10,
     guildPool = nil,
+    -- Phase 19. On by default: it marks the monsters that are dangerous, which is
+    -- information the client has the artwork for and does not draw.
+    rarityRings = true,
+    rarityRingSize = 1.0,
+    rarityRingOffsetX = 0,
+    rarityRingOffsetY = 0,
+    ringPool = nil,
+    ringCount = 0,
+    -- One probe per tier per UI load; false means "probed and not there".
+    ringArt = {},
+    -- Sampled with the map rather than per plate: it changes only with the map.
+    ringsAllowed = false,
     -- What GetHeight last gave back, so /pa plates can show the round-trip.
     lastBarRead = nil,
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
@@ -111,6 +132,17 @@ local function readSettings(config)
     state.barHeightFraction = settings.barHeightFraction or state.barHeightFraction
     state.guildNames = (settings.guildNames == true)
     state.guildFontSize = settings.guildFontSize or state.guildFontSize
+    state.rarityRings = (settings.rarityRings ~= false)
+    -- Compared against nil, not truthiness: an offset of 0 is a position.
+    if settings.rarityRingSize ~= nil then
+        state.rarityRingSize = settings.rarityRingSize
+    end
+    if settings.rarityRingOffsetX ~= nil then
+        state.rarityRingOffsetX = settings.rarityRingOffsetX
+    end
+    if settings.rarityRingOffsetY ~= nil then
+        state.rarityRingOffsetY = settings.rarityRingOffsetY
+    end
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
     state.palette = Threat.PaletteFrom(settings)
@@ -128,7 +160,12 @@ local function resolveParts(frame)
     -- carries two BOTTOM anchors and an explicit height, which is the difference
     -- Phase 2 section 4.9 missed.
     local container = unitFrame.HealthBarsContainer or unitFrame.healthBarsContainer
-    return unitFrame, healthBar, container
+    -- Phase 19 section 4.1. The level badge: a 28-wide indicator carrying the unit's
+    -- level, to the right of the health bar. Resolved rather than assumed, like the
+    -- two above, because on this client the well-known name is the one that moves --
+    -- build 70450 re-anchored this very frame.
+    local levelBadge = unitFrame.PlayerLevelDiffFrame or unitFrame.playerLevelDiffFrame
+    return unitFrame, healthBar, container, levelBadge
 end
 
 -- Scope -----------------------------------------------------------------------
@@ -755,6 +792,267 @@ local function unstylePlate(plate)
     plate.desiredColour = nil
 end
 
+-- Rare and elite rings (Phase 19 section 4) -----------------------------------
+--
+-- A dragon surround around the level badge, in the client's own artwork.
+--
+-- THE CLIENT HAS THIS FEATURE AND THIS FLAVOUR SWITCHES IT OFF.
+-- NamePlateClassificationFrameMixin picks an elite, rare or rare-elite atlas from
+-- UnitClassification and draws it on the plate; Camelot closes both of its gates on
+-- purpose -- showClassificationIndicator = false in
+-- Blizzard_NamePlates/Camelot/Blizzard_NamePlateFrameOptionsOverrides.lua:1, and the
+-- settings checkbox hidden in Blizzard_SettingsDefinitions_Frame/Camelot/
+-- NameplatesOverrides.lua:20 with the comment "Nameplates don't show Rarity icons in
+-- Camelot so this option is not needed". Opening either means writing a Blizzard
+-- global table that their plate driver then reads, which rule 2 forbids. So the ring
+-- is ours, and Phase 15's guild label is the shape it follows: a pooled frame under
+-- UIParent, anchored to a plate sub-frame, released on untrack.
+--
+-- THE ARTWORK IS VERIFIED BY USE, not by name. The three atlases are the ones
+-- Blizzard_UnitFrame/Camelot/TargetFrameUtils.lua:9-19 hands to
+-- Mainline/TargetFrame.lua:423 every time the player targets an elite. Atlas
+-- membership cannot be read from the UI export, so each tier is probed once per UI
+-- load through C_Texture.GetAtlasInfo (MayReturnNothing) and a tier that does not
+-- resolve draws NOTHING -- never another tier's art, because a silver dragon on an
+-- elite is a wrong answer and no ring is an honest one.
+--
+-- SIZED FROM THE BADGE'S WIDTH, deliberately. Build 70450 re-anchored the badge to
+-- the health bar's top and bottom (Camelot/Blizzard_NamePlateLevelFrame.xml), so its
+-- HEIGHT now follows the bar -- and Phase 14's slider writes that bar's height. The
+-- width still comes from SetSize (Blizzard_NamePlateUnitFrame.lua:239), which is the
+-- one dimension our own writes cannot move, so a ring sized from it never needs
+-- re-measuring on the hot path.
+
+local RARITY_TIER = ns.RARITY_TIER
+
+local function ensureRingPool()
+    if state.ringPool then
+        return state.ringPool
+    end
+    state.ringPool = ns.FramePool.Create({
+        poolName = "rarityRings",
+        capacity = ns.RARITY_RING_POOL_CAPACITY,
+        dropPolicy = ns.DROP_POLICY.SURFACE_AND_FAIL,
+        factory = function()
+            -- UIParent, never the plate: rule 6, and the same SmartNavigation
+            -- reason the guild label records.
+            local frame = CreateFrame("Frame", nil, _G.UIParent)
+            frame:EnableMouse(false)
+            if frame.SetFrameStrata then
+                pcall(frame.SetFrameStrata, frame, ns.RARITY_RING_STRATA)
+            end
+            local texture = frame:CreateTexture(nil, "OVERLAY")
+            texture:SetAllPoints(frame)
+            frame.texture = texture
+            frame:Hide()
+            return frame
+        end,
+        reset = function(frame)
+            frame:Hide()
+            frame:ClearAllPoints()
+        end,
+    })
+    return state.ringPool
+end
+
+-- One tier's artwork, resolved once per UI load.
+--
+-- SetAtlas reports nothing -- no return value, SecretArguments = AllowedWhenTainted
+-- (SimpleTextureBaseAPIDocumentation.lua:368) -- so it cannot refuse the way Phase
+-- 18's SetFont did and "did not raise" is all it would tell us. Existence is
+-- therefore established here, before anything is drawn.
+local function resolveRingArt(tier)
+    local cached = state.ringArt[tier]
+    if cached ~= nil then
+        return cached ~= false and cached or nil
+    end
+
+    local atlas = ns.RARITY_RING_ATLAS[tier]
+    local info = _G.C_Texture and _G.C_Texture.GetAtlasInfo
+    if type(atlas) ~= "string" or type(info) ~= "function" then
+        state.ringArt[tier] = false
+        bump(state.counters, "ringArtMissing")
+        ns.Log.Once("plates:ringatlas:" .. tostring(tier), format(
+            "this client has no atlas reader, so %s nameplates get no ring", tostring(tier)))
+        return nil
+    end
+
+    local kind, atlasInfo = ClientRead.Call(info, "table", atlas)
+    local width, height
+    if kind == PLAIN then
+        local widthKind, widthValue = ClientRead.Field(atlasInfo, "width", "number")
+        local heightKind, heightValue = ClientRead.Field(atlasInfo, "height", "number")
+        width = widthKind == PLAIN and widthValue or nil
+        height = heightKind == PLAIN and heightValue or nil
+    end
+    if kind ~= PLAIN or not width or width <= 0 then
+        state.ringArt[tier] = false
+        bump(state.counters, "ringArtMissing")
+        ns.Log.Once("plates:ringatlas:" .. tostring(tier), format(
+            "this client does not carry the %s nameplate ring artwork (%s), so those plates get no ring",
+            tostring(tier), atlas))
+        return nil
+    end
+
+    -- A readable width with an unusable height is still art: it is drawn square.
+    local aspect = (height and height > 0) and (height / width) or ns.RARITY_RING_ASPECT_FALLBACK
+    local art = { atlas = atlas, aspect = aspect }
+    state.ringArt[tier] = art
+    return art
+end
+
+-- The unit's tier, read ONCE per plate attach and cached on the record.
+--
+-- UnitIsBossMob first, then the classification, which is the precedence Camelot's
+-- own target frame uses. Read unconditionally -- before the rarityRings, map and
+-- attackable gates -- so a plate already on screen has a tier the moment a gate
+-- opens, and so the tier counters measure the world rather than the sweep interval.
+local function readRarityTier(unitToken)
+    if not unitToken then
+        return nil
+    end
+    local bossKind, isBoss = ClientRead.Call(_G.UnitIsBossMob, "boolean", unitToken)
+    if bossKind == PLAIN and isBoss then
+        return RARITY_TIER.BOSS
+    end
+    local classKind, classification = ClientRead.Call(UnitClassification, "string", unitToken)
+    if classKind ~= PLAIN then
+        if classKind == WITHHELD then
+            bump(state.counters, "classificationWithheld")
+        end
+        return nil
+    end
+    return ns.RARITY_TIER_FOR_CLASSIFICATION[classification]
+end
+
+local function releaseRarityRing(plate)
+    if not plate.rarityRing then
+        return
+    end
+    ns.FramePool.Release(state.ringPool, plate.rarityRing)
+    plate.rarityRing = nil
+    state.ringCount = state.ringCount - 1
+end
+
+local function releaseAllRarityRings()
+    if not state.ringPool then
+        return
+    end
+    for _, plate in pairs(state.plates) do
+        releaseRarityRing(plate)
+    end
+end
+
+-- Whether a ring may be drawn at all on this map (D3).
+--
+-- Not a secrecy stand-down: UnitClassification carries no SecretWhen*Restricted
+-- flag, so the tier is readable in a dungeon. It is a product decision -- in a
+-- dungeon nearly every mob is elite and a ring on every plate says nothing -- and
+-- Unreadable stands down too, which rule 10 requires and which is also the quiet
+-- answer here.
+local function ringsAllowedHere()
+    return ns.MapRestriction.Read() == ns.MapRestriction.UNRESTRICTED
+end
+
+-- Sizes and places one plate's ring on its level badge, or releases it.
+local function applyRarityRing(plate)
+    if not state.rarityRings then
+        releaseRarityRing(plate)
+        return RING.NOT_RANKED
+    end
+    if not state.ringsAllowed then
+        releaseRarityRing(plate)
+        return RING.STOOD_DOWN
+    end
+    if not plate.rarityTier then
+        releaseRarityRing(plate)
+        return RING.NOT_RANKED
+    end
+
+    local attackKind, attackable = ClientRead.Call(UnitCanAttack, "boolean", "player", plate.unitToken)
+    if attackKind ~= PLAIN or not attackable then
+        releaseRarityRing(plate)
+        return RING.NOT_RANKED
+    end
+
+    local art = resolveRingArt(plate.rarityTier)
+    if not art then
+        releaseRarityRing(plate)
+        return RING.NOT_RANKED
+    end
+
+    local badge = plate.levelBadge
+    if not badge then
+        releaseRarityRing(plate)
+        bump(state.counters, "ringBadgeMissing")
+        return RING.NO_BADGE
+    end
+    local shownKind, shown = ClientRead.Call(badge.IsShown, "boolean", badge)
+    if shownKind == PLAIN and shown == false then
+        releaseRarityRing(plate)
+        bump(state.counters, "ringBadgeHidden")
+        return RING.NO_BADGE
+    end
+
+    local placement = RING.PLACED
+    local widthKind, badgeWidth = ClientRead.Call(badge.GetWidth, "number", badge)
+    if widthKind ~= PLAIN or not badgeWidth or badgeWidth <= 0 then
+        badgeWidth = ns.LEVEL_INDICATOR_WIDTH_FALLBACK
+        bump(state.counters, "ringBadgeUnmeasured")
+        placement = RING.BADGE_UNMEASURED
+    end
+
+    local ring = plate.rarityRing
+    if not ring then
+        local acquired, poolError = ns.FramePool.Acquire(ensureRingPool())
+        if not acquired then
+            bump(state.counters, "ringPoolExhausted")
+            ns.Log.OnceError("plates:ringpool", format(
+                "the nameplate ring pool was exhausted (%s); the cap is wrong",
+                tostring(poolError)))
+            return RING.NOT_RANKED
+        end
+        ring = acquired
+        plate.rarityRing = ring
+        state.ringCount = state.ringCount + 1
+        -- Counted on acquisition, not on every placement: the sweep re-places every
+        -- ring it finds, so a per-placement counter would measure the sweep interval.
+        bump(state.counters, "ringsDrawn")
+    end
+
+    -- Square from the badge's WIDTH, so the badge sits inside the dragon (D5). The
+    -- art's own aspect keeps the scaling uniform; the offsets are plain screen
+    -- pixels, undivided, because this is SetSize and not SetScale.
+    local width = badgeWidth * ns.RARITY_RING_WIDTH_FACTOR * state.rarityRingSize
+    ring:SetSize(width, width * art.aspect)
+    ring.texture:SetAtlas(art.atlas)
+    ring:ClearAllPoints()
+    ring:SetPoint("CENTER", badge, "CENTER",
+        state.rarityRingOffsetX, state.rarityRingOffsetY)
+    ring:Show()
+    return placement
+end
+
+-- Phase 19. The ring's map gate, re-read where the map can have changed. Read on
+-- demand would be a client call per plate per sweep for a value that changes only
+-- with the map.
+local function refreshRingsAllowed()
+    local allowed = ringsAllowedHere()
+    if allowed == state.ringsAllowed then
+        return false
+    end
+    state.ringsAllowed = allowed
+    if not allowed then
+        bump(state.counters, "ringStoodDown")
+        ns.Log.Once("plates:ringsoff",
+            "rare and elite rings are off here: this map restricts addons, where nearly every monster is elite")
+    end
+    for _, plate in pairs(state.plates) do
+        applyRarityRing(plate)
+    end
+    return true
+end
+
 -- Lifecycle -------------------------------------------------------------------
 
 local function untrackPlate(frame)
@@ -767,6 +1065,10 @@ local function untrackPlate(frame)
     -- a recycled plate would show the previous unit's guild.
     releaseGuildLabel(plate)
     plate.guild = nil
+    -- Phase 19. Same moment and same reason: a ring left on a recycled plate would
+    -- give the next unit the previous unit's rank.
+    releaseRarityRing(plate)
+    plate.rarityTier = nil
     -- Phase 17 section 4.1. Same moment and same reason as the guild label: a
     -- marker left on a recycled plate would sit over the wrong mob.
     if ns.QuestMarkers then
@@ -794,18 +1096,28 @@ local function trackPlate(unitToken)
         untrackPlate(frame)
     end
 
-    local unitFrame, healthBar, container = resolveParts(frame)
+    local unitFrame, healthBar, container, levelBadge = resolveParts(frame)
     local plate = {
         frame = frame,
         unitFrame = unitFrame,
         healthBar = healthBar,
         container = container,
+        levelBadge = levelBadge,
         unitToken = unitToken,
         scope = classifyScope(unitToken, frame),
         styleApplied = false,
         lastVerdict = nil,
         desiredColour = nil,
+        -- Phase 19 section 4.6: read once, here, and unconditionally -- before the
+        -- feature, map and attackable gates -- so a plate already on screen has a
+        -- tier the moment one of those gates opens.
+        rarityTier = nil,
+        rarityRing = nil,
     }
+    plate.rarityTier = readRarityTier(unitToken)
+    if plate.rarityTier then
+        bump(state.counters, "ringTier" .. plate.rarityTier)
+    end
 
     state.plates[frame] = plate
     if unitFrame then
@@ -826,6 +1138,10 @@ local function trackPlate(unitToken)
     -- every player's plate, friendly or hostile, and NPCs are excluded by having
     -- no guild rather than by scope.
     applyGuild(plate)
+    -- Phase 19, outside it for a sharper reason: a neutral elite is SCOPE.OUT by
+    -- classifyScope's own definition -- it classifies for the COLOUR feature, from a
+    -- damage dealer's point of view -- and is still attackable and still elite.
+    applyRarityRing(plate)
 
     if plate.scope == SCOPE.UNREACHABLE then
         ns.Log.Once("plates:unreachable",
@@ -862,6 +1178,11 @@ local function rescopePlate(plate)
     elseif wasIn then
         unstylePlate(plate)
     end
+
+    -- Phase 19. Scope moved because UnitCanAttack moved, which is the ring's own
+    -- gate D: a unit that stops being attackable while its plate is up must lose
+    -- its ring here rather than at NAME_PLATE_UNIT_REMOVED.
+    applyRarityRing(plate)
 end
 
 local function sweepStalePlates()
@@ -1006,6 +1327,17 @@ local function sweep()
     state.reassertPending = false
 
     local allies, allyCount = Threat.Allies()
+    -- Phase 19 section 4.6. The ring pass is outside the scope filter below, and
+    -- before it: the badge may have been re-laid out by a style or scale change, and
+    -- a neutral elite is SCOPE.OUT while still deserving a ring. No client read for
+    -- the tier happens here -- that was done once at attach.
+    if state.rarityRings then
+        for _, plate in pairs(state.plates) do
+            if plate.rarityTier then
+                applyRarityRing(plate)
+            end
+        end
+    end
     for _, plate in pairs(state.plates) do
         if plate.scope == SCOPE.IN then
             local ok, fault = ns.Isolation.Call(paintPlate, plate, allies, allyCount)
@@ -1024,6 +1356,9 @@ local function sweep()
     end
     if state.sweepCount % ns.RESTRICTION_SAMPLE_EVERY == 0 then
         sampleRestrictedMap()
+        -- Phase 19: the same cadence, and for the same reason -- the map changes
+        -- rarely and a per-plate read would be a client call per plate per sweep.
+        refreshRingsAllowed()
     end
 end
 
@@ -1148,6 +1483,7 @@ end
 
 local function onEnteringWorld()
     sweepStalePlates()
+    refreshRingsAllowed()
 end
 
 local SIGNALS = {
@@ -1201,6 +1537,9 @@ local function enable(config)
     end
 
     state.enabled = true
+    -- Before any plate is adopted, so the first ring decision is made against a
+    -- read map rather than against the default.
+    state.ringsAllowed = ringsAllowedHere()
 
     -- Adopt plates already on screen: enabling mid-session must not wait for the
     -- next spawn.
@@ -1236,6 +1575,11 @@ local function disable()
     restoreBarHeights()
 
     releaseAllGuildLabels()
+    releaseAllRarityRings()
+    -- The artwork probe is per UI load, not per enable -- but a disable is the
+    -- cheapest moment to let it run again, and three C_Texture reads on the next
+    -- enable are not worth remembering a client that answered oddly once.
+    state.ringArt = {}
 
     for frame in pairs(state.plates) do
         untrackPlate(frame)
@@ -1279,6 +1623,29 @@ local function onConfigChanged(config, changedKey)
 
     if changedKey == "guildFontSize" then
         applyGuildFontSize()
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    -- Phase 19 section 4.6. The toggle is the branch that matters: off releases
+    -- every ring, on places one on every tracked plate that passes the gates. The
+    -- three sliders re-place what is already on screen.
+    if changedKey == "rarityRings" then
+        if state.rarityRings then
+            state.ringsAllowed = ringsAllowedHere()
+            for _, plate in pairs(state.plates) do
+                applyRarityRing(plate)
+            end
+        else
+            releaseAllRarityRings()
+        end
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    if changedKey == "rarityRingSize" or changedKey == "rarityRingOffsetX"
+        or changedKey == "rarityRingOffsetY" then
+        for _, plate in pairs(state.plates) do
+            applyRarityRing(plate)
+        end
         return ns.CONFIG_RESULT.APPLIED
     end
 
@@ -1339,6 +1706,12 @@ defaultSettings.barHeightFraction = 1.0
 -- Phase 15: off by default, because it puts text on every player's nameplate.
 defaultSettings.guildNames = false
 defaultSettings.guildFontSize = ns.GUILD_FONT_DEFAULT
+-- Phase 19: on by default. Unlike the guild label this adds no text and appears
+-- only on the monsters whose rank is worth knowing before you pull them.
+defaultSettings.rarityRings = true
+defaultSettings.rarityRingSize = 1.0
+defaultSettings.rarityRingOffsetX = 0
+defaultSettings.rarityRingOffsetY = 0
 
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
@@ -1376,8 +1749,31 @@ ns.Registry.Register(FEATURE_ID, {
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = ns.GUILD_FONT_MINIMUM, maximum = ns.GUILD_FONT_MAXIMUM, step = 1,
         },
+        -- Phase 19. The three sliders sit under the toggle in the order a player
+        -- scans them, and none of the labels says "dragon": the artwork is the
+        -- game's own and may be a star or a skull on another flavour.
+        rarityRings = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Rare and elite rings", order = 5,
+            description = "The game's own target-frame surround around the level badge: gold for an elite, silver for a rare or rare-elite, winged gold for a boss. Only on monsters you can attack, and off in dungeons and raids where nearly everything is elite.",
+        },
+        rarityRingSize = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring size", order = 6,
+            unit = ns.ConfigSchema.UNIT.FRACTION,
+            minimum = ns.RARITY_RING_SIZE_MINIMUM, maximum = ns.RARITY_RING_SIZE_MAXIMUM,
+            step = ns.RARITY_RING_SIZE_STEP,
+        },
+        rarityRingOffsetX = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring offset, left and right", order = 7,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = -ns.RARITY_RING_OFFSET_LIMIT, maximum = ns.RARITY_RING_OFFSET_LIMIT, step = 1,
+        },
+        rarityRingOffsetY = {
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring offset, up and down", order = 8,
+            unit = ns.ConfigSchema.UNIT.PIXELS,
+            minimum = -ns.RARITY_RING_OFFSET_LIMIT, maximum = ns.RARITY_RING_OFFSET_LIMIT, step = 1,
+        },
         yieldSelectedTarget = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 5,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 9,
             description = "Stops contesting the bar colour on the unit you have selected. Turn this on if that plate flickers.",
         },
         colourOnPlayer = {
@@ -1490,6 +1886,45 @@ ns.Nameplates = {
             -- that will not accept the OUTLINE flag shows up.
             guildOutlined = counters.guildOutlined or 0,
             guildOutlineFallbacks = counters.guildOutlineFallbacks or 0,
+            -- Phase 19 section 7.
+            rarityRings = state.rarityRings,
+            rarityRingSize = state.rarityRingSize,
+            rarityRingOffsetX = state.rarityRingOffsetX,
+            rarityRingOffsetY = state.rarityRingOffsetY,
+            ringsAllowed = state.ringsAllowed,
+            ringsDrawnNow = state.ringCount,
+            ringsByTier = (function()
+                local byTier = { Boss = 0, Silver = 0, Gold = 0 }
+                for _, plate in pairs(state.plates) do
+                    if plate.rarityRing and plate.rarityTier then
+                        byTier[plate.rarityTier] = (byTier[plate.rarityTier] or 0) + 1
+                    end
+                end
+                return byTier
+            end)(),
+            ringArt = (function()
+                local resolved = {}
+                for _, tier in pairs(ns.RARITY_TIER) do
+                    local art = state.ringArt[tier]
+                    resolved[tier] = (art == nil and "unprobed")
+                        or (art == false and "missing") or "ok"
+                end
+                return resolved
+            end)(),
+            ringTiersSeen = {
+                Boss = counters.ringTierBoss or 0,
+                Silver = counters.ringTierSilver or 0,
+                Gold = counters.ringTierGold or 0,
+            },
+            ringsDrawn = counters.ringsDrawn or 0,
+            ringArtMissing = counters.ringArtMissing or 0,
+            ringBadgeMissing = counters.ringBadgeMissing or 0,
+            ringBadgeHidden = counters.ringBadgeHidden or 0,
+            ringBadgeUnmeasured = counters.ringBadgeUnmeasured or 0,
+            ringStoodDown = counters.ringStoodDown or 0,
+            ringPoolExhausted = counters.ringPoolExhausted or 0,
+            ringPoolCapacity = ns.RARITY_RING_POOL_CAPACITY,
+            classificationWithheld = counters.classificationWithheld or 0,
             barHeightWrites = counters.barHeightWrites or 0,
             barHeightUnchanged = counters.barHeightUnchanged or 0,
             barHeightBaseWithheld = counters.barHeightBaseWithheld or 0,

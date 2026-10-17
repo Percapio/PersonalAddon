@@ -516,3 +516,54 @@ statement = "The Gamepad UI owns the soft-target tooltip CVars and sets them to 
 source = "Phase 18 section 4.2"
 consequence = "The one premise here whose breaking is good news. If the Gamepad UI stops disabling the soft-target tooltip, section 4.2's reason for rejecting the CVar route weakens and the route is worth re-examining. Sections 4.1 and 4.3 would still stand, so re-read all of section 4 rather than reinstating the feature"
 check = { kind = "Pattern", file = "Blizzard_Gamepad/Core.lua", regex = 'SetupTempCVar\("SoftTargetTooltipEnemy", 0\);\s*\n\s*SetupTempCVar\("SoftTargetTooltipFriend", 0\);', expect = "Present" }
+
+# Phase 19 (Architecture/20261016-Phase19.md section 8) ---------------------------------
+
+[[premise]]
+id = "LEVEL-BADGE-FRAME"
+statement = "The nameplate level badge hangs off the unit frame as PlayerLevelDiffFrame"
+source = "Phase 19 section 4.1"
+consequence = "There is nothing for the rare/elite ring to encircle; resolveParts answers nil, the ring stands down and says so once (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlates.xml", regex = 'parentKey="PlayerLevelDiffFrame"', expect = "Present" }
+
+[[premise]]
+id = "LEVEL-BADGE-ANCHORED-TO-BAR"
+statement = "The level badge's height follows the health bar, and its width does not"
+source = "Phase 19 section 4.2"
+consequence = "The premise build 70450 moved: the badge was re-anchored from one LEFT point on the container to the bar's top and bottom. If it goes back to a fixed size the ring still works, because it is sized from the WIDTH, but the spill above and below the bar changes. Re-read section 4.2 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Camelot/Blizzard_NamePlateLevelFrame.xml", regex = 'point="TOPLEFT" relativeKey="\$parent\.HealthBarsContainer\.healthBar"[\s\S]{0,200}?point="BOTTOMLEFT" relativeKey="\$parent\.HealthBarsContainer\.healthBar"', expect = "Present" }
+
+[[premise]]
+id = "LEVEL-INDICATOR-WIDTH"
+statement = "The level badge's width is a constant times the classification scale"
+source = "Phase 19 section 4.4"
+consequence = "LEVEL_INDICATOR_WIDTH_FALLBACK is wrong. Only the arm where the badge's own GetWidth did not answer is affected, and it is counted as ringBadgeUnmeasured (Core/Constants.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlates.lua", regex = 'function GetLevelIndicatorWidth\(namePlateScale\)\s*\n\s*return NamePlateConstants\.LEVEL_INDICATOR_WIDTH \* namePlateScale\.classification', expect = "Present" }
+
+[[premise]]
+id = "RARITY-ICON-OFF-IN-CAMELOT"
+statement = "This flavour does not draw its own nameplate rarity icon"
+source = "Phase 19 sections 1.3 and 4.1"
+consequence = "The one premise here whose breaking is good news, and it is not a licence to delete ours: if Blizzard turns their classification indicator back on, OUR ring duplicates it and section 4 should be reconsidered rather than re-anchored. Their icon sits beside the raid-target frame, not on the level badge, so the two would both be visible (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Camelot/Blizzard_NamePlateFrameOptionsOverrides.lua", regex = 'NamePlateEnemyFrameOptions\.showClassificationIndicator = false', expect = "Present" }
+
+[[premise]]
+id = "BOSS-PORTRAIT-ATLASES"
+statement = "The three classification atlases are the ones Camelot's target frame sets"
+source = "Phase 19 section 4.3"
+consequence = "The artwork has been renamed. resolveRingArt already fails soft -- it probes with C_Texture.GetAtlasInfo and draws nothing for a tier that does not resolve -- but this catches it at patch time instead of at the next elite (Core/Constants.lua)"
+check = { kind = "Pattern", file = "Blizzard_UnitFrame/Camelot/TargetFrameUtils.lua", regex = 'UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold-Winged[\s\S]{0,400}?UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Silver-Winged[\s\S]{0,200}?UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold"', expect = "Present" }
+
+[[premise]]
+id = "UNITCLASSIFICATION-READABLE"
+statement = "A unit's classification is never secret"
+source = "Phase 19 section 4.5"
+consequence = "The tier read would need the stand-down the quest markers use, and the ring's restricted-map gate would stop being a product decision and become a secrecy one. Features/ThreatPanel.lua's +/r tags depend on the same read (Features/Nameplates.lua, Features/ThreatPanel.lua)"
+check = { kind = "FlagAbsent", entry = "UnitClassification", flag = "SecretWhenUnitIdentityRestricted" }
+
+[[premise]]
+id = "QUEST-OBJECTIVES-CARRY-FINISHED"
+statement = "A quest's objectives come back with a type and a finished flag"
+source = "Phase 19 sections 2.1 and 2.3"
+consequence = "There is no progress signal, so every marker reverts to Phase 17's meaning and markersIgnoreProgress becomes the only behaviour available. Re-read section 2.1 before reaching for the undocumented GetQuestObjectiveInfo (Features/QuestMarkers.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua", regex = 'Name = "QuestObjectiveInfo",[\s\S]{0,400}?\{ Name = "type", Type = "string", Nilable = false \},[\s\S]{0,200}?\{ Name = "finished", Type = "bool", Nilable = false \}', expect = "Present" }

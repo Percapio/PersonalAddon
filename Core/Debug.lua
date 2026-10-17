@@ -252,6 +252,30 @@ local function commandPlates()
             view.barHeightWrites, view.barHeightUnchanged, view.barHeightBaseWithheld,
             view.barHeightCompareWithheld, view.barHeightRefused))
     end
+
+    -- Phase 19 section 7. The art line is the one to read first when no ring
+    -- appears: "missing" means this client does not carry that atlas, which is a
+    -- different problem from no elites being around.
+    if view.rarityRings == false then
+        ns.Log.Info("  rarity rings: off")
+    else
+        local byTier = view.ringsByTier or {}
+        local art = view.ringArt or {}
+        ns.Log.Info(format("  rarity rings: %d drawn (gold=%d silver=%d boss=%d)  art: gold=%s silver=%s boss=%s",
+            view.ringsDrawnNow or 0, byTier.Gold or 0, byTier.Silver or 0, byTier.Boss or 0,
+            tostring(art.Gold), tostring(art.Silver), tostring(art.Boss)))
+        local seen = view.ringTiersSeen or {}
+        ns.Log.Info(format("    tiers seen: gold=%d silver=%d boss=%d  size=%.2f offset=%d,%d",
+            seen.Gold or 0, seen.Silver or 0, seen.Boss or 0,
+            view.rarityRingSize or 1, view.rarityRingOffsetX or 0, view.rarityRingOffsetY or 0))
+        ns.Log.Info(format("    badge: missing=%d hidden=%d unmeasured=%d  pool: %d of %d (exhausted %d)",
+            view.ringBadgeMissing or 0, view.ringBadgeHidden or 0,
+            view.ringBadgeUnmeasured or 0, view.ringsDrawnNow or 0,
+            view.ringPoolCapacity or 0, view.ringPoolExhausted or 0))
+        if view.ringsAllowed == false then
+            ns.Log.Info("    rings are off here: this map restricts addons")
+        end
+    end
     -- Phase 15.
     if view.guildNames then
         ns.Log.Info(format("  guild names: on, size %s; labels %d of %d pooled",
@@ -543,6 +567,23 @@ local function commandQuests()
         ns.Log.Info(format("  plates attached=%d carrying a marker=%d  scale=%.2f offset=%d,%d",
             view.attached or 0, view.markers or 0, view.markerScale or 1,
             view.markerOffsetX or 0, view.markerOffsetY or 0))
+        -- Phase 19 section 7. The objective-types line is in-game check 1: the five
+        -- type strings the pairing compares against are not in the UI export, so
+        -- this is where a wrong table shows itself.
+        local pairing = view.pairing or {}
+        ns.Log.Info(format("  claims: %d on %d NPC ids, %d paired to an objective, %d quest-level",
+            view.claimCount or 0, view.npcCount or 0, view.pairedClaims or 0,
+            (view.claimCount or 0) - (view.pairedClaims or 0)))
+        ns.Log.Info(format("  pairing: paired=%d skipped=%d countMismatch=%d typeContradiction=%d unknownType=%d unreadable=%d",
+            pairing.paired or 0, pairing.skipped or 0, pairing.countMismatch or 0,
+            pairing.typeContradiction or 0, pairing.unknownType or 0, pairing.unreadable or 0))
+        ns.Log.Info("  objective types seen: " .. (#(view.objectiveTypesSeen or {}) > 0
+            and table.concat(view.objectiveTypesSeen, ", ") or "none"))
+        ns.Log.Info(format("  satisfied: %d of %d claims", view.satisfiedClaims or 0,
+            view.claimCount or 0))
+        ns.Log.Info("  meaning: " .. (view.markersIgnoreProgress
+            and "a marker stays until the quest leaves the log (setting)"
+            or "a marker goes when its objective is satisfied"))
         -- The two lists side by side: if a mob you expect a marker on shows up in
         -- "seen" but not in "targets", the quest's objectives are the problem; if it
         -- is in neither, the plate never reached us.
