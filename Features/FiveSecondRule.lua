@@ -12,6 +12,12 @@
 --
 -- Nothing in this file reads a power amount. The only unit call is the power
 -- TYPE, and only its string token is compared.
+--
+-- Phase 20 (Architecture/20261021-Phase20.md section 2): a cast that costs nothing
+-- leaves the window alone. C_Spell.GetSpellPowerCost answers NOTHING for a spell with
+-- no resource cost -- its documented answer, and the one every Blizzard caller treats
+-- as "no cost" -- and this file used to read that as "the client will not say", which
+-- restarted the window on every wand shot, Auto Shot, potion and Hearthstone.
 
 local ADDON_NAME, ns = ...
 
@@ -25,7 +31,7 @@ local FSR_WINDOW = ns.FSR_WINDOW
 -- The spellcast payload and the mana bar's geometry are client values that can be
 -- secret (Phase 9 section 5.2), so they are read through ClientRead.
 local ClientRead = ns.ClientRead
-local PLAIN, WITHHELD = ClientRead.PLAIN, ClientRead.WITHHELD
+local PLAIN, ABSENT, WITHHELD = ClientRead.PLAIN, ClientRead.ABSENT, ClientRead.WITHHELD
 local bump = ns.Diagnostics.Bump
 
 local tracker = {
@@ -40,7 +46,9 @@ local tracker = {
     windowTimer = nil,
     timerGeneration = 0,
     manaUser = true,
+    -- False exactly when this client has no spell cost lookup at all.
     costQueryable = nil,
+    lastUnknownReason = nil,
     lineWidth = 2,
     lineAlpha = 0.9,
     -- This UI load's diagnostics table, bound at enable.
@@ -238,37 +246,105 @@ end
 
 -- Signals --------------------------------------------------------------------
 
--- Returns 1 when the cast cost mana, 0 when it did not, or nil when this client
--- will not say. The whole lookup is protected because the cost may itself be a
--- restricted value, and only the predicate is returned so a protected number
--- never escapes this function.
-local function costsMana(spellId)
-    local getCosts = (C_Spell and C_Spell.GetSpellPowerCost) or _G.GetSpellPowerCost
-    if not getCosts then
-        return nil
+-- What a cast cost (section 2.3). Unknown carries its reason.
+local CAST_COST = { COSTS_MANA = "CostsMana", FREE = "Free", UNKNOWN = "Unknown" }
+local UNKNOWN_REASON = {
+    API_MISSING = "ApiMissing",
+    CALL_FAILED = "CallFailed",
+    WITHHELD = "Withheld",
+    ENTRY_UNREADABLE = "EntryUnreadable",
+}
+local MANA_ENTRY = { NOT_MANA = "NotMana", MANA = "Mana", UNREADABLE = "Unreadable" }
+
+-- No real cost answer has more than a handful of entries; this only bounds the walk
+-- if a client table answers every index.
+local COST_ENTRY_LIMIT = 16
+
+local function costLookup()
+    return (C_Spell and C_Spell.GetSpellPowerCost) or _G.GetSpellPowerCost
+end
+
+-- One cost entry, field by field through ClientRead. Returns the kind and, for MANA,
+-- whether any of its cost is above zero and whether it applies. Applicability is part
+-- of the MANA test, so a hidden aura field is "could not tell", never "free" (audit
+-- finding 3): a non-zero requiredAuraID needs hasRequiredAura to read Plain.
+local function readManaEntry(entry)
+    local typeKind, powerType = ClientRead.Field(entry, "type", "number")
+    if typeKind == WITHHELD then
+        return MANA_ENTRY.UNREADABLE
+    end
+    if typeKind ~= PLAIN or powerType ~= MANA then
+        return MANA_ENTRY.NOT_MANA
+    end
+    local costKind, cost = ClientRead.Field(entry, "cost", "number")
+    local perSecondKind, perSecond = ClientRead.Field(entry, "costPerSec", "number")
+    local auraKind, auraId = ClientRead.Field(entry, "requiredAuraID", "number")
+    if costKind == WITHHELD or perSecondKind == WITHHELD or auraKind == WITHHELD then
+        return MANA_ENTRY.UNREADABLE
+    end
+    local applies = true
+    if auraKind == PLAIN and auraId ~= 0 then
+        local hasKind, has = ClientRead.Field(entry, "hasRequiredAura", "boolean")
+        if hasKind ~= PLAIN then
+            return MANA_ENTRY.UNREADABLE
+        end
+        applies = (has == true)
+    end
+    local positive = ((costKind == PLAIN) and cost > 0)
+        or ((perSecondKind == PLAIN) and perSecond > 0)
+    return MANA_ENTRY.MANA, positive, applies
+end
+
+-- Whether one successful player cast spent mana (section 2.3). Returns the cost and,
+-- for Unknown, the reason. No cost value leaves this function.
+local function classifyCastCost(spellId)
+    local kind, costs = ClientRead.Call(costLookup(), "table", spellId)
+    if kind == ABSENT then
+        -- The documented answer for a spell with no resource cost.
+        return CAST_COST.FREE
+    end
+    if kind ~= PLAIN then
+        if costs == ClientRead.UNAVAILABLE then
+            return CAST_COST.UNKNOWN, UNKNOWN_REASON.API_MISSING
+        end
+        if costs == ClientRead.CALL_FAILED then
+            return CAST_COST.UNKNOWN, UNKNOWN_REASON.CALL_FAILED
+        end
+        return CAST_COST.UNKNOWN, UNKNOWN_REASON.WITHHELD
     end
 
-    local ok, predicate = pcall(function()
-        local costs = getCosts(spellId)
-        if type(costs) ~= "table" then
-            return nil
+    -- A table carrying type or cost at its top level is one entry, the shape the
+    -- pre-Phase-20 code already tolerated; otherwise its array part.
+    local topType = ClientRead.Field(costs, "type", "number")
+    local topCost = ClientRead.Field(costs, "cost", "number")
+    if topType ~= ABSENT or topCost ~= ABSENT then
+        local entryKind, positive, applies = readManaEntry(costs)
+        if entryKind == MANA_ENTRY.UNREADABLE then
+            return CAST_COST.UNKNOWN, UNKNOWN_REASON.ENTRY_UNREADABLE
         end
-        if costs.type ~= nil or costs.cost ~= nil then
-            costs = { costs }
+        if entryKind == MANA_ENTRY.MANA and positive and applies then
+            return CAST_COST.COSTS_MANA
         end
-        for index = 1, #costs do
-            local entry = costs[index]
-            if entry and entry.type == MANA then
-                return ((entry.cost or 0) > 0) and 1 or 0
-            end
-        end
-        return 0
-    end)
-
-    if not ok then
-        return nil
+        return CAST_COST.FREE
     end
-    return predicate
+
+    for index = 1, COST_ENTRY_LIMIT do
+        local slotKind, entry = ClientRead.Field(costs, index, "table")
+        if slotKind == ABSENT then
+            break
+        end
+        if slotKind ~= PLAIN then
+            return CAST_COST.UNKNOWN, UNKNOWN_REASON.ENTRY_UNREADABLE
+        end
+        local entryKind, positive, applies = readManaEntry(entry)
+        if entryKind == MANA_ENTRY.UNREADABLE then
+            return CAST_COST.UNKNOWN, UNKNOWN_REASON.ENTRY_UNREADABLE
+        end
+        if entryKind == MANA_ENTRY.MANA and positive and applies then
+            return CAST_COST.COSTS_MANA
+        end
+    end
+    return CAST_COST.FREE
 end
 
 local function startWindow(now)
@@ -281,8 +357,12 @@ end
 
 -- UNIT_SPELLCAST_SUCCEEDED is SecretWhenUnitSpellCastRestricted: individual spells
 -- can be flagged always secret, even for the player. A withheld unit is not the
--- player's; a withheld spell is treated as costing mana, the same fallback as a
--- cost the client will not report, and counted.
+-- player's. A spell id that is not Plain -- withheld or missing -- restarts the
+-- window, as a cost the client will not report does, and is counted (section 2.4).
+--
+-- Unknown restarts the window too: a line on a cast that was free is a cosmetic
+-- error, and no line on a mana user is a dead feature. What changed in Phase 20 is
+-- that Free now means free.
 local function onSpellcastSucceeded(unit, _, spellId)
     local unitKind, unitToken = ClientRead.Classify(unit, "string")
     if unitKind ~= PLAIN or unitToken ~= "player" then
@@ -296,22 +376,23 @@ local function onSpellcastSucceeded(unit, _, spellId)
         return
     end
 
-    local predicate = costsMana(spell)
-    if predicate == nil then
-        -- A standing client limitation, not an event: it is equally true on every
-        -- cast for the whole session, so announcing it in chat tells the user
-        -- something they cannot act on at a moment they did not ask. Recorded on
-        -- the tracker and reported by /pa fsr, which is where someone goes when
-        -- the indicator looks wrong.
-        tracker.costQueryable = false
-        predicate = 1
-    else
+    local cost, reason = classifyCastCost(spell)
+    if cost == CAST_COST.FREE then
+        bump(tracker.counters, "castsFree")
         tracker.costQueryable = true
+        return
     end
-
-    if predicate > 0 then
+    if cost == CAST_COST.UNKNOWN then
+        bump(tracker.counters, "castsCostUnknown")
+        tracker.lastUnknownReason = reason
+        -- A missing lookup is a standing client fact; a per-cast failure is not.
+        tracker.costQueryable = (reason ~= UNKNOWN_REASON.API_MISSING)
         startWindow(GetTime())
+        return
     end
+    bump(tracker.counters, "castsCostingMana")
+    tracker.costQueryable = true
+    startWindow(GetTime())
 end
 
 local function onDisplayPower(unit)
@@ -459,8 +540,13 @@ ns.FiveSecondRule = {
             windowRemaining = max(0, tracker.windowEndsAt - now),
             manaUser = tracker.manaUser,
             costQueryable = tracker.costQueryable,
+            lastUnknownReason = tracker.lastUnknownReason,
             withheldSpellIds = tracker.counters.withheldSpellIds or 0,
             withheldBarGeometry = tracker.counters.withheldBarGeometry or 0,
+            castsCostingMana = tracker.counters.castsCostingMana or 0,
+            castsFree = tracker.counters.castsFree or 0,
+            castsCostUnknown = tracker.counters.castsCostUnknown or 0,
+            windowStartedAt = tracker.windowStartedAt,
         }
     end,
 }

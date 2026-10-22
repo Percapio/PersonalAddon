@@ -567,3 +567,92 @@ statement = "A quest's objectives come back with a type and a finished flag"
 source = "Phase 19 sections 2.1 and 2.3"
 consequence = "There is no progress signal, so every marker reverts to Phase 17's meaning and markersIgnoreProgress becomes the only behaviour available. Re-read section 2.1 before reaching for the undocumented GetQuestObjectiveInfo (Features/QuestMarkers.lua)"
 check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua", regex = 'Name = "QuestObjectiveInfo",[\s\S]{0,400}?\{ Name = "type", Type = "string", Nilable = false \},[\s\S]{0,200}?\{ Name = "finished", Type = "bool", Nilable = false \}', expect = "Present" }
+
+# Phase 20 (Architecture/20261021-Phase20.md section 12). Premises 75-86.
+#
+# Nothing here is about QuestieDB's subName, for Phase 17's reason: it is third-party,
+# and the bridge's gates check it at run time.
+
+[[premise]]
+id = "SPELL-COST-NIL-IS-FREE"
+statement = "C_Spell.GetSpellPowerCost answers nothing for a spell with no resource cost"
+source = "Phase 20 sections 2.2 and 2.3"
+consequence = "Section 2's Absent-is-Free arm may be wrong: a nil could now mean the client refused, and a wand shot would be counted free when the client simply would not say. Re-read section 2.3 (Features/FiveSecondRule.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua", regex = 'Name = "GetSpellPowerCost",[\s\S]{0,80}?MayReturnNothing = true,[\s\S]{0,400}?has no resource costs', expect = "Present" }
+
+[[premise]]
+id = "SPELL-COST-ENTRY-FIELDS"
+statement = "A spell cost entry carries type, cost, costPerSec, requiredAuraID and hasRequiredAura"
+source = "Phase 20 section 2.3"
+consequence = "Entries read Unreadable and every cast reads Unknown, which restarts the window: Phase 1's over-reporting, never silence. castsCostUnknown climbs (Features/FiveSecondRule.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/SpellSharedDocumentation.lua", regex = 'Name = "SpellPowerCostInfo",[\s\S]{0,300}?Name = "type"[\s\S]{0,300}?Name = "cost"[\s\S]{0,1200}?Name = "costPerSec"[\s\S]{0,500}?Name = "requiredAuraID"[\s\S]{0,400}?Name = "hasRequiredAura"', expect = "Present" }
+
+[[premise]]
+id = "GETMONEY-READABLE"
+statement = "The player's money is never secret"
+source = "Phase 20 section 6.3"
+consequence = "Visits cannot be measured: every visit finalizes as visitMoneyUnreadable and a held junk sale shows on its own (Features/Toasts.lua)"
+check = { kind = "FlagAbsent", entry = "GetMoney", flag = "SecretReturns" }
+
+[[premise]]
+id = "MERCHANT-INTERACTION-READABLE"
+statement = "Whether a merchant interaction is open is never secret"
+source = "Phase 20 section 6.3"
+consequence = "Visits end only at the 600-second cap. Auto-sell's atMerchant compares the answer with == true outside its pcall, so on a secret it raises and the sale faults the feature (Features/Toasts.lua, Features/AutoSellJunk.lua)"
+check = { kind = "FlagAbsent", entry = "C_PlayerInteractionManager.IsInteractingWithNpcOfType", flag = "SecretReturns" }
+
+[[premise]]
+id = "MERCHANT-FRAME"
+statement = "The merchant panel opens through the interaction manager and closes through CloseMerchant on hide"
+source = "Phase 20 section 6.7"
+consequence = "Re-read Phase 8 section 4.4's classification of MERCHANT_SHOW before trusting the subscription auto-sell and Toasts now share (Features/Toasts.lua, Features/AutoSellJunk.lua)"
+check = { kind = "Watch", files = ["Blizzard_UIPanels_Game/Mainline/MerchantFrame.lua"] }
+
+[[premise]]
+id = "PLATE-NAME-JUSTIFY-FROM-OPTIONS"
+statement = "Above the bar, a nameplate name's alignment comes from nameJustificationWhenAboveHealthBar"
+source = "Phase 20 sections 8.1 and 8.5"
+consequence = "restoreNameAlignment writes back a value Blizzard no longer uses; its next layout pass corrects it, so the cost is one frame. Re-read section 8.5 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua", regex = 'self\.name:SetJustifyH\(setupOptions\.nameJustificationWhenAboveHealthBar\)', expect = "Present" }
+
+[[premise]]
+id = "PLATE-NAME-CENTRED-IN-CAMELOT"
+statement = "This flavour centres the nameplate name above the bar"
+source = "Phase 20 section 8.1"
+consequence = "Good news, and not a licence to keep writing: if Blizzard left-aligns the name itself, nameAlignLeft is redundant and should be retired rather than kept (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Camelot/Blizzard_NamePlateFrameOptionsOverrides.lua", regex = 'nameJustificationWhenAboveHealthBar = "CENTER"', expect = "Present" }
+
+[[premise]]
+id = "PLATE-NAME-ANCHOR-STYLE"
+statement = "A nameplate name's layout follows unitNameAnchorStyle, which the Style sets"
+source = "Phase 20 section 8.2"
+consequence = "Eligibility reads a field nothing sets, and every plate is skipped as StyleUnreadable: the setting goes quiet rather than wrong (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlates.lua", regex = 'NamePlateSetupOptions\.unitNameAnchorStyle = GetUnitNameAnchorStyle\(namePlateStyle\)', expect = "Present" }
+
+[[premise]]
+id = "PLATE-FRIENDLY-TEST"
+statement = "Blizzard treats a nameplate as friendly when UnitIsFriend answers true for the player and the unit"
+source = "Phase 20 section 7.2"
+consequence = "Our friendly stops matching Blizzard's friendly plates, so roles may show on plates drawn as hostile or be missing from ones drawn as friendly. Re-read section 7.2 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateBase.lua", regex = 'if UnitIsFriend\("player", self\.unitToken\)', expect = "Present" }
+
+[[premise]]
+id = "UNIT-IS-FRIEND-READABLE"
+statement = "Friendliness is not secret by unit identity"
+source = "Phase 20 sections 7.2 and 7.6"
+consequence = "Roles read Withheld wherever identity is restricted and roleReadsWithheld climbs; nothing is mislabelled (Features/Nameplates.lua)"
+check = { kind = "FlagAbsent", entry = "UnitIsFriend", flag = "SecretWhenUnitIdentityRestricted" }
+
+[[premise]]
+id = "OFFSCREEN-OPTION-PRESENT"
+statement = "Options, Nameplates offers Offscreen Nameplates"
+source = "Phase 20 section 4"
+consequence = "README's threat-panel advice names an option that is gone (README.md)"
+check = { kind = "Pattern", file = "Blizzard_SettingsDefinitions_Frame/Nameplates.lua", regex = 'Settings\.SetupCVarCheckbox\(category, "nameplateShowOffscreen"', expect = "Present" }
+
+[[premise]]
+id = "CLEANUP-BAGS-IS-SORTBAGS"
+statement = "The bag menu's Clean Up Bags runs C_Container.SortBags"
+source = "Phase 20 section 5"
+consequence = "README's claim that tidy bags runs the game's own Clean Up Bags, and so leaves an Ignore Cleanup bag alone, is wrong (README.md, Features/AutoSortBags.lua)"
+check = { kind = "Pattern", file = "Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua", regex = 'CreateButton\(BAG_CLEANUP_BAGS, function\(\)\s*\n\s*C_Container\.SortBags\(\);', expect = "Present" }

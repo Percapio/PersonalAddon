@@ -62,9 +62,9 @@ Combat modules provide low-overhead combat telemetry while respecting Blizzard's
 | ![Damage Breakdown HUD](Images/Screenshot%202026-10-11%20223253.png) | ![Combat Settings](Images/combat.png) |
 | *Damage breakdown anchored above player unit frame with spell icons, DPS, and relative contribution.* | *Fine-grained controls for Five-Second Rule indicator, damage meters, and threat rows.* |
 
-- **Damage Breakdown:** Renders active combat contributions (spells, icons, raw damage, and percentage share) directly above the player frame. Reads Blizzard's internal meter rather than processing combat log text strings.
+- **Damage Breakdown:** Renders the last fight's damage by spell directly above the player frame: a header with the fight's length and DPS, then each spell's icon, DPS, and share, with shares that always add up to 100%. Reads Blizzard's internal meter rather than processing combat log text strings.
 - **Threat Panel:** Displays attacking mobs, current threat margins, target markers, and health bars in the same HUD anchor during encounters.
-- **Five-Second Rule (FSR):** Smooth status sweep texture mapped across the mana bar tracking spirit regeneration windows for casters.
+- **Five-Second Rule (FSR):** Smooth status sweep texture mapped across the mana bar tracking spirit regeneration windows for casters. Only a cast that spends mana starts it; wand shots, Auto Shot, and potions leave it alone.
 - **Implementations:** [`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua), [`Features/ThreatPanel.lua`](Features/ThreatPanel.lua), and [`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua).
 
 ---
@@ -80,6 +80,8 @@ Custom nameplate restyling prioritizes threat accountability, target hierarchy, 
 
 - **Proportional Health Bar Height:** Configured as a fractional percentage (30% to 100%) of the game's base scale to ensure cross-resolution and UI scale consistency.
 - **Guild Names:** Displayed under player health bars in secondary weight with outline filtering and full escape-code neutralization ([`Core/EscapeGuard.lua`](Core/EscapeGuard.lua)).
+- **NPC Roles:** Friendly NPCs show their role (Innkeeper, Weapon Merchant, Flight Master) in the guild name's place, read from QuestieDB.
+- **Name Alignment:** On the Thin and Cast Focus styles, an option moves each nameplate's name from the middle of the bar to its left end.
 - **Threat-Priority Color Palette:** Six prioritized color states reflecting aggro status, pull proximity, outside taps, and neutral disposition.
 - **Implementation:** [`Features/Nameplates.lua`](Features/Nameplates.lua).
 
@@ -95,9 +97,9 @@ Streamlined inventory management focused on non-disruptive automation and clear 
 | *Geometry and opacity controls for Equipped Skills dock and toast notification triggers.* | *Throttle controls for post-close bag sorting and merchant auto-vend.* |
 
 - **Equipped Skills Panel:** Docks adjacent to open bags displaying weapon skill ranks, defense, and primary professions.
-- **Custom Loot Toasts:** Independent pop-ups for looted currency, uncommon-or-better items, and quest objects without hooking Blizzard's alert frames.
+- **Custom Loot Toasts:** Independent pop-ups for looted currency, uncommon-or-better items, quest objects, and the gold a merchant visit earns you, without hooking Blizzard's alert frames.
 - **Safe Container Sorting:** Automatically executes Clean Up Bags on bag close with a 60-second cooldown lock, verifying no item locks are held.
-- **Auto-Junk Liquidation:** Executes automated grey-item sales upon opening merchant frames with itemized earning toasts.
+- **Auto-Junk Liquidation:** Executes automated grey-item sales upon opening merchant frames, with the proceeds folded into the merchant visit toast.
 - **Implementations:** [`Features/EquippedSkills.lua`](Features/EquippedSkills.lua), [`Features/Toasts.lua`](Features/Toasts.lua), [`Features/AutoSortBags.lua`](Features/AutoSortBags.lua), and [`Features/AutoSellJunk.lua`](Features/AutoSellJunk.lua).
 
 ---
@@ -152,7 +154,21 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 ### Combat
 
 - **Five-Second Rule ([`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua)):**
-  For mana users, a calibrated indicator sweeps across the player mana bar displaying the elapsed time until spirit-based mana regeneration resumes. Recasting resets the sweep. Mana values remain masked by the client, so discrete regeneration ticks cannot be surfaced.
+  For mana users, a calibrated indicator sweeps across the player mana bar displaying the elapsed time until spirit-based mana regeneration resumes. A cast that spends mana restarts the sweep; a cast that costs no mana — a wand shot, Auto Shot, a potion — leaves the sweep alone. Mana values remain masked by the client, so discrete regeneration ticks cannot be surfaced.
+- **Threat Panel HUD ([`Features/ThreatPanel.lua`](Features/ThreatPanel.lua)):**
+  During combat, dynamically summarizes all units engaged with the player or party:
+  - Unit health bar rendered in threat-priority color palette.
+  - Current threat percentage relative to lead target.
+  - Active target identification, level badge, and elite classification.
+  - Automatically hides outside combat. Width, scale, and offset configurable in settings.
+
+  > [!TIP]
+  > **Turn on Options → Nameplates → Offscreen Nameplates.** The panel lists mobs that have a nameplate. Without this option, a mob whose nameplate leaves the screen — behind you, say — drops off the panel while it is still fighting you; with it, the client keeps the plate of anything in combat with you or your group.
+- **Damage Breakdown HUD ([`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua)):**
+  Your damage by spell after each fight: a header with the fight's length and DPS, then icon, DPS, and share. The shares always add up to 100%: a spell that hit several enemies counts once, and spells past the row limit are summed in a final "+N more" row. Directly reads Blizzard's internal damage meter engine to maintain numerical parity. By default hides in combat to yield screen position to the Threat Panel.
+
+### Nameplates
+
 - **Nameplate Threat Colors ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Recolors hostile and neutral nameplates based on tank/damage-dealer threat hierarchy:
 
@@ -168,31 +184,27 @@ All configuration options are accessible in-game via **Options > AddOns > Person
   Red and orange are prioritized for survival; tapped grey never masks an enemy targeting the player. Colors derive from server threat tables, functioning reliably in dungeons and raid instances.
 - **Guild Names on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Draws player guild tags underneath health bars in secondary muted white with black outline shaders. Strings pass through [`Core/EscapeGuard.lua`](Core/EscapeGuard.lua) to strip formatting exploits before drawing.
+- **NPC Roles on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
+  Under the health bar of a friendly NPC, in the guild name's place and at its size: the role its tooltip shows — Innkeeper, Weapon Merchant, Flight Master — read from QuestieDB rather than scraped from the tooltip. "Friendly" is the client's own answer for the character you are playing, so it works the same for Alliance and Horde. Hostile and attackable units never get one, and a unit that turns hostile loses it. Its own switch, off by default; the text passes through [`Core/EscapeGuard.lua`](Core/EscapeGuard.lua) like a guild name. Requires QuestieDB and friendly NPC nameplates enabled. **Nothing is shown in dungeons and raids**, where the client withholds which NPC a unit is.
+- **Names at the Left End of the Bar ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
+  On the Thin and Cast Focus styles the game centres each nameplate's name above the bar; this option moves it to the bar's left end. Only the name's alignment changes and no anchor is moved, which is why a free x-offset is not offered (see [Tried and Not Possible](#tried-and-not-possible)). The Large and Block styles already put the name inside the bar on the left and are left alone, as are name-only plates. The first plate is tested once per session: `/pa plates` shows `capability=Verified` when the client keeps the alignment, and `Refused` or `Unverifiable`, with the setting standing down, when it does not.
 - **Nameplate Health Bar Height ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Scales nameplate bar height from 30% to 100% of Blizzard's base layout, automatically adapting to the player's selected UI Style and Global Scale.
 - **Quest Markers on Nameplates ([`Features/QuestMarkers.lua`](Features/QuestMarkers.lua)):**
   Renders an indicator beside the nameplates of monsters an active quest objective still wants. The marker **clears as soon as that objective is satisfied** — the kill count filled, or enough of the item collected — including on the creatures that drop a quest item rather than only on named kill targets. A setting keeps markers until the quest leaves the log instead, for farming a mob whose objective is already done. Requires QuestieDB and enemy nameplates enabled. **Automatically disabled in dungeons and raids** where the client withholds unit GUIDs to prevent misleading false negatives.
 - **Rare and Elite Rings on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Encircles the nameplate level badge with the client's own target-frame surround: gold for an elite, silver for a rare or rare-elite, winged gold for a world boss. Drawn only on attackable units, and **off in dungeons and raids** where nearly every monster is elite and the ring would carry no information. Size and position are configurable; the artwork is resolved at runtime and the tier simply goes undrawn on a client that does not carry it.
-- **Threat Panel HUD ([`Features/ThreatPanel.lua`](Features/ThreatPanel.lua)):**
-  During combat, dynamically summarizes all units engaged with the player or party:
-  - Unit health bar rendered in threat-priority color palette.
-  - Current threat percentage relative to lead target.
-  - Active target identification, level badge, and elite classification.
-  - Automatically hides outside combat. Width, scale, and offset configurable in settings.
-- **Damage Breakdown HUD ([`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua)):**
-  Displays damage output segmented by ability, including icon, DPS, and relative percentage. Directly reads Blizzard's internal damage meter engine to maintain numerical parity. By default hides in combat to yield screen position to the Threat Panel.
 
 ### Bags & Loot
 
 - **Equipped Skills Panel ([`Features/EquippedSkills.lua`](Features/EquippedSkills.lua)):**
   When bags are open, docks a compact skill summary against the left container frame showing primary profession ranks, equipped weapon skills, and defense as `rank / maximum`.
 - **Custom Toast Alerts ([`Features/Toasts.lua`](Features/Toasts.lua)):**
-  Surfaces popups for looted currency, green-or-better items, and quest objects. Does not trigger for vendor purchases, quest rewards, or crafted items. Screen duration, offset, and categories are configurable.
+  Surfaces popups for looted currency, green-or-better items, and quest objects. When you leave a merchant richer than you arrived, one toast shows the gold gained over the visit — items sold by hand and junk sold automatically alike. The game's own "You gained" chat line still prints. A visit that only bought things shows nothing, and quest rewards and crafted items never trigger a toast. Screen duration, offset, and categories are configurable; "Gold gained at a merchant" switches the visit toast off and brings back a junk sale's own toast.
 - **Automated Bag Consolidation ([`Features/AutoSortBags.lua`](Features/AutoSortBags.lua)):**
-  Executes native `Clean Up Bags` upon closing inventory frames. Throttled to at most once per 60 seconds, blocked in combat, and suspended while item locks or Cooldown Manager updates are active.
+  Executes native `Clean Up Bags` upon closing inventory frames. It is `C_Container.SortBags`, the same call as the bag's Clean Up Bags button, so a bag you set to Ignore Cleanup is left alone. Throttled to at most once per 60 seconds, blocked in combat, and suspended while item locks or Cooldown Manager updates are active.
 - **Junk Liquidation ([`Features/AutoSellJunk.lua`](Features/AutoSellJunk.lua)):**
-  Triggers Blizzard's `Sell All Junk` handler upon interacting with merchant frames without confirmation modals, reporting total proceeds via toast notifications or chat.
+  Triggers Blizzard's `Sell All Junk` handler upon interacting with merchant frames without confirmation modals, reporting total proceeds in the merchant visit toast, or on its own toast when that is switched off (in chat when toasts are off).
 
 ### Consumables
 
@@ -238,11 +250,11 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 | `/pa on <feature>`, `/pa off <feature>` | Toggles specific feature modules on or off |
 | `/pa get <feature>`, `/pa set <feature> <k> <v>` | Reads or updates a specific configuration key |
 | `/pa skills` | Dumps current skills panel layout and tracked values to chat |
-| `/pa toasts`, `/pa toasts test` | Summarizes toast metrics; emits synthetic test toasts across all categories |
+| `/pa toasts`, `/pa toasts test` | Summarizes toast metrics and the merchant visit in progress; emits one synthetic toast of each kind, merchant visit included |
 | `/pa bags`, `/pa vend` | Reports last container sort or vendor event, including skip reasons |
 | `/pa consumables` | Summarizes active consumable bindings and assignment diagnostics |
 | `/pa quests` | Displays QuestieDB bridge status, offered NPC quests, and marker targets |
-| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of damage meter, threat monitor, nameplates, and FSR tracker |
+| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles, name alignment and its capability), and FSR tracker (casts that spent mana, cost nothing, or could not be priced) |
 | `/pa preview [on\|off\|threat\|dps]` | Manages visual adjustment preview mode and toggles active HUD anchor |
 | `/pa panel` | Inspects settings registration tree and category building diagnostics |
 | `/pa blocked` | Outputs protected function refusals attributed to PersonalAddon |
@@ -263,6 +275,11 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Verification:** When this defect triggers, `/pa blocked` displays a call stack passing through Blizzard's `MainActionBarFrame.lua` or `FrameControlsManager.lua` rather than addon source files. Diagnostic counters increment `refusalsOurs` accompanied by `knownDefectHintShown`.
 - **Workaround:** Enter `/reload` in chat. Detailed architectural analysis is documented in [`Architecture/20261002-GAPBugs01.md`](Architecture/20261002-GAPBugs01.md).
 
+### A Mob Vanished from the Threat Panel
+
+- **Mechanism:** The threat panel lists mobs that have a nameplate. When the client removes a plate — the mob is behind you, or off the edge of the screen — its row goes with it, even while the mob is still fighting you.
+- **Fix:** Turn on **Options → Nameplates → Offscreen Nameplates**. With it, the client keeps the plate of anything in combat with you or your group, so the panel keeps the row. PersonalAddon never changes this option itself; it is yours to set. Details in [`Architecture/20261021-Phase20.md`](Architecture/20261021-Phase20.md) §4.
+
 ---
 
 ## What the Game Already Does
@@ -275,7 +292,7 @@ To eliminate redundant execution overhead, PersonalAddon intentionally omits fea
 - Underlying combat damage meter infrastructure (which [`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua) reads directly).
 - Directional strafing/backpedaling angles configured via Options → Gamepad.
 - Container cleanup accessible through the bag Manage menu.
-- Native vendor junk selling and transaction summaries.
+- Native vendor junk selling and transaction summaries, and the "You gained" chat receipt on leaving a merchant (PersonalAddon shows the same figure as a toast).
 
 ---
 
@@ -287,7 +304,7 @@ Architectural decisions and experiments evaluated across development phases and 
 |---|---|---|
 | Scrolling Combat Text | Client combat log restricted for third-party addons; events drop hits intermittently. Replaced with Damage Breakdown HUD | [Phase 4](Architecture/20260919-Phase04.md) §1.1 |
 | Dynamic Camera Pitch | Client accepts CVar mutations but ignores camera pitch parameters under gamepad mode | [Phase 5](Architecture/20260919-Phase05.md) §4.5b |
-| NPC Role Tags on Plates | No API provides NPC roles without scraping localized tooltip lines; nameplate text regions are restricted and cannot be measured | [Phase 15](Architecture/20261010-Phase15.md) §1.3, build 1.60.1.70338 |
+| Nameplate Name Offset | The name's anchors are restricted and unreadable; an offset means re-implementing Blizzard's layout. Alignment ships instead | [Phase 20](Architecture/20261021-Phase20.md) §1.3, build 1.60.1.70450 |
 | Custom Nameplate Bar Width | Nameplate width is governed by opposing layout anchors; modifying width requires re-anchoring Blizzard frames | [Phase 14](Architecture/20261010-Phase14.md) §1.3, build 1.60.1.70334 |
 | Minimalist Unit Frames | Requires modifying protected Blizzard unit frames; FSR indicators anchor cleanly to native mana bars | [Phase 6](Architecture/20260919-Phase06.md) |
 | Level-Sorted Quest Tracker | Re-ordering watches fires tracker updates synchronously inside the call, spreading taint into quest tracking | [Phase 7](Architecture/20260926-Phase07.md) §6.4 |
@@ -355,7 +372,7 @@ The World of Warcraft client evaluates code trust per execution thread. When Bli
 - Chat output routes through `AddMessage`, which enters Blizzard's message history and `FADEFRAMES` list.
 - Settings registration stores control definitions inside Blizzard's Settings tables.
 - The NPC quest tooltip block executes inside Blizzard's tooltip construction callback to ensure correct frame measurement before display ([`Features/NPCQuests.lua`](Features/NPCQuests.lua)).
-- Nameplate restyling post-hooks execute inside Blizzard's draw call to prevent single-frame color flickers ([`Features/Nameplates.lua`](Features/Nameplates.lua)).
+- Nameplate restyling post-hooks execute inside Blizzard's draw call to prevent single-frame color flickers; the bar height and the name's left alignment are re-asserted on the same hooks ([`Features/Nameplates.lua`](Features/Nameplates.lua)).
 
 ### To Trace How Taint Reached a Refusal
 

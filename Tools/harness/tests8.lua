@@ -134,7 +134,10 @@ elseif HARNESS_SESSION == "phase8-noglobals" then
     check("no globals: toasts still enabled", view.enabled)
     check("no globals: loot capture off", view.lootCapture == false)
     check("no globals: names the missing global", view.patternFailure == "LOOT_ITEM_SELF", view.patternFailure)
-    check("no globals: no chat subscriptions", ns.Dispatch.SubscriptionCount("toasts") == 0,
+    -- Phase 20 section 6.7: Toasts subscribes MERCHANT_SHOW BEFORE the loot-pattern
+    -- return, so a client missing a loot string still gets the merchant visit toast.
+    -- That one subscription is all there is: still no chat event.
+    check("no globals: no chat subscriptions", ns.Dispatch.SubscriptionCount("toasts") == 1,
         ns.Dispatch.SubscriptionCount("toasts"))
     local outcomes = ns.Toasts.PostSamples()
     check("no globals: the display still works", outcomes[1] == "Shown" and outcomes[2] == "Shown"
@@ -533,6 +536,11 @@ else
     check("re-enabled by hand", ns.Registry.State("autoSortBags") == "ENABLED")
 
     -- Sell junk (section 7.2) -------------------------------------------------------------
+    -- Phase 20 section 6.8: these checks are Phase 8's path, where a junk sale shows
+    -- its own toast at once. With the merchant visit toast on -- the default -- the
+    -- sale is held into the visit instead, which tests20.lua covers. So this section
+    -- runs with it off, and stands as the regression for the path it describes.
+    slash("set toasts showMerchantGold false")
     local function junkToast()
         for _, toast in ipairs(toastFrames()) do
             local label = toast.label:GetText()

@@ -499,16 +499,20 @@ end
 
 -- The marker (section 4.4) ------------------------------------------------------------
 
+-- The GUID parse is Core/UnitIdentity.lua's since Phase 20 section 9. The second
+-- return keeps its old meaning for attachMarker: Withheld for a GUID the client hid,
+-- nil for anything that simply is not an NPC.
+local IDENTITY = ns.UnitIdentity.READING
+
 local function npcIdForPlate(plate)
-    local kind, guid = ClientRead.Call(_G.UnitGUID, "string", plate.unitToken)
-    if kind ~= ClientRead.PLAIN then
-        return nil, kind
+    local reading, detail = ns.UnitIdentity.NpcIdFor(plate.unitToken)
+    if reading == IDENTITY.RESOLVED then
+        return detail
     end
-    local guidType = guid:match("^(%a+)")
-    if guidType ~= "Creature" and guidType ~= "Vehicle" then
-        return nil
+    if reading == IDENTITY.WITHHELD then
+        return nil, ClientRead.WITHHELD
     end
-    return tonumber(guid:match("-(%d+)-%x+$"))
+    return nil
 end
 
 local function detachMarker(plate)

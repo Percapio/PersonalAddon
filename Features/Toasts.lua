@@ -14,6 +14,14 @@
 -- packets, so no Blizzard Lua raises them inside its own call, and neither is among
 -- the chat events the client makes secret in dungeons and raids (section 3). The
 -- first deliveries of each session check that on the stack (section 6.5).
+--
+-- Phase 20 (Architecture/20261021-Phase20.md section 6): a merchant visit that leaves
+-- you richer ends with one toast for the gold gained -- the arithmetic of Blizzard's
+-- own "You gained" chat receipt. The visit opens a frame after MERCHANT_SHOW, which
+-- the server raises, and ends on a READ of whether a merchant is still open, polled on
+-- our own ticker: MERCHANT_CLOSED and PLAYER_INTERACTION_MANAGER_FRAME_HIDE are raised
+-- inside Blizzard's panel-hide path and are never subscribed. A junk sale posted while
+-- a visit is open is HELD and folded into the visit's toast.
 
 local ADDON_NAME, ns = ...
 
@@ -40,15 +48,26 @@ local KIND = {
     LOOTED_ITEM = "LootedItem",
     LOOTED_MONEY = "LootedMoney",
     JUNK_SOLD = "JunkSold",
+    -- Phase 20 section 6.6. Posted only by this file.
+    MERCHANT_VISIT = "MerchantVisit",
 }
 
 local OUTCOME = {
     SHOWN = "Shown",
     QUEUED = "Queued",
     COALESCED = "Coalesced",
+    -- Phase 20 section 6.5: a junk sale folded into the open merchant visit. Neither
+    -- Unavailable nor Dropped, so AutoSellJunk's chat fallback stays quiet; this file
+    -- owns the fallback for a held sale from here on.
+    HELD = "Held",
     DROPPED = "Dropped",
     UNAVAILABLE = "Unavailable",
 }
+
+-- The merchant visit's phases (Phase 20 section 6.3).
+local VISIT = { IDLE = "Idle", OPEN = "Open", SETTLING = "Settling" }
+
+local MIDDLE_DOT = "\194\183"
 
 local UNAVAILABLE = {
     DISABLED = "ToastsDisabled",
@@ -70,6 +89,9 @@ local COUNT_NAMES = {
     "secretTexts", "unparsed", "unresolved", "notShown", "notOurs", "inboxDropped",
     "stackChecked", "deliveredInsideCall",
     "lootMessagesOnRestrictedMap", "shownOnRestrictedMap",
+    -- Phase 20 section 11.
+    "merchantVisits", "merchantVisitToasts", "merchantVisitsSilent", "junkHeld",
+    "visitMoneyUnreadable", "visitPollCapped",
 }
 
 local bump = ns.Diagnostics.Bump
@@ -88,10 +110,21 @@ local state = {
     tokens = {},
     -- A detached table until enable binds this UI load's diagnostics table.
     counts = {},
+    -- Phase 20 section 6.3: the one merchant visit in progress, if any, its two
+    -- timers, and the generations that make a late timer or deferral a no-op.
+    visit = { phase = VISIT.IDLE },
+    visitTicker = nil,
+    visitSettleTimer = nil,
+    visitGeneration = 0,
+    visitDeferGeneration = 0,
+    visitCapable = nil,
+    lastVisitVerdict = nil,
+    lastVisitNet = nil,
     settings = {
         showLootedItems = true,
         showQuestItems = true,
         showLootedMoney = true,
+        showMerchantGold = true,
         durationSeconds = 4,
         anchorOffsetX = 0,
         anchorOffsetY = -180,
@@ -250,6 +283,24 @@ local function paint(toast, request)
             toast.label:SetText("Junk sale not confirmed")
             toast.text:SetText(format("%d still in your bags", request.itemsUnsold))
         end
+    elseif request.kind == KIND.MERCHANT_VISIT then
+        -- Phase 20 section 6.6: the visit's net gain, with any junk sale it held.
+        toast.icon:SetTexture(MONEY_ICON)
+        toast.text:SetTextColor(1, 1, 1)
+        local label = "Gained at a merchant"
+        local junk = request.junk
+        if junk then
+            if junk.confirmed then
+                label = label .. format(" %s %d junk", MIDDLE_DOT, junk.itemsSold or 0)
+                if (junk.itemsUnsold or 0) > 0 then
+                    label = label .. format(", %d left", junk.itemsUnsold)
+                end
+            else
+                label = label .. format(" %s junk not sold", MIDDLE_DOT)
+            end
+        end
+        toast.label:SetText(label)
+        toast.text:SetText("+" .. coinText(request.net or 0))
     end
 end
 
@@ -390,19 +441,55 @@ end
 
 -- The service (section 6.2) -------------------------------------------------------
 
--- Queues a notice. The one entry point other features use.
+-- A junk sale folded into the visit in progress (Phase 20 section 6.5). A second sale
+-- in the same visit MERGES: items and revenue summed, items left the latest figure,
+-- confirmed only if every sale was.
+local function holdJunk(request)
+    local sale = {
+        itemsSold = request.itemsSold or 0,
+        revenue = request.revenue or 0,
+        itemsUnsold = request.itemsUnsold or 0,
+        confirmed = request.confirmed == true,
+    }
+    local held = state.visit.heldJunk
+    if held then
+        held.itemsSold = held.itemsSold + sale.itemsSold
+        held.revenue = held.revenue + sale.revenue
+        held.itemsUnsold = sale.itemsUnsold
+        held.confirmed = held.confirmed and sale.confirmed
+    else
+        state.visit.heldJunk = sale
+    end
+    bump(state.counts, "junkHeld")
+end
+
+local function visitInProgress()
+    local phase = state.visit.phase
+    return phase == VISIT.OPEN or phase == VISIT.SETTLING
+end
+
+-- Queues a notice. allowHold is false for this file's own posts and the samples, so
+-- a toast that already carries a held sale, or a test run during a real visit, is
+-- never captured by the visit (audit finding 10).
 -- Returns an outcome, plus a reason when the outcome is Unavailable.
-local function post(request)
+local function postRequest(request, allowHold)
     if not state.enabled or not state.pool then
         bump(state.counts, "unavailable")
         return OUTCOME.UNAVAILABLE, UNAVAILABLE.DISABLED
     end
     if type(request) ~= "table" or not (request.kind == KIND.LOOTED_ITEM
-        or request.kind == KIND.LOOTED_MONEY or request.kind == KIND.JUNK_SOLD) then
+        or request.kind == KIND.LOOTED_MONEY or request.kind == KIND.JUNK_SOLD
+        or request.kind == KIND.MERCHANT_VISIT) then
         bump(state.counts, "unavailable")
         return OUTCOME.UNAVAILABLE, UNAVAILABLE.NOT_READY
     end
     bump(state.counts, "posted")
+
+    if allowHold and request.kind == KIND.JUNK_SOLD and state.settings.showMerchantGold
+        and visitInProgress() then
+        holdJunk(request)
+        return OUTCOME.HELD
+    end
 
     if request.kind == KIND.LOOTED_MONEY and coalesceMoney(request.amount) then
         bump(state.counts, "coalesced")
@@ -433,6 +520,247 @@ local function post(request)
     state.queue[#state.queue + 1] = request
     bump(state.counts, "queued")
     return OUTCOME.QUEUED
+end
+
+-- The one entry point other features use: AutoSellJunk's JunkSold may be held.
+local function post(request)
+    return postRequest(request, true)
+end
+
+-- The merchant visit (Phase 20 section 6) ----------------------------------------
+
+local ClientRead = ns.ClientRead
+
+local function readMoney()
+    local kind, amount = ClientRead.Call(_G.GetMoney, "number")
+    if kind == ClientRead.PLAIN then
+        return amount
+    end
+    return nil
+end
+
+-- Without this read the poll could never answer "left", and every visit would run
+-- to the ten-minute cap, so a client lacking it opens no visit at all.
+local function merchantInteractionReadable()
+    local manager = _G.C_PlayerInteractionManager
+    local interaction = _G.Enum and _G.Enum.PlayerInteractionType
+    return type(manager) == "table" and type(manager.IsInteractingWithNpcOfType) == "function"
+        and type(interaction) == "table" and interaction.Merchant ~= nil
+end
+
+-- AutoSellJunk's own words for a sale, for the chat line a held sale falls back to.
+local function junkSummaryText(sale)
+    if not sale.confirmed then
+        return format("junk sale not confirmed: %d still in your bags", sale.itemsUnsold or 0)
+    end
+    local text = format("sold %d junk item(s) for %s", sale.itemsSold or 0, coinText(sale.revenue or 0))
+    if (sale.itemsUnsold or 0) > 0 then
+        text = text .. format("; %d left", sale.itemsUnsold)
+    end
+    return text
+end
+
+local function junkRequest(sale)
+    return {
+        kind = KIND.JUNK_SOLD,
+        itemsSold = sale.itemsSold,
+        revenue = sale.revenue,
+        itemsUnsold = sale.itemsUnsold,
+        confirmed = sale.confirmed,
+    }
+end
+
+-- Holding a sale took AutoSellJunk's chat fallback away, so a toast carrying one that
+-- cannot be shown writes the chat line here (audit finding 9).
+local function postCarryingJunk(request, sale)
+    local outcome = postRequest(request, false)
+    if sale and (outcome == OUTCOME.DROPPED or outcome == OUTCOME.UNAVAILABLE) then
+        ns.Log.Info(junkSummaryText(sale))
+    end
+    return outcome
+end
+
+-- Both timers, and the generation that turns a timer already due into a no-op.
+local function stopVisitTimers()
+    if state.visitTicker and state.visitTicker.Cancel then
+        state.visitTicker:Cancel()
+    end
+    state.visitTicker = nil
+    if state.visitSettleTimer and state.visitSettleTimer.Cancel then
+        state.visitSettleTimer:Cancel()
+    end
+    state.visitSettleTimer = nil
+    state.visitGeneration = state.visitGeneration + 1
+end
+
+-- Ends the visit and decides what to show (section 6.3). The visit is reset BEFORE
+-- anything is posted, so a junk toast posted here is never held by the visit it came
+-- from. Returns the verdict.
+local function finalizeVisit()
+    local visit = state.visit
+    if visit.phase == VISIT.IDLE then
+        return nil
+    end
+    stopVisitTimers()
+    local held, moneyAtOpen = visit.heldJunk, visit.moneyAtOpen
+    state.visit = { phase = VISIT.IDLE }
+
+    local verdict, net = nil, nil
+    local moneyNow = readMoney()
+    if moneyNow == nil or moneyAtOpen == nil then
+        -- Audit finding 8: no net, so no visit toast to fold the sale into; any held
+        -- sale, confirmed or not, shows on its own.
+        bump(state.counts, "visitMoneyUnreadable")
+        if held then
+            postCarryingJunk(junkRequest(held), held)
+            verdict = "PostJunkOnly"
+        else
+            bump(state.counts, "merchantVisitsSilent")
+            verdict = "Silent"
+        end
+    else
+        net = moneyNow - moneyAtOpen
+        if net > 0 then
+            bump(state.counts, "merchantVisitToasts")
+            postCarryingJunk({ kind = KIND.MERCHANT_VISIT, net = net, junk = held }, held)
+            verdict = "PostVisit"
+        elseif held and (not held.confirmed or (held.itemsUnsold or 0) > 0) then
+            -- A failure notice is never swallowed, gain or no gain.
+            postCarryingJunk(junkRequest(held), held)
+            verdict = "PostJunkOnly"
+        else
+            -- D2: only a gain is shown. A confirmed sale outweighed by purchases too.
+            bump(state.counts, "merchantVisitsSilent")
+            verdict = "Silent"
+        end
+    end
+    state.lastVisitVerdict = verdict
+    state.lastVisitNet = net
+    return verdict
+end
+
+local function guarded(action, what)
+    local ok, err = ns.Isolation.Call(action)
+    if not ok then
+        ns.Registry.Fault(FEATURE_ID, what, err)
+    end
+end
+
+-- One poll of an open visit, on our own ticker. "Could not tell" never ends a visit
+-- early (rule 10); the cap bounds the ticker whatever the client answers.
+local function pollVisit()
+    local visit = state.visit
+    if visit.phase ~= VISIT.OPEN then
+        return
+    end
+    local manager = _G.C_PlayerInteractionManager
+    local kind, interacting = ClientRead.Call(manager and manager.IsInteractingWithNpcOfType,
+        "boolean", _G.Enum.PlayerInteractionType.Merchant)
+    local left = (kind == ClientRead.PLAIN and interacting == false)
+    if not left and GetTime() - (visit.openedAt or 0) >= ns.MERCHANT_VISIT_MAXIMUM_SECONDS then
+        bump(state.counts, "visitPollCapped")
+        left = true
+    end
+    if not left then
+        return
+    end
+
+    visit.phase = VISIT.SETTLING
+    if state.visitTicker and state.visitTicker.Cancel then
+        state.visitTicker:Cancel()
+    end
+    state.visitTicker = nil
+    if C_Timer and C_Timer.NewTimer then
+        local generation = state.visitGeneration
+        state.visitSettleTimer = C_Timer.NewTimer(ns.MERCHANT_VISIT_SETTLE_SECONDS, function()
+            if generation ~= state.visitGeneration then
+                return
+            end
+            state.visitSettleTimer = nil
+            guarded(finalizeVisit, "raised finishing a merchant visit")
+        end)
+    else
+        finalizeVisit()
+    end
+end
+
+-- Starts tracking a visit, a frame after MERCHANT_SHOW (section 6.3). The money read
+-- shares that frame with auto-sell's sale call, and a sale's proceeds arrive in a
+-- server reply that cannot land within the frame the request was sent (section 6.4).
+local function openVisit()
+    if not state.enabled or not state.settings.showMerchantGold then
+        return
+    end
+    if not merchantInteractionReadable() then
+        state.visitCapable = false
+        ns.Log.Once("toasts:novisit",
+            "this client cannot say when you leave a merchant, so there is no merchant visit toast; junk sales show on their own")
+        return
+    end
+    state.visitCapable = true
+
+    local visit = state.visit
+    if visit.phase == VISIT.OPEN then
+        -- A second MERCHANT_SHOW without leaving is the same visit.
+        return
+    end
+    if visit.phase == VISIT.SETTLING then
+        finalizeVisit()
+    end
+
+    local amount = readMoney()
+    if amount == nil then
+        bump(state.counts, "visitMoneyUnreadable")
+        return
+    end
+
+    state.visitGeneration = state.visitGeneration + 1
+    local generation = state.visitGeneration
+    state.visit = { phase = VISIT.OPEN, moneyAtOpen = amount, openedAt = GetTime(), heldJunk = nil }
+    bump(state.counts, "merchantVisits")
+    if C_Timer and C_Timer.NewTicker then
+        state.visitTicker = C_Timer.NewTicker(ns.MERCHANT_VISIT_POLL_SECONDS, function()
+            if generation ~= state.visitGeneration then
+                return
+            end
+            guarded(pollVisit, "raised polling a merchant visit")
+        end)
+    end
+end
+
+-- MERCHANT_SHOW comes from the server (Phase 8 section 4.4). The visit still opens a
+-- frame later, from a deferral disable can cancel (rule 5).
+local function onMerchantShow()
+    if not state.enabled or not state.settings.showMerchantGold then
+        return
+    end
+    if not (C_Timer and C_Timer.After) then
+        return
+    end
+    local generation = state.visitDeferGeneration
+    C_Timer.After(0, function()
+        if generation ~= state.visitDeferGeneration or not state.enabled then
+            return
+        end
+        guarded(openVisit, "raised opening a merchant visit")
+    end)
+end
+
+-- Drops the visit without its toast. A held sale is not lost: it is shown as the
+-- Phase 8 junk toast when showToast is set, or written to chat when Toasts itself is
+-- going away.
+local function abandonVisit(showToast)
+    local held = state.visit.heldJunk
+    stopVisitTimers()
+    state.visit = { phase = VISIT.IDLE }
+    if not held then
+        return
+    end
+    if showToast then
+        postCarryingJunk(junkRequest(held), held)
+    else
+        ns.Log.Info(junkSummaryText(held))
+    end
 end
 
 -- The samples the preview holds (decision D5): one item and one money toast.
@@ -908,6 +1236,17 @@ local function enable(config)
     state.enabled = true
     registerPreview()
 
+    -- Phase 20 section 6.7: before the loot-pattern return below, so a client missing
+    -- a loot format string still gets the merchant visit toast. Not required: without
+    -- it a junk sale simply shows on its own, as before Phase 20.
+    local merchantToken = ns.Dispatch.Subscribe(FEATURE_ID, "MERCHANT_SHOW", onMerchantShow)
+    if merchantToken then
+        state.tokens[#state.tokens + 1] = merchantToken
+    else
+        ns.Log.Once("toasts:nomerchantshow",
+            "MERCHANT_SHOW is unavailable on this client, so there is no merchant visit toast")
+    end
+
     local patterns, missing = buildLootPatterns()
     state.patterns = patterns
     state.patternFailure = missing
@@ -931,6 +1270,9 @@ end
 local function disable()
     ns.Preview.Unregister(ns.PREVIEW_PANEL.TOASTS)
     state.enabled = false
+    -- Phase 20 section 6.5: a sale held by an open visit goes to chat, never nowhere.
+    state.visitDeferGeneration = state.visitDeferGeneration + 1
+    abandonVisit(false)
     state.inboxGeneration = state.inboxGeneration + 1
     state.inboxScheduled = false
     state.inbox = {}
@@ -957,6 +1299,10 @@ local function onConfigChanged(config, changedKey)
         anchorContainer()
     elseif changedKey == "maximumVisible" then
         showNext()
+    elseif changedKey == "showMerchantGold" and not state.settings.showMerchantGold then
+        -- The visit in progress ends with no toast of its own; a sale it held shows
+        -- at once as the Phase 8 junk toast (section 6.5).
+        abandonVisit(true)
     end
     return ns.CONFIG_RESULT.APPLIED
 end
@@ -964,13 +1310,14 @@ end
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Toasts",
-    description = "Pop-up notices for money and notable items you loot, and for junk sold automatically.",
+    description = "Pop-up notices for money and notable items you loot, and for the gold a merchant visit earns you, junk sold automatically included.",
     settingsPage = ns.SETTINGS_PAGE.BAGS_AND_LOOT,
     settingsOrder = 20,
     settings = {
         showLootedItems = true,
         showQuestItems = true,
         showLootedMoney = true,
+        showMerchantGold = true,
         durationSeconds = 4,
         anchorOffsetX = 0,
         anchorOffsetY = -180,
@@ -987,18 +1334,24 @@ ns.Registry.Register(FEATURE_ID, {
         showLootedMoney = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Looted money", order = 3,
         },
+        -- Phase 20 section 10.2. On by default: it replaces a toast the user already
+        -- gets. Off restores Phase 8's junk toast exactly.
+        showMerchantGold = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Gold gained at a merchant", order = 4,
+            description = "When you leave a merchant richer than you arrived: one toast with the gold gained, junk sold automatically included.",
+        },
         durationSeconds = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Seconds on screen", order = 4,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Seconds on screen", order = 5,
             unit = ns.ConfigSchema.UNIT.SECONDS,
             minimum = 2, maximum = 10, step = 0.5,
         },
         anchorOffsetX = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal position", order = 5,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Horizontal position", order = 6,
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -800, maximum = 800, step = 1,
         },
         anchorOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical position, from the top", order = 6,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Vertical position, from the top", order = 7,
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -800, maximum = 0, step = 1,
         },
@@ -1024,7 +1377,11 @@ ns.Toasts = {
     OUTCOME = OUTCOME,
     Post = post,
 
-    -- One of each kind, for placing the toasts and checking the art.
+    -- One of each kind, for placing the toasts and checking the art. Four kinds since
+    -- Phase 20: at the default maximumVisible of 3 the last one queues and appears
+    -- when the first fades (audit finding 11). The junk sample is posted past the
+    -- merchant visit's hold, so a test run at a merchant leaves the real visit alone
+    -- (audit finding 10).
     PostSamples = function()
         local outcomes = {}
         outcomes[#outcomes + 1] = post({
@@ -1033,9 +1390,13 @@ ns.Toasts = {
             isQuestItem = false,
         })
         outcomes[#outcomes + 1] = post({ kind = KIND.LOOTED_MONEY, amount = 12345 })
-        outcomes[#outcomes + 1] = post({
+        outcomes[#outcomes + 1] = postRequest({
             kind = KIND.JUNK_SOLD, itemsSold = 3, revenue = 250, itemsUnsold = 0, confirmed = true,
-        })
+        }, false)
+        outcomes[#outcomes + 1] = postRequest({
+            kind = KIND.MERCHANT_VISIT, net = 12345,
+            junk = { itemsSold = 3, revenue = 250, itemsUnsold = 0, confirmed = true },
+        }, false)
         return outcomes
     end,
 
@@ -1063,6 +1424,14 @@ ns.Toasts = {
             lootCapture = state.patterns ~= nil,
             patternFailure = state.patternFailure,
             counts = counts,
+            -- Phase 20 section 11.
+            showMerchantGold = state.settings.showMerchantGold,
+            visitPhase = state.visit.phase,
+            visitHeldJunk = state.visit.heldJunk ~= nil,
+            visitTimersPending = state.visitTicker ~= nil or state.visitSettleTimer ~= nil,
+            visitCapable = state.visitCapable,
+            lastVisitVerdict = state.lastVisitVerdict,
+            lastVisitNet = state.lastVisitNet,
             poolConstructed = constructed,
             poolLive = live,
             poolFree = free,

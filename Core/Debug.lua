@@ -207,9 +207,13 @@ local function commandFsr()
     ns.Log.Info(format("state=%s visible=%s remaining=%.2fs elapsed=%d%% manaUser=%s",
         tostring(view.state), tostring(view.visible), view.windowRemaining,
         view.elapsedFraction * 100, tostring(view.manaUser)))
+    -- Phase 20 section 2.5: a free cast (a wand shot, a potion) leaves the window
+    -- alone; these say which way each cast went.
+    ns.Log.Info(format("  casts: mana=%d free=%d unknown=%d%s",
+        view.castsCostingMana or 0, view.castsFree or 0, view.castsCostUnknown or 0,
+        view.lastUnknownReason and (" (last unknown: " .. tostring(view.lastUnknownReason) .. ")") or ""))
     if view.costQueryable == false then
-        ns.Log.Warn("  spell mana cost is not queryable on this client, so EVERY successful")
-        ns.Log.Warn("  cast opens the window; a free cast shows a window that is not running")
+        ns.Log.Warn("  this client has no spell cost lookup, so every cast opens the window")
     end
     if view.withheldSpellIds > 0 or view.withheldBarGeometry > 0 then
         ns.Log.Info(format("  withheld reads: spell ids=%d (each opened the window) bar geometry=%d",
@@ -296,6 +300,26 @@ local function commandPlates()
     else
         ns.Log.Info("  guild names: off")
     end
+    -- Phase 20 section 11.
+    if view.npcRoles then
+        ns.Log.Info(format("  roles: on, QuestieDB %s; labels %d", tostring(view.roleBridge),
+            view.roleLabels or 0))
+        ns.Log.Info(format("    reads: plain=%d none=%d withheld=%d notFriendly=%d unavailable=%d",
+            view.roleReadsPlain or 0, view.roleReadsNone or 0, view.roleReadsWithheld or 0,
+            view.roleSkippedNotFriendly or 0, view.roleBridgeUnavailable or 0))
+    else
+        ns.Log.Info("  roles: off")
+    end
+    if view.nameAlignLeft then
+        ns.Log.Info(format("  alignment: on, capability=%s; aligned %d",
+            tostring(view.nameAlignCapability), view.nameAlignedNow or 0))
+        ns.Log.Info(format("    writes=%d unchanged=%d skipped style=%d nameOnly=%d noRegion=%d failed=%d",
+            view.nameAlignWrites or 0, view.nameAlignUnchanged or 0,
+            view.nameAlignSkippedStyle or 0, view.nameAlignSkippedNameOnly or 0,
+            view.nameAlignSkippedNoRegion or 0, view.nameAlignWriteFailed or 0))
+    else
+        ns.Log.Info("  alignment: off")
+    end
     ns.Log.Info(format("  ledger: widgets=%d restored=%d widgetGone=%d writeRefused=%d",
         view.ledgerWidgets, view.ledgerRestored, view.ledgerWidgetGone,
         view.ledgerWriteRefused))
@@ -336,6 +360,13 @@ local function commandDps()
         tostring(view.panelShown), tostring(view.inCombat)))
     ns.Log.Info(format("  total=%d over %ds  (compare this against the built-in meter)",
         view.totalAmount, view.durationSeconds))
+    -- Phase 20 section 3.6: percents reads 100 whenever a row is drawn, 0 when none is.
+    ns.Log.Info(format("  entries=%d spells=%d merged=%d sumOfSpells=%d sourceTotal=%d percents=%d%s",
+        view.lastEntries or 0, view.lastSpells or 0, view.lastMergedEntries or 0,
+        view.sumOfSpells or 0, view.sourceTotal or 0, view.percentsSum or 0,
+        view.otherRowShown and format(" (+%d more)", view.truncatedRows) or ""))
+    ns.Log.Info(format("  counted this load: mergedEntries=%d otherRowsDrawn=%d totalMismatchReads=%d",
+        view.mergedEntries or 0, view.otherRowsDrawn or 0, view.totalMismatchReads or 0))
     ns.Log.Info(format("  icons=%s border=%s anchor=%s settlePending=%d",
         tostring(view.iconsAvailable), tostring(view.borderStyle),
         view.anchorIsPlayerFrame and "PlayerFrame" or "screen",
@@ -435,6 +466,16 @@ local function commandToasts(subcommand)
         counts.deliveredInsideCall, counts.stackChecked))
     ns.Log.Info(format("  restricted map: messages=%d shown=%d (Phase 10 section 7.2)",
         counts.lootMessagesOnRestrictedMap, counts.shownOnRestrictedMap))
+    -- Phase 20 section 11.
+    if view.showMerchantGold == false then
+        ns.Log.Info("  merchant: off (a junk sale shows on its own)")
+    else
+        ns.Log.Info(format("  merchant: phase=%s visits=%d toasts=%d silent=%d held=%d moneyUnreadable=%d capped=%d%s",
+            tostring(view.visitPhase), counts.merchantVisits, counts.merchantVisitToasts,
+            counts.merchantVisitsSilent, counts.junkHeld, counts.visitMoneyUnreadable,
+            counts.visitPollCapped,
+            view.visitCapable == false and " (this client cannot tell when you leave)" or ""))
+    end
 end
 
 -- Phase 8 section 7.1: why the last bag close did or did not sort.

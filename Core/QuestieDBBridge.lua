@@ -53,10 +53,21 @@ local state = {
     factsCount = 0,
     claimsByQuest = {},
     claimsCount = 0,
+    -- Phase 20 section 7.4: npcId -> role text, or false for "QuestieDB says none".
+    rolesByNpc = {},
+    rolesCount = 0,
 
     reads = 0,
     hits = 0,
 }
+
+-- What NpcRole answers (Phase 20 section 7.4).
+QuestieDBBridge.ROLE = {
+    PLAIN = "Plain",
+    NO_ROLE = "NoRole",
+    UNAVAILABLE = "Unavailable",
+}
+local ROLE = QuestieDBBridge.ROLE
 
 local function counters()
     return ns.Diagnostics.CountersFor("questieBridge")
@@ -710,6 +721,52 @@ function QuestieDBBridge.NpcName(npcId)
     return kind == ClientRead.PLAIN and name or nil
 end
 
+-- An NPC's role, the subtitle its tooltip shows as <Innkeeper> (Phase 20 section 7.4).
+--
+-- Returns Plain and the text -- QuestieDB's, UNNEUTRALIZED: the caller neutralizes it
+-- where it draws, because RegisterCorrection is public and any addon can inject one.
+-- NoRole is an answer and is cached, since most NPCs have none and not caching that
+-- would re-read QuestieDB for every guard and critter that attaches. Unavailable, with
+-- the reason, is not an answer and is not cached (Phase 18 section 5): the getter
+-- missing, raising, or handing back something that is not a string.
+function QuestieDBBridge.NpcRole(npcId)
+    if type(npcId) ~= "number" then
+        return ROLE.UNAVAILABLE, "no NPC id"
+    end
+    if not QuestieDBBridge.IsAvailable() then
+        return ROLE.UNAVAILABLE, QuestieDBBridge.Describe()
+    end
+    local cached = state.rolesByNpc[npcId]
+    if cached ~= nil then
+        noteHit()
+        if cached == false then
+            return ROLE.NO_ROLE
+        end
+        return ROLE.PLAIN, cached
+    end
+    noteRead()
+    local getter = _G.NpcDB and _G.NpcDB.subName
+    if type(getter) ~= "function" then
+        noteReadFailed()
+        return ROLE.UNAVAILABLE, "this QuestieDB has no NpcDB.subName"
+    end
+    local kind, text = ClientRead.Call(getter, "string", npcId)
+    if kind == ClientRead.ABSENT or (kind == ClientRead.PLAIN and text == "") then
+        roomFor("rolesByNpc", "rolesCount", ns.NPC_ROLE_CACHE_CAPACITY)
+        state.rolesByNpc[npcId] = false
+        state.rolesCount = state.rolesCount + 1
+        return ROLE.NO_ROLE
+    end
+    if kind ~= ClientRead.PLAIN then
+        noteReadFailed()
+        return ROLE.UNAVAILABLE, format("NpcDB.subName gave no usable answer (%s)", tostring(text))
+    end
+    roomFor("rolesByNpc", "rolesCount", ns.NPC_ROLE_CACHE_CAPACITY)
+    state.rolesByNpc[npcId] = text
+    state.rolesCount = state.rolesCount + 1
+    return ROLE.PLAIN, text
+end
+
 function QuestieDBBridge.Inspect()
     local kind, detail = resolveState()
     return {
@@ -724,6 +781,7 @@ function QuestieDBBridge.Inspect()
         cachedNpcs = state.startsCount,
         cachedQuests = state.factsCount,
         cachedTargets = state.claimsCount,
+        cachedRoles = state.rolesCount,
     }
 end
 
@@ -735,5 +793,6 @@ function QuestieDBBridge.Reset()
     state.startsByNpc, state.startsCount = {}, 0
     state.factsByQuest, state.factsCount = {}, 0
     state.claimsByQuest, state.claimsCount = {}, 0
+    state.rolesByNpc, state.rolesCount = {}, 0
     state.reads, state.hits = 0, 0
 end

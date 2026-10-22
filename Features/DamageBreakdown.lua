@@ -21,6 +21,12 @@
 -- Phase 11 (Architecture/20261005-Phase11.md section 6): with hideInCombat, on by
 -- default, the panel hides for the length of a fight, when it can only show the
 -- last one, and the threat panel takes its place.
+--
+-- Phase 20 (Architecture/20261021-Phase20.md section 3): the rows add up. A spell the
+-- client lists once per target is merged into one row, shares are of the sum of the
+-- spells rather than the session total, they are apportioned so the integers shown
+-- sum to exactly 100, spells past the row limit are summed in a "+N more" row, and a
+-- header gives the fight's length and DPS.
 
 local ADDON_NAME, ns = ...
 
@@ -57,6 +63,16 @@ local state = {
     anchorIsPlayerFrame = false,
     lastRowCount = 0,
     truncatedRows = 0,
+    -- Phase 20 section 3: the header line, and what the last read added up to.
+    header = nil,
+    headerText = nil,
+    otherRowShown = false,
+    lastSumOfSpells = 0,
+    lastMergedEntries = 0,
+    lastEntryCount = 0,
+    lastSpellCount = 0,
+    percentsSum = 0,
+    panelHeight = nil,
     -- This UI load's diagnostics table, bound at enable (Phase 9 section 5.1).
     counters = {},
     settings = {
@@ -121,9 +137,11 @@ local function enumsPresent()
         and damageDoneValue() ~= nil
 end
 
--- This client has already proved C_Spell is only partially populated -- Phase 1
--- reports GetSpellPowerCost missing from both the namespace and the globals -- so
--- the icon lookup is a chain resolved once, not an assumption.
+-- The icon lookup is a chain resolved once, not an assumption. Phase 4 justified the
+-- chain by Phase 1 finding GetSpellPowerCost "missing"; that was wrong -- the message
+-- it relied on fired on any free cast, and the function is present (Phase 20 section
+-- 2.2). The chain stays because it is harmless and C_Spell's population is still not
+-- something to assume.
 local function resolveIconLookup()
     if state.iconLookupResolved then
         return state.iconLookup
@@ -174,15 +192,19 @@ end
 -- Read ------------------------------------------------------------------------
 
 -- Sorts our own copies of the spells, never the client's tables, so every value
--- compared here was already classified Plain.
+-- compared here was already classified Plain. Ties go to the lower spell id, so two
+-- equal spells never swap rows between two reads.
 local function byTotalDescending(left, right)
-    return left.totalAmount > right.totalAmount
+    if left.totalAmount ~= right.totalAmount then
+        return left.totalAmount > right.totalAmount
+    end
+    return (left.spellID or 0) < (right.spellID or 0)
 end
 
--- The spells worth a row, as plain copies. Returns nil when any figure was
--- withheld, so a half-read session never renders as if it were whole.
-local function rankedSpells(spells)
-    local ranked = {}
+-- The client's spell entries worth a row, as plain copies. Returns nil when any figure
+-- was withheld, so a half-read session never renders as if it were whole.
+local function collectEntries(spells)
+    local entries = {}
     for index = 1, #spells do
         local entryKind, spell = ClientRead.Field(spells, index, "table")
         if entryKind == WITHHELD then
@@ -198,7 +220,7 @@ local function rankedSpells(spells)
             amount = (amountKind == PLAIN) and amount or 0
             -- A spell that landed for nothing displaces a row that means something.
             if amount > 0 then
-                ranked[#ranked + 1] = {
+                entries[#entries + 1] = {
                     spellID = spellId,
                     totalAmount = amount,
                     amountPerSecond = (rateKind == PLAIN) and rate or 0,
@@ -206,7 +228,132 @@ local function rankedSpells(spells)
             end
         end
     end
-    return ranked
+    return entries
+end
+
+-- One total per spell, however many entries the client gave it (section 3.2, H1). If
+-- the client lists a spell once per target, a multi-target fight would otherwise push
+-- spells past the row limit and the shares would stop reaching 100.
+local function mergeBySpell(entries)
+    local bySpell, totals = {}, {}
+    local mergedEntries, sumOfSpells = 0, 0
+    for index = 1, #entries do
+        local entry = entries[index]
+        local key = entry.spellID or 0
+        local existing = bySpell[key]
+        if existing then
+            existing.totalAmount = existing.totalAmount + entry.totalAmount
+            existing.amountPerSecond = existing.amountPerSecond + entry.amountPerSecond
+            existing.entries = existing.entries + 1
+            mergedEntries = mergedEntries + 1
+        else
+            existing = {
+                spellID = entry.spellID,
+                totalAmount = entry.totalAmount,
+                amountPerSecond = entry.amountPerSecond,
+                entries = 1,
+            }
+            bySpell[key] = existing
+            totals[#totals + 1] = existing
+        end
+        sumOfSpells = sumOfSpells + entry.totalAmount
+    end
+    sort(totals, byTotalDescending)
+    return { totals = totals, mergedEntries = mergedEntries, sumOfSpells = sumOfSpells }
+end
+
+-- Integer percentages that sum to exactly 100 (section 3.3, H4): every share floored,
+-- and the points the floors left over handed to the largest remainders, ties to the
+-- earlier row.
+local function largestRemainderPercents(amounts, sum)
+    local exact, percents, order = {}, {}, {}
+    local total = 0
+    for index = 1, #amounts do
+        exact[index] = 100 * amounts[index] / sum
+        percents[index] = floor(exact[index])
+        total = total + percents[index]
+        order[index] = index
+    end
+    sort(order, function(left, right)
+        local leftRemainder = exact[left] - percents[left]
+        local rightRemainder = exact[right] - percents[right]
+        if leftRemainder ~= rightRemainder then
+            return leftRemainder > rightRemainder
+        end
+        return left < right
+    end)
+    for position = 1, math.min(100 - total, #order) do
+        local index = order[position]
+        percents[index] = percents[index] + 1
+    end
+    return percents
+end
+
+-- The rows the panel draws (section 3.3). Shares are of the sum of the spells, never
+-- of the session's own total (H3); spells past rowLimit are summed into one "+N more"
+-- row (H2). Nothing to apportion -- no fight yet, the meter off, or a fight that dealt
+-- nothing -- is zero rows (audit finding 5).
+local function apportionRows(merged, rowLimit)
+    local totals = merged.totals
+    if #totals == 0 or merged.sumOfSpells <= 0 then
+        return { spells = {}, other = nil, percentsSum = 0 }
+    end
+    local drawCount = math.min(#totals, rowLimit)
+    local amounts = {}
+    for index = 1, drawCount do
+        amounts[index] = totals[index].totalAmount
+    end
+    local other = nil
+    if #totals > drawCount then
+        other = { spellCount = #totals - drawCount, totalAmount = 0, amountPerSecond = 0 }
+        for index = drawCount + 1, #totals do
+            other.totalAmount = other.totalAmount + totals[index].totalAmount
+            other.amountPerSecond = other.amountPerSecond + totals[index].amountPerSecond
+        end
+        amounts[#amounts + 1] = other.totalAmount
+    end
+    local percents = largestRemainderPercents(amounts, merged.sumOfSpells)
+    local spells, percentsSum = {}, 0
+    for index = 1, drawCount do
+        spells[index] = {
+            spellId = totals[index].spellID,
+            amountPerSecond = totals[index].amountPerSecond,
+            percent = percents[index],
+        }
+        percentsSum = percentsSum + percents[index]
+    end
+    if other then
+        other.percent = percents[#percents]
+        percentsSum = percentsSum + other.percent
+    end
+    return { spells = spells, other = other, percentsSum = percentsSum }
+end
+
+-- The line above the rows (section 3.4): the fight's length when it read, and the
+-- sum of the client's own per-spell rates, which divide by a fractional duration it
+-- does not otherwise expose (Phase 4 section 4.4). Never total / duration.
+local MIDDLE_DOT = "\194\183"
+
+local function headerText(durationSeconds, merged)
+    local rate = 0
+    for index = 1, #merged.totals do
+        rate = rate + merged.totals[index].amountPerSecond
+    end
+    local dps = format("%d dps", floor(rate + 0.5))
+    if durationSeconds then
+        return format("%ds %s %s", floor(durationSeconds + 0.5), MIDDLE_DOT, dps)
+    end
+    return dps
+end
+
+-- A breakdown with nothing in it: no fight yet, the meter switched off, or a session
+-- with no spells. Zero rows and percentsSum 0 (audit finding 5).
+local function emptyBreakdown(meterOff)
+    return {
+        rows = {}, other = nil, totalAmount = 0, sumOfSpells = 0, truncatedRows = 0,
+        mergedEntries = 0, entryCount = 0, percentsSum = 0, headerText = nil,
+        meterOff = meterOff or nil,
+    }
 end
 
 -- Returns a breakdown table, or nil plus a reason. A nil session is NOT a
@@ -232,7 +379,7 @@ local function readOwnBreakdown()
     if not available then
         ns.Log.Once("dps:meteroff",
             "the built-in damage meter is switched off, so the breakdown panel has nothing to show")
-        return { rows = {}, totalAmount = 0, truncatedRows = 0, meterOff = true }
+        return emptyBreakdown(true)
     end
 
     local guidKind, playerGuid = ClientRead.Call(UnitGUID, "string", "player")
@@ -242,7 +389,7 @@ local function readOwnBreakdown()
     local sourceKind, source = ClientRead.Call(api.GetCombatSessionSourceFromType, "table",
         sessionType, meterType, playerGuid)
     if sourceKind == ABSENT then
-        return { rows = {}, totalAmount = 0, truncatedRows = 0 }
+        return emptyBreakdown()
     end
     if sourceKind ~= PLAIN then
         if source == ClientRead.CALL_FAILED then
@@ -252,7 +399,7 @@ local function readOwnBreakdown()
     end
     local spellsKind, spells = ClientRead.Field(source, "combatSpells", "table")
     if spellsKind == ABSENT then
-        return { rows = {}, totalAmount = 0, truncatedRows = 0 }
+        return emptyBreakdown()
     end
     local totalKind, total = ClientRead.Field(source, "totalAmount", "number")
     if spellsKind ~= PLAIN or totalKind == WITHHELD then
@@ -260,7 +407,8 @@ local function readOwnBreakdown()
     end
     total = (totalKind == PLAIN) and total or 0
 
-    local durationSeconds = 0
+    -- nil when the duration did not read: the header then shows DPS alone (B6).
+    local durationSeconds = nil
     if api.GetSessionDurationSeconds then
         local durationKind, seconds = ClientRead.Call(api.GetSessionDurationSeconds, "number", sessionType)
         if durationKind == PLAIN then
@@ -268,37 +416,46 @@ local function readOwnBreakdown()
         end
     end
 
-    local ranked = rankedSpells(spells)
-    if not ranked then
+    local entries = collectEntries(spells)
+    if not entries then
         return nil, READ_WITHHELD
     end
-    sort(ranked, byTotalDescending)
+    local merged = mergeBySpell(entries)
+    local apportioned = apportionRows(merged, max(1, state.settings.maximumRows))
+
+    -- Per read, so a settle read counts again: these say which of section 3.1's
+    -- hypotheses was in play, and "did it ever happen" is the question they answer.
+    if merged.mergedEntries > 0 then
+        bump(state.counters, "mergedEntries", merged.mergedEntries)
+    end
+    if #entries > 0 and merged.sumOfSpells ~= total then
+        bump(state.counters, "totalMismatchReads")
+    end
 
     local lookup = resolveIconLookup()
-    local limit = max(1, state.settings.maximumRows)
-    local rows = {}
-    for index = 1, math.min(#ranked, limit) do
-        local spell = ranked[index]
-        local icon = nil
+    local rows = apportioned.spells
+    for index = 1, #rows do
+        local row = rows[index]
         if lookup then
-            local iconOk, texture = pcall(lookup, spell.spellID)
+            local iconOk, texture = pcall(lookup, row.spellId)
             if iconOk then
-                icon = texture
+                row.iconTexture = texture
             end
         end
-        rows[index] = {
-            spellId = spell.spellID,
-            iconTexture = icon,
-            amountPerSecond = spell.amountPerSecond,
-            shareOfTotal = (total > 0) and (spell.totalAmount / total) or 0,
-        }
     end
 
     return {
         rows = rows,
+        other = apportioned.other,
         totalAmount = total,
+        sumOfSpells = merged.sumOfSpells,
         durationSeconds = durationSeconds,
-        truncatedRows = max(0, #ranked - #rows),
+        truncatedRows = apportioned.other and apportioned.other.spellCount or 0,
+        mergedEntries = merged.mergedEntries,
+        entryCount = #entries,
+        spellCount = #merged.totals,
+        percentsSum = apportioned.percentsSum,
+        headerText = (#rows > 0) and headerText(durationSeconds, merged) or nil,
     }
 end
 
@@ -338,6 +495,14 @@ local function createRow()
     row.share:SetJustifyH("RIGHT")
     row.share:SetWidth(36)
 
+    -- Phase 20 section 3.4: the "+N more" row's count, in the icon cell. Hidden on a
+    -- spell row, so a pooled row can be either.
+    row.more = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.more:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.more:SetJustifyH("LEFT")
+    row.more:SetWidth(ICON_SIZE + 6)
+    row.more:Hide()
+
     return row
 end
 
@@ -348,6 +513,8 @@ local function resetRow(row)
     row.icon:Hide()
     row.rate:SetText("")
     row.share:SetText("")
+    row.more:SetText("")
+    row.more:Hide()
 end
 
 -- Re-resolved on every enable, not once at creation: a UI that builds PlayerFrame
@@ -393,6 +560,18 @@ local function ensurePanel()
     state.borderStyle = chrome.borderStyle
 
     state.panel = panel
+
+    -- Phase 20 section 3.4: the fight's length and DPS, above the rows.
+    local header = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    header:SetPoint("TOPLEFT", panel, "TOPLEFT", PANEL_PADDING, -PANEL_PADDING)
+    header:SetWidth(PANEL_WIDTH - PANEL_PADDING * 2)
+    header:SetHeight(ns.BREAKDOWN_HEADER_HEIGHT)
+    header:SetJustifyH("LEFT")
+    header:SetWordWrap(false)
+    header:SetText("")
+    header:Hide()
+    state.header = header
+
     anchorPanel()
     state.rowPool = ns.FramePool.Create({
         poolName = "damageBreakdownRows",
@@ -417,8 +596,8 @@ local function formatRate(rate)
     return format("%d", floor((rate or 0) + 0.5))
 end
 
-local function formatShare(share)
-    return format("%d%%", floor((share or 0) * 100 + 0.5))
+local function formatShare(percent)
+    return format("%d%%", percent or 0)
 end
 
 -- During a fight the panel can only show the last one (Phase 11 section 6).
@@ -426,23 +605,17 @@ local function hiddenForCombat()
     return state.inCombat and state.settings.hideInCombat
 end
 
-local function renderBreakdown(breakdown)
-    local panel = ensurePanel()
+-- The header, row and height layout both the real breakdown and the preview draw
+-- through (section 3.4, audit finding 6). Returns how many rows it drew, the "+N
+-- more" row counted. With rows: the header at the top, row 1 a header and a gap below
+-- it. Without: no header, and the empty panel's height unchanged from Phase 4.
+local function drawRows(spellRows, otherRow, header)
+    local panel = state.panel
     releaseRows()
 
-    local rows = breakdown and breakdown.rows or {}
-    state.lastRowCount = #rows
-    state.truncatedRows = breakdown and breakdown.truncatedRows or 0
-    state.lastTotalAmount = breakdown and breakdown.totalAmount or 0
-    state.lastDurationSeconds = breakdown and breakdown.durationSeconds or 0
-
-    if #rows == 0 and not state.settings.showWhenEmpty then
-        panel:Hide()
-        return
-    end
-
+    local wanted = #spellRows + (otherRow and 1 or 0)
     local previous = nil
-    for index = 1, #rows do
+    for index = 1, wanted do
         local row, poolError = ns.FramePool.Acquire(state.rowPool)
         if not row then
             -- maximumRows exceeds the pool cap: a configuration error, surfaced
@@ -453,21 +626,33 @@ local function renderBreakdown(breakdown)
             break
         end
 
-        local entry = rows[index]
-        if entry.iconTexture then
-            row.icon:SetTexture(entry.iconTexture)
-            row.icon:Show()
+        local entry = spellRows[index]
+        if entry then
+            row.more:SetText("")
+            row.more:Hide()
+            if entry.iconTexture then
+                row.icon:SetTexture(entry.iconTexture)
+                row.icon:Show()
+            else
+                row.icon:Hide()
+            end
+            row.rate:SetText(formatRate(entry.amountPerSecond))
+            row.share:SetText(formatShare(entry.percent))
         else
+            row.icon:SetTexture(nil)
             row.icon:Hide()
+            row.more:SetText(format(ns.BREAKDOWN_MORE_FORMAT, otherRow.spellCount))
+            row.more:Show()
+            row.rate:SetText(formatRate(otherRow.amountPerSecond))
+            row.share:SetText(formatShare(otherRow.percent))
         end
-        row.rate:SetText(formatRate(entry.amountPerSecond))
-        row.share:SetText(formatShare(entry.shareOfTotal))
 
         row:ClearAllPoints()
         if previous then
             row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -ROW_SPACING)
         else
-            row:SetPoint("TOPLEFT", panel, "TOPLEFT", PANEL_PADDING, -PANEL_PADDING)
+            row:SetPoint("TOPLEFT", panel, "TOPLEFT", PANEL_PADDING,
+                -(PANEL_PADDING + ns.BREAKDOWN_HEADER_HEIGHT + ROW_SPACING))
         end
         row:Show()
 
@@ -476,9 +661,53 @@ local function renderBreakdown(breakdown)
     end
 
     local shown = #state.liveRows
-    local height = PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
-        + max(0, shown - 1) * ROW_SPACING
+    local height
+    if shown > 0 then
+        state.header:SetText(header or "")
+        state.header:Show()
+        state.headerText = header
+        height = PANEL_PADDING * 2 + ns.BREAKDOWN_HEADER_HEIGHT + ROW_SPACING
+            + shown * ROW_HEIGHT + (shown - 1) * ROW_SPACING
+    else
+        state.header:SetText("")
+        state.header:Hide()
+        state.headerText = nil
+        height = PANEL_PADDING * 2 + ROW_HEIGHT
+    end
     panel:SetHeight(height)
+    state.panelHeight = height
+    return shown
+end
+
+local function renderBreakdown(breakdown)
+    local panel = ensurePanel()
+
+    local rows = breakdown and breakdown.rows or {}
+    local other = breakdown and breakdown.other or nil
+    state.lastRowCount = #rows
+    state.otherRowShown = other ~= nil
+    state.truncatedRows = breakdown and breakdown.truncatedRows or 0
+    state.lastTotalAmount = breakdown and breakdown.totalAmount or 0
+    state.lastSumOfSpells = breakdown and breakdown.sumOfSpells or 0
+    state.lastDurationSeconds = breakdown and breakdown.durationSeconds or 0
+    state.lastMergedEntries = breakdown and breakdown.mergedEntries or 0
+    state.lastEntryCount = breakdown and breakdown.entryCount or 0
+    state.lastSpellCount = breakdown and breakdown.spellCount or 0
+    state.percentsSum = breakdown and breakdown.percentsSum or 0
+
+    if #rows == 0 and not state.settings.showWhenEmpty then
+        releaseRows()
+        state.header:SetText("")
+        state.header:Hide()
+        state.headerText = nil
+        panel:Hide()
+        return
+    end
+
+    drawRows(rows, other, breakdown and breakdown.headerText or nil)
+    if other then
+        bump(state.counters, "otherRowsDrawn")
+    end
     ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
     if hiddenForCombat() then
         panel:Hide()
@@ -493,63 +722,67 @@ end
 -- and no counter moved. The row carries no name string -- the icon is the
 -- identifier -- so there is nothing inside a row to mark as a sample, and
 -- /pa dps reporting preview: on is the whole signal. The figures are plainly
--- round.
+-- round. Phase 20: they go through the same merge, apportion and layout as a real
+-- fight, with a sample duration, because the preview is where the layout is first
+-- seen (section 3.5).
 local PREVIEW_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local PREVIEW_RATES = { 184.0, 121.5, 96.0, 62.5, 41.0, 27.5, 18.0, 12.5, 8.0, 5.5 }
+local PREVIEW_DURATION_SECONDS = 20
 
 local function showPlaceholders()
     if not state.panel then
         return 0
     end
-    releaseRows()
-
-    local drawCount = max(1, math.min(state.settings.maximumRows, #PREVIEW_RATES))
-
-    local total = 0
-    for index = 1, drawCount do
-        total = total + PREVIEW_RATES[index]
+    local entries = {}
+    for index = 1, #PREVIEW_RATES do
+        entries[index] = {
+            spellID = index,
+            totalAmount = PREVIEW_RATES[index] * PREVIEW_DURATION_SECONDS,
+            amountPerSecond = PREVIEW_RATES[index],
+        }
+    end
+    local merged = mergeBySpell(entries)
+    local apportioned = apportionRows(merged, max(1, state.settings.maximumRows))
+    for index = 1, #apportioned.spells do
+        apportioned.spells[index].iconTexture = PREVIEW_ICON
     end
 
-    local previous = nil
-    for index = 1, drawCount do
-        local row, poolError = ns.FramePool.Acquire(state.rowPool)
-        if not row then
-            ns.Log.OnceError("dps:previewpool", format(
-                "the breakdown row pool was exhausted drawing a preview (%s)",
-                tostring(poolError)))
-            break
-        end
-        row.icon:SetTexture(PREVIEW_ICON)
-        row.icon:Show()
-        row.rate:SetText(formatRate(PREVIEW_RATES[index]))
-        row.share:SetText(formatShare(PREVIEW_RATES[index] / total))
-
-        row:ClearAllPoints()
-        if previous then
-            row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -ROW_SPACING)
-        else
-            row:SetPoint("TOPLEFT", state.panel, "TOPLEFT", PANEL_PADDING, -PANEL_PADDING)
-        end
-        row:Show()
-        state.liveRows[#state.liveRows + 1] = row
-        previous = row
-    end
-
-    local shown = #state.liveRows
-    state.panel:SetHeight(PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
-        + max(0, shown - 1) * ROW_SPACING)
+    local shown = drawRows(apportioned.spells, apportioned.other,
+        headerText(PREVIEW_DURATION_SECONDS, merged))
     ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
     state.panel:Show()
     return shown
 end
 
+-- Forward-declared: clearing the preview redraws the real breakdown.
+local refreshNow
+
+-- Audit finding 7: closing the preview no longer leaves the panel hidden and the
+-- sample header in place. Preview.SetEnabled(false) clears its own flag before it
+-- calls this, so refreshNow is not refused by its preview guard; a focus switch
+-- clears this window while the preview is still on, and refreshNow returns at once
+-- there. In combat the meter would only be withheld, and the end-of-combat refresh
+-- draws the fight anyway, so nothing is read.
 local function clearPlaceholders()
     if state.rowPool then
         releaseRows()
     end
+    if state.header then
+        state.header:SetText("")
+        state.header:Hide()
+    end
+    state.headerText = nil
     if state.panel then
         state.panel:Hide()
     end
+    if ns.Preview.IsEnabled() then
+        return
+    end
+    local combatKind, inCombat = ClientRead.Call(UnitAffectingCombat, "boolean", "player")
+    if combatKind == PLAIN and inCombat == true then
+        return
+    end
+    refreshNow()
 end
 
 local function registerPreview()
@@ -562,7 +795,7 @@ local function registerPreview()
     })
 end
 
-local function refreshNow()
+function refreshNow()
     if not state.enabled then
         return false
     end
@@ -767,6 +1000,11 @@ local function disable()
     if state.rowPool then
         releaseRows()
     end
+    if state.header then
+        state.header:SetText("")
+        state.header:Hide()
+    end
+    state.headerText = nil
     if state.panel then
         state.panel:Hide()
     end
@@ -779,6 +1017,7 @@ local function disable()
     state.inCombat = false
     state.lastRowCount = 0
     state.truncatedRows = 0
+    state.otherRowShown = false
 end
 
 local function onConfigChanged(config, changedKey)
@@ -835,7 +1074,7 @@ ns.Registry.Register(FEATURE_ID, {
         maximumRows = {
             kind = ns.ConfigSchema.KIND.NUMBER, label = "Rows shown", order = 2,
             unit = ns.ConfigSchema.UNIT.COUNT,
-            description = "How many spells to list. Anything beyond this is counted, not dropped.",
+            description = "How many spells to list. Spells past this are summed in a final '+N more' row.",
             minimum = 1, maximum = 10, step = 1,
         },
         panelAlpha = {
@@ -899,6 +1138,19 @@ ns.DamageBreakdown = {
             durationSeconds = state.lastDurationSeconds,
             settlePending = state.settlePending,
             withheldReads = state.counters.withheldReads or 0,
+            -- Phase 20 section 3.6.
+            otherRowShown = state.otherRowShown == true,
+            headerText = state.headerText,
+            sumOfSpells = state.lastSumOfSpells or 0,
+            sourceTotal = state.lastTotalAmount,
+            lastMergedEntries = state.lastMergedEntries or 0,
+            lastEntries = state.lastEntryCount or 0,
+            lastSpells = state.lastSpellCount or 0,
+            percentsSum = state.percentsSum or 0,
+            panelHeight = state.panelHeight,
+            mergedEntries = state.counters.mergedEntries or 0,
+            otherRowsDrawn = state.counters.otherRowsDrawn or 0,
+            totalMismatchReads = state.counters.totalMismatchReads or 0,
             poolConstructed = constructed,
             poolLive = live,
             poolFree = free,

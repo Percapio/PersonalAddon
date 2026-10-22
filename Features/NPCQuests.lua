@@ -242,9 +242,10 @@ end
 local RESOLUTION = { RESOLVED = "Resolved", NOT_AN_NPC = "NotAnNpc",
     WITHHELD = "Withheld", ABSENT = "Absent" }
 
--- UnitGUID carries SecretWhenUnitIdentityRestricted, so the GUID is classified
--- before any string operation: strsplit on a withheld value raises in our code
--- (rule 10), and the secret-read lint exists for exactly this line.
+-- The GUID parse is Core/UnitIdentity.lua's since Phase 20 section 9; what is counted,
+-- and how each reading maps onto this file's resolutions, is unchanged.
+local IDENTITY = ns.UnitIdentity.READING
+
 local function npcIdForTooltip(tooltip)
     local getUnit = type(tooltip) == "table" and tooltip.GetUnit
     if type(getUnit) ~= "function" then
@@ -255,31 +256,22 @@ local function npcIdForTooltip(tooltip)
         return RESOLUTION.ABSENT
     end
 
-    local kind, guid = ClientRead.Call(_G.UnitGUID, "string", unit)
-    if kind == ClientRead.ABSENT then
-        return RESOLUTION.ABSENT
-    end
-    if kind ~= ClientRead.PLAIN then
+    local reading, detail = ns.UnitIdentity.NpcIdFor(unit)
+    if reading == IDENTITY.WITHHELD then
         bump("guidWithheld")
         return RESOLUTION.WITHHELD
     end
-
-    -- Creature-0-<server>-<instance>-<zone>-<npcId>-<spawn>. The first field says
-    -- what it is: a player's GUID has no NPC id, and a pet's belongs to its owner.
-    local guidType = guid:match("^(%a+)")
-    if guidType == "Player" then
-        bump("notAnNpc")
+    if reading == IDENTITY.NOT_AN_NPC then
+        if detail == true then
+            bump("notAnNpc")
+        end
         return RESOLUTION.NOT_AN_NPC
     end
-    if guidType ~= "Creature" and guidType ~= "Vehicle" then
-        return RESOLUTION.NOT_AN_NPC
-    end
-    local npcId = tonumber(guid:match("-(%d+)-%x+$"))
-    if npcId == nil then
+    if reading ~= IDENTITY.RESOLVED then
         return RESOLUTION.ABSENT
     end
     bump("npcsResolved")
-    return RESOLUTION.RESOLVED, npcId
+    return RESOLUTION.RESOLVED, detail
 end
 
 -- Drawing (section 3.4) ---------------------------------------------------------------

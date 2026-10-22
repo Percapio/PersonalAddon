@@ -105,6 +105,13 @@ local state = {
     ringsAllowed = false,
     -- What GetHeight last gave back, so /pa plates can show the round-trip.
     lastBarRead = nil,
+    -- Phase 20 section 7. Off by default, for Phase 15's reason: text on plates.
+    npcRoles = false,
+    -- Phase 20 section 8. Off by default: it changes how Blizzard's own plate looks.
+    nameAlignLeft = false,
+    -- Whether this client lets us set, and see, the name's alignment. Probed once on
+    -- the first eligible plate (section 8.4).
+    alignCapability = "NotYetProbed",
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
     -- enable binds it, so nothing here ever indexes nil.
     counters = {},
@@ -132,6 +139,8 @@ local function readSettings(config)
     state.barHeightFraction = settings.barHeightFraction or state.barHeightFraction
     state.guildNames = (settings.guildNames == true)
     state.guildFontSize = settings.guildFontSize or state.guildFontSize
+    state.npcRoles = (settings.npcRoles == true)
+    state.nameAlignLeft = (settings.nameAlignLeft == true)
     state.rarityRings = (settings.rarityRings ~= false)
     -- Compared against nil, not truthiness: an offset of 0 is a position.
     if settings.rarityRingSize ~= nil then
@@ -165,7 +174,10 @@ local function resolveParts(frame)
     -- two above, because on this client the well-known name is the one that moves --
     -- build 70450 re-anchored this very frame.
     local levelBadge = unitFrame.PlayerLevelDiffFrame or unitFrame.playerLevelDiffFrame
-    return unitFrame, healthBar, container, levelBadge
+    -- Phase 20 section 8.2. Blizzard's own name font string, which the alignment
+    -- setting writes one property of and never anchors.
+    local nameRegion = unitFrame.name
+    return unitFrame, healthBar, container, levelBadge, nameRegion
 end
 
 -- Scope -----------------------------------------------------------------------
@@ -270,6 +282,12 @@ end
 -- NOTHING RE-ASSERTS IT. The label is ours and Blizzard never writes it, which is
 -- what makes this phase smaller than the colour or the height. The guild is read
 -- when a plate attaches, and again when the client says a guild changed.
+--
+-- PHASE 20 (Architecture/20261021-Phase20.md section 7): the same slot carries an NPC's
+-- role -- <Innkeeper>, <Weapon Merchant> -- from QuestieDB's subName. A player has a
+-- guild and an NPC a role, so a plate carries at most one label. The decision is made
+-- per plate by wantedLabel, never per source: before it, a PLAYER_GUILD_UPDATE
+-- anywhere in view would have released every NPC's role.
 
 local GUILD_READING = {
     PLAIN = "Plain",
@@ -278,23 +296,16 @@ local GUILD_READING = {
     UNAVAILABLE = "Unavailable",
 }
 
--- The guild name for one unit. UnitIsPlayer is asked first because two thirds of
--- the plates in a city have no guild and six in ten of those are NPCs, and it is
--- the cheaper question (section 3.3).
+local LABEL_SOURCE = { GUILD = "Guild", ROLE = "Role" }
+
+-- The guild name for one unit already known to be a player. UnitIsPlayer is asked by
+-- wantedLabel, once per plate, before this: two thirds of the plates in a city have
+-- no guild and six in ten of those are NPCs, and it is the cheaper question
+-- (Phase 15 section 3.3).
 local function readGuild(unitToken)
     local fn = _G.GetGuildInfo
     if type(fn) ~= "function" then
         return GUILD_READING.UNAVAILABLE, "GetGuildInfo is missing from this client"
-    end
-
-    local playerKind, isPlayer = ClientRead.Call(_G.UnitIsPlayer, "boolean", unitToken)
-    if playerKind == WITHHELD then
-        -- "Could not tell whether this is a player" is not grounds for asking
-        -- about its guild.
-        return GUILD_READING.WITHHELD
-    end
-    if playerKind ~= PLAIN or isPlayer ~= true then
-        return GUILD_READING.NO_GUILD
     end
 
     local kind, name = ClientRead.Call(fn, "string", unitToken)
@@ -329,8 +340,9 @@ local function ensureGuildPool()
         return state.guildPool
     end
     state.guildPool = ns.FramePool.Create({
-        poolName = "guildLabels",
-        capacity = ns.GUILD_LABEL_POOL_CAPACITY,
+        -- Phase 20: one pool for guild and role labels alike (section 7.6).
+        poolName = "plateLabels",
+        capacity = ns.PLATE_LABEL_POOL_CAPACITY,
         dropPolicy = ns.DROP_POLICY.SURFACE_AND_FAIL,
         factory = function()
             -- UIParent, never the plate: SmartNavigation post-hooks CreateFrame
@@ -405,15 +417,20 @@ end
 -- than leaving that plate plain for the session.
 local sizeGuildLabel = styleGuildLabel
 
-local function releaseGuildLabel(plate)
-    if not plate.label then
-        return
+-- The plate's one label released, and every field that described it cleared.
+local function releasePlateLabel(plate)
+    if plate.label then
+        ns.FramePool.Release(state.guildPool, plate.label)
+        plate.label = nil
     end
-    ns.FramePool.Release(state.guildPool, plate.label)
-    plate.label = nil
+    plate.guild = nil
+    plate.role = nil
+    plate.labelSource = nil
 end
 
-local function attachGuildLabel(plate, guildName)
+-- Puts our label under one plate's health bar with the given text. Guild or role,
+-- the frame, size, outline, fade, anchor and gap are Phase 15's, unchanged.
+local function attachPlateLabel(plate, text, source)
     if not plate.container then
         return false
     end
@@ -422,7 +439,7 @@ local function attachGuildLabel(plate, guildName)
         if not label then
             bump(state.counters, "guildPoolExhausted")
             ns.Log.OnceError("plates:guildpool", format(
-                "the guild label pool was exhausted (%s); the cap is wrong",
+                "the nameplate label pool was exhausted (%s); the cap is wrong",
                 tostring(poolError)))
             return false
         end
@@ -435,72 +452,160 @@ local function attachGuildLabel(plate, guildName)
     label:SetWidth((widthKind == PLAIN and width and width > 0) and width or 120)
     label:ClearAllPoints()
     label:SetPoint("TOP", plate.container, "BOTTOM", 0, -ns.GUILD_LABEL_GAP)
-    -- Player-chosen text, so every pipe is doubled before it reaches the font
-    -- string: that is what makes the escape codes inert.
-    label.text:SetText(ns.EscapeGuard.Neutralize(guildName))
+    -- Player-chosen or third-party text, so every pipe is doubled before it reaches
+    -- the font string: that is what makes the escape codes inert. A guild name is
+    -- the server's word for a player's choice; a role is QuestieDB's, whose
+    -- RegisterCorrection any addon can call (section 7.6).
+    label.text:SetText(ns.EscapeGuard.Neutralize(text))
     label:Show()
-    bump(state.counters, "guildLabelsAttached")
+    if source == LABEL_SOURCE.ROLE then
+        bump(state.counters, "roleLabelsAttached")
+    else
+        bump(state.counters, "guildLabelsAttached")
+    end
     return true
 end
 
--- Brings one plate's label to whatever its guild reads as now. The one place the
--- guild is read, so attach and refresh cannot drift apart.
-local function applyGuild(plate)
-    if not state.guildNames or not plate.unitToken then
-        releaseGuildLabel(plate)
-        plate.guild = nil
-        return
+-- The role half of wantedLabel, for a unit already known not to be a player
+-- (section 7.2). Friendly is the client's own answer for the character playing now --
+-- the test Blizzard gives a plate its friendly options by -- so the same code serves
+-- Alliance and Horde, and nothing here knows a faction.
+local function wantedRole(unitToken)
+    local friendKind, friendly = ClientRead.Call(_G.UnitIsFriend, "boolean", "player", unitToken)
+    if friendKind == WITHHELD then
+        bump(state.counters, "roleReadsWithheld")
+        return nil
+    end
+    if friendly ~= true then
+        bump(state.counters, "roleSkippedNotFriendly")
+        return nil
     end
 
-    local reading, value = readGuild(plate.unitToken)
-    countGuildReading(reading)
-
-    if reading == GUILD_READING.UNAVAILABLE then
-        ns.Log.Once("plates:noguildapi", format(
-            "%s, so guild names cannot be shown", tostring(value)))
-        releaseGuildLabel(plate)
-        plate.guild = nil
-        return
+    local reading, npcId = ns.UnitIdentity.NpcIdFor(unitToken)
+    if reading == ns.UnitIdentity.READING.WITHHELD then
+        bump(state.counters, "roleReadsWithheld")
+        return nil
+    end
+    if reading ~= ns.UnitIdentity.READING.RESOLVED then
+        -- A pet, a player-controlled vehicle, or a GUID with no id: no role to have.
+        return nil
     end
 
-    if reading ~= GUILD_READING.PLAIN then
-        releaseGuildLabel(plate)
-        plate.guild = nil
-        return
+    local Bridge = ns.QuestieDBBridge
+    local roleReading, text = Bridge.NpcRole(npcId)
+    if roleReading == Bridge.ROLE.PLAIN then
+        bump(state.counters, "roleReadsPlain")
+        return LABEL_SOURCE.ROLE, text
+    end
+    if roleReading == Bridge.ROLE.NO_ROLE then
+        bump(state.counters, "roleReadsNone")
+        return nil
+    end
+    bump(state.counters, "roleBridgeUnavailable")
+    ns.Log.Once("plates:rolebridge", format(
+        "NPC roles come from QuestieDB, which is not usable here (%s), so none are shown",
+        tostring(text)))
+    return nil
+end
+
+-- What label one plate should carry (section 7.3, audit finding 12). Returns the
+-- source and the text, or nil. Nothing is read when both toggles are off (Phase 15's
+-- "no label, no read"). UnitIsPlayer is read once; a withheld answer is counted for
+-- each toggle that is on and asks nothing more; an NPC counts as "no guild" while
+-- guild names are on, exactly as Phase 15 counted it, and is never asked its guild.
+local function wantedLabel(plate)
+    local guildOn, rolesOn = state.guildNames, state.npcRoles
+    local unitToken = plate.unitToken
+    if not (guildOn or rolesOn) or not unitToken then
+        return nil
     end
 
-    if plate.guild == value and plate.label then
+    local playerKind, isPlayer = ClientRead.Call(_G.UnitIsPlayer, "boolean", unitToken)
+    if playerKind == WITHHELD then
+        -- "Could not tell whether this is a player" is not grounds for asking about
+        -- its guild, nor its role.
+        if guildOn then
+            countGuildReading(GUILD_READING.WITHHELD)
+        end
+        if rolesOn then
+            bump(state.counters, "roleReadsWithheld")
+        end
+        return nil
+    end
+
+    if playerKind == PLAIN and isPlayer == true then
+        if not guildOn then
+            return nil
+        end
+        local reading, value = readGuild(unitToken)
+        countGuildReading(reading)
+        if reading == GUILD_READING.UNAVAILABLE then
+            ns.Log.Once("plates:noguildapi", format(
+                "%s, so guild names cannot be shown", tostring(value)))
+            return nil
+        end
+        if reading ~= GUILD_READING.PLAIN then
+            return nil
+        end
+        return LABEL_SOURCE.GUILD, value
+    end
+
+    if guildOn then
+        countGuildReading(GUILD_READING.NO_GUILD)
+    end
+    if not rolesOn then
+        return nil
+    end
+    return wantedRole(unitToken)
+end
+
+-- Brings one plate's label to what wantedLabel says now. The one place either kind
+-- of label is decided, so attach, refresh and the toggles cannot drift apart.
+local function applyPlateLabel(plate)
+    local source, text = wantedLabel(plate)
+    if not source then
+        releasePlateLabel(plate)
         return
     end
-    plate.guild = value
-    attachGuildLabel(plate, value)
+    if plate.labelSource == source and plate.label
+        and ((source == LABEL_SOURCE.GUILD and plate.guild == text)
+            or (source == LABEL_SOURCE.ROLE and plate.role == text)) then
+        return
+    end
+    plate.labelSource = source
+    if source == LABEL_SOURCE.GUILD then
+        plate.guild, plate.role = text, nil
+    else
+        plate.role, plate.guild = text, nil
+    end
+    attachPlateLabel(plate, text, source)
 end
 
 -- PLAYER_GUILD_UPDATE: a player can join, leave or be kicked from a guild while
 -- their plate is on screen, so a label read only at attach would go stale. The
 -- event names a unit, but as a UnitTokenVariant that need not be the nameplateN
 -- token our records are keyed by, and matching it would cost a read per plate
--- anyway, so every tracked plate is re-read. Bounded by the plate cap.
-local function refreshGuildLabels()
+-- anyway, so every tracked plate is re-read. Bounded by the plate cap. A role comes
+-- from the bridge's cache, so for an NPC this is a table lookup.
+local function refreshPlateLabels()
     bump(state.counters, "guildRefreshes")
-    if not state.guildNames then
+    if not (state.guildNames or state.npcRoles) then
         return 0
     end
     local touched = 0
     for _, plate in pairs(state.plates) do
-        applyGuild(plate)
+        applyPlateLabel(plate)
         touched = touched + 1
     end
     return touched
 end
 
-local function releaseAllGuildLabels()
+local function releaseAllPlateLabels()
     if not state.guildPool then
         return
     end
     for _, plate in pairs(state.plates) do
-        releaseGuildLabel(plate)
-        plate.guild = nil
+        releasePlateLabel(plate)
     end
 end
 
@@ -512,6 +617,195 @@ local function applyGuildFontSize()
         return
     end
     ns.FramePool.ForEach(state.guildPool, sizeGuildLabel)
+end
+
+-- Name alignment (Phase 20 section 8) -----------------------------------------
+--
+-- On the Thin and Cast Focus styles Blizzard lays the name out ABOVE the bar,
+-- anchored from the bar's left end to its right end, and Camelot centres it
+-- (nameJustificationWhenAboveHealthBar = "CENTER"). So "the name at the left end of
+-- the bar" is one property -- SetJustifyH("LEFT") -- and no anchor is touched. Phase
+-- 2 section 4.7's restriction is on anchoring (GetPoint is SecretWhenAnchoringSecret);
+-- justification is not anchoring, but it has never been tried on a nameplate name,
+-- so the first eligible plate is PROBED: written, read back, and the verdict kept.
+--
+-- UpdateAnchors rewrites the alignment on every layout pass, so like the bar colour
+-- and the container height the value has two writers and is re-asserted -- from
+-- trackPlate, from the existing post-hooks, from every sweep, and when the setting
+-- turns on. No hook is added. No Blizzard code reads the name's justification back,
+-- so nothing of ours reaches Blizzard's execution through it.
+
+local ALIGN_CAPABILITY = {
+    NOT_YET_PROBED = "NotYetProbed",
+    VERIFIED = "Verified",
+    REFUSED = "Refused",
+    UNVERIFIABLE = "Unverifiable",
+}
+
+local ALIGN_SKIP = {
+    STYLE_NOT_ABOVE = "StyleNotAbove",
+    STYLE_UNREADABLE = "StyleUnreadable",
+    NAME_ONLY = "NameOnly",
+    NO_NAME_REGION = "NoNameRegion",
+}
+
+-- Each skip lands on one counter (audit finding 16). Off and CapabilityDown are
+-- checked before any per-plate work and counted nowhere.
+local ALIGN_SKIP_COUNTER = {
+    StyleNotAbove = "nameAlignSkippedStyle",
+    StyleUnreadable = "nameAlignSkippedStyle",
+    NameOnly = "nameAlignSkippedNameOnly",
+    NoNameRegion = "nameAlignSkippedNoRegion",
+}
+
+-- Whether Blizzard is laying names out above the bar, spanning it: true, false, or
+-- nil when either option field did not read. Read once per sweep, and once per hook
+-- fire for its one plate; both fields change only with the Style.
+local function readNameAnchorStyle()
+    local styleKind, style = ClientRead.Field(_G.NamePlateSetupOptions, "unitNameAnchorStyle", "number")
+    local stylesKind, styles = ClientRead.Field(_G.NamePlateConstants, "NAME_ANCHOR_STYLES", "table")
+    if styleKind ~= PLAIN or stylesKind ~= PLAIN then
+        return nil
+    end
+    local aboveKind, above = ClientRead.Field(styles, "AboveHealthBar", "number")
+    if aboveKind ~= PLAIN then
+        return nil
+    end
+    return style == above
+end
+
+-- Why a plate is not eligible, or nil when it is (section 8.2). showOnlyName is
+-- provisional while Blizzard's OnUnitSet runs (audit finding 14): a plate judged
+-- eligible from a hook during attach is healed by the next pass that sees it final.
+local function alignIneligibility(plate, styleAbove)
+    if styleAbove == nil then
+        return ALIGN_SKIP.STYLE_UNREADABLE
+    end
+    if not styleAbove then
+        return ALIGN_SKIP.STYLE_NOT_ABOVE
+    end
+    if not plate.nameRegion then
+        return ALIGN_SKIP.NO_NAME_REGION
+    end
+    local onlyKind, onlyName = ClientRead.Field(plate.unitFrame, "showOnlyName", "boolean")
+    if onlyKind == WITHHELD or (onlyKind == PLAIN and onlyName == true) then
+        return ALIGN_SKIP.NAME_ONLY
+    end
+    return nil
+end
+
+local function noteAlignCapability(verdict)
+    state.alignCapability = verdict
+    -- A counter NAME, not a string value: Diagnostics rejects a non-number counter
+    -- and would discard the whole saved log (section 11).
+    bump(state.counters, "nameAlignCapability" .. verdict)
+end
+
+-- The first eligible plate: write, read back, keep the verdict (section 8.4). At most
+-- three calls, so at most one complaint line whatever the client does.
+local function probeNameAlignment(plate)
+    local region = plate.nameRegion
+    local firstKind, original = ClientRead.Call(region.GetJustifyH, "string", region)
+    if firstKind ~= PLAIN then
+        noteAlignCapability(ALIGN_CAPABILITY.UNVERIFIABLE)
+        ns.Log.Once("plates:alignunverifiable",
+            "this client will not show a nameplate name's alignment, so the left-align setting cannot tell whether it worked and stays off")
+        return ALIGN_CAPABILITY.UNVERIFIABLE
+    end
+    local wrote = pcall(region.SetJustifyH, region, ns.NAME_ALIGN_JUSTIFY)
+    local backKind, back = ClientRead.Call(region.GetJustifyH, "string", region)
+    if wrote and backKind == PLAIN and back == ns.NAME_ALIGN_JUSTIFY then
+        noteAlignCapability(ALIGN_CAPABILITY.VERIFIED)
+        plate.nameAligned = true
+        if original ~= ns.NAME_ALIGN_JUSTIFY then
+            bump(state.counters, "nameAlignWrites")
+        end
+        return ALIGN_CAPABILITY.VERIFIED
+    end
+    pcall(region.SetJustifyH, region, original)
+    noteAlignCapability(ALIGN_CAPABILITY.REFUSED)
+    ns.Log.Once("plates:alignrefused",
+        "this client did not keep a nameplate name's alignment, so the left-align setting stays off")
+    return ALIGN_CAPABILITY.REFUSED
+end
+
+-- Keeps one eligible plate's name at the left end of its bar. Read before write: it
+-- is what tells a refused write from an accepted one. A write that raises stands the
+-- setting down rather than being retried four times a second.
+local function reassertNameAlignment(plate)
+    local region = plate.nameRegion
+    local kind, current = ClientRead.Call(region.GetJustifyH, "string", region)
+    if kind == PLAIN and current == ns.NAME_ALIGN_JUSTIFY then
+        plate.nameAligned = true
+        bump(state.counters, "nameAlignUnchanged")
+        return
+    end
+    if not pcall(region.SetJustifyH, region, ns.NAME_ALIGN_JUSTIFY) then
+        bump(state.counters, "nameAlignWriteFailed")
+        noteAlignCapability(ALIGN_CAPABILITY.REFUSED)
+        ns.Log.Once("plates:alignrefused",
+            "this client did not keep a nameplate name's alignment, so the left-align setting stays off")
+        return
+    end
+    plate.nameAligned = true
+    bump(state.counters, "nameAlignWrites")
+end
+
+-- The one alignment entry point (section 8.3), for trackPlate, the hooks, the sweep
+-- and the setting turning on. styleAbove is readNameAnchorStyle()'s answer.
+local function alignPlateName(plate, styleAbove)
+    if not state.nameAlignLeft then
+        return
+    end
+    local verdict = state.alignCapability
+    if verdict == ALIGN_CAPABILITY.REFUSED or verdict == ALIGN_CAPABILITY.UNVERIFIABLE then
+        return
+    end
+    local why = alignIneligibility(plate, styleAbove)
+    if why then
+        -- The layout pass that made it ineligible already rewrote its alignment, so
+        -- nothing is written; the mark and the counters converge here.
+        plate.nameAligned = false
+        bump(state.counters, ALIGN_SKIP_COUNTER[why])
+        return
+    end
+    if verdict == ALIGN_CAPABILITY.NOT_YET_PROBED then
+        probeNameAlignment(plate)
+        return
+    end
+    reassertNameAlignment(plate)
+end
+
+-- Every tracked plate, outside the colour sweep's SCOPE.IN filter: a friendly plate's
+-- name is as much the user's as an enemy's (Phase 19's lesson).
+local function alignAllPlateNames()
+    if not state.nameAlignLeft then
+        return
+    end
+    local styleAbove = readNameAnchorStyle()
+    for _, plate in pairs(state.plates) do
+        alignPlateName(plate, styleAbove)
+    end
+end
+
+-- Hands every aligned name back to Blizzard's own alignment (section 8.5). That option
+-- is the original by construction: it is what UpdateAnchors writes on an eligible
+-- plate. When it does not read, nothing is written and Blizzard's next layout pass
+-- restores the value. Returns how many were written back.
+local function restoreNameAlignment()
+    local kind, original = ClientRead.Field(_G.NamePlateSetupOptions,
+        "nameJustificationWhenAboveHealthBar", "string")
+    local restored = 0
+    for _, plate in pairs(state.plates) do
+        if plate.nameAligned then
+            plate.nameAligned = false
+            if kind == PLAIN and plate.nameRegion
+                and pcall(plate.nameRegion.SetJustifyH, plate.nameRegion, original) then
+                restored = restored + 1
+            end
+        end
+    end
+    return restored
 end
 
 -- Bar height (Phase 14) -------------------------------------------------------
@@ -1062,9 +1356,11 @@ local function untrackPlate(frame)
     end
     unstylePlate(plate)
     -- Before the record goes, while the label is still reachable: a label left on
-    -- a recycled plate would show the previous unit's guild.
-    releaseGuildLabel(plate)
-    plate.guild = nil
+    -- a recycled plate would show the previous unit's guild, or role.
+    releasePlateLabel(plate)
+    -- Phase 20 section 8.5: nothing to write back. The plate's next occupancy runs
+    -- Blizzard's UpdateAnchors before anything is drawn.
+    plate.nameAligned = false
     -- Phase 19. Same moment and same reason: a ring left on a recycled plate would
     -- give the next unit the previous unit's rank.
     releaseRarityRing(plate)
@@ -1096,13 +1392,16 @@ local function trackPlate(unitToken)
         untrackPlate(frame)
     end
 
-    local unitFrame, healthBar, container, levelBadge = resolveParts(frame)
+    local unitFrame, healthBar, container, levelBadge, nameRegion = resolveParts(frame)
     local plate = {
         frame = frame,
         unitFrame = unitFrame,
         healthBar = healthBar,
         container = container,
         levelBadge = levelBadge,
+        -- Phase 20 section 8.2.
+        nameRegion = nameRegion,
+        nameAligned = false,
         unitToken = unitToken,
         scope = classifyScope(unitToken, frame),
         styleApplied = false,
@@ -1135,13 +1434,18 @@ local function trackPlate(unitToken)
     -- write is idempotent, so doing it twice costs one comparison.
     reassertBarHeight(plate)
     -- Phase 15. Outside the scope guard, like the height: a guild name belongs on
-    -- every player's plate, friendly or hostile, and NPCs are excluded by having
-    -- no guild rather than by scope.
-    applyGuild(plate)
+    -- every player's plate, friendly or hostile. Phase 20: so does a friendly NPC's
+    -- role, and friendly NPCs are SCOPE.OUT by definition.
+    applyPlateLabel(plate)
     -- Phase 19, outside it for a sharper reason: a neutral elite is SCOPE.OUT by
     -- classifyScope's own definition -- it classifies for the COLOUR feature, from a
     -- damage dealer's point of view -- and is still attackable and still elite.
     applyRarityRing(plate)
+    -- Phase 20 section 8.3, audit finding 14: an attach is judged HERE. Blizzard's
+    -- OnUnitSet re-lays the name out after the setup-time hooks have returned, so the
+    -- hooks cannot be the attach path; this handler, run after Blizzard's driver, sees
+    -- the final layout and showOnlyName decided.
+    alignPlateName(plate, readNameAnchorStyle())
 
     if plate.scope == SCOPE.UNREACHABLE then
         ns.Log.Once("plates:unreachable",
@@ -1183,6 +1487,9 @@ local function rescopePlate(plate)
     -- gate D: a unit that stops being attackable while its plate is up must lose
     -- its ring here rather than at NAME_PLATE_UNIT_REMOVED.
     applyRarityRing(plate)
+    -- Phase 20 section 7.5. A unit turning hostile loses its role here, beside the
+    -- ring, and one turning friendly gains it.
+    applyPlateLabel(plate)
 end
 
 local function sweepStalePlates()
@@ -1264,6 +1571,9 @@ local function reassertPlate(plate)
     -- friendly ones included, because a bar that were short on enemies and tall
     -- on friends would read as a defect rather than a setting (section 5.4).
     reassertBarHeight(plate)
+    -- Phase 20 section 8.3: outside it for the same reason. A layout pass on an
+    -- attached plate reaches here in the same frame as Blizzard's reset.
+    alignPlateName(plate, readNameAnchorStyle())
 
     if plate.scope ~= SCOPE.IN or not plate.styleApplied then
         return
@@ -1338,6 +1648,9 @@ local function sweep()
             end
         end
     end
+    -- Phase 20 section 8.3: every plate, outside the scope filter below, for the
+    -- paths that re-lay a name out after the hooks have run.
+    alignAllPlateNames()
     for _, plate in pairs(state.plates) do
         if plate.scope == SCOPE.IN then
             local ok, fault = ns.Isolation.Call(paintPlate, plate, allies, allyCount)
@@ -1441,7 +1754,7 @@ end
 -- Signals ---------------------------------------------------------------------
 
 local function onGuildUpdate()
-    refreshGuildLabels()
+    refreshPlateLabels()
 end
 
 local function onPlateAdded(unitToken)
@@ -1573,8 +1886,13 @@ local function disable()
     -- Blizzard would restore these itself on its next layout pass; this only
     -- makes it immediate (section 5.5).
     restoreBarHeights()
+    -- Phase 20 section 8.5, for the same reason and at the same moment.
+    restoreNameAlignment()
+    -- Like the ring art below: a disable is the cheapest moment to let the probe
+    -- run again, and the only way back to an unprobed state inside a UI load.
+    state.alignCapability = ALIGN_CAPABILITY.NOT_YET_PROBED
 
-    releaseAllGuildLabels()
+    releaseAllPlateLabels()
     releaseAllRarityRings()
     -- The artwork probe is per UI load, not per enable -- but a disable is the
     -- cheapest moment to let it run again, and three C_Texture reads on the next
@@ -1610,13 +1928,21 @@ local function onConfigChanged(config, changedKey)
         return ns.CONFIG_RESULT.APPLIED
     end
 
-    if changedKey == "guildNames" then
-        if state.guildNames then
-            for _, plate in pairs(state.plates) do
-                applyGuild(plate)
-            end
+    -- Phase 20 section 7.5: either toggle re-decides every plate's one label, which
+    -- leaves the other kind's labels as they were.
+    if changedKey == "guildNames" or changedKey == "npcRoles" then
+        for _, plate in pairs(state.plates) do
+            applyPlateLabel(plate)
+        end
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    -- Phase 20 section 8.3: on, every tracked plate at once; off, handed back.
+    if changedKey == "nameAlignLeft" then
+        if state.nameAlignLeft then
+            alignAllPlateNames()
         else
-            releaseAllGuildLabels()
+            restoreNameAlignment()
         end
         return ns.CONFIG_RESULT.APPLIED
     end
@@ -1706,6 +2032,9 @@ defaultSettings.barHeightFraction = 1.0
 -- Phase 15: off by default, because it puts text on every player's nameplate.
 defaultSettings.guildNames = false
 defaultSettings.guildFontSize = ns.GUILD_FONT_DEFAULT
+-- Phase 20: off by default, for Phase 15's reason (section 10.2).
+defaultSettings.npcRoles = false
+defaultSettings.nameAlignLeft = false
 -- Phase 19: on by default. Unlike the guild label this adds no text and appears
 -- only on the monsters whose rank is worth knowing before you pull them.
 defaultSettings.rarityRings = true
@@ -1737,15 +2066,26 @@ ns.Registry.Register(FEATURE_ID, {
             description = "As a share of the game's own height. Everything else on the nameplate stays the game's, so a shorter bar lowers the name with it.",
             minimum = 0.3, maximum = 1.0, step = 0.05,
         },
+        -- Phase 20 section 8. Blizzard's own name, re-aligned; no anchor is moved.
+        nameAlignLeft = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Names at the left end of the bar", order = 3,
+            description = "Moves each nameplate's name from the middle of the bar to its left end. For the Thin and Cast Focus styles; Large and Block already put the name inside the bar on the left.",
+        },
         -- Phase 15. A guild name encodes nothing, unlike the six colours below,
         -- so it gets no colour of its own: one faded white is the right amount
         -- of emphasis for a label.
         guildNames = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show guild names", order = 3,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show guild names", order = 4,
             description = "Under the health bar, for every player who has one. Nothing is shown for a player with no guild, or for a monster.",
         },
+        -- Phase 20 section 7: the same place, size, outline and fade as a guild name,
+        -- with a switch of its own (decision D5).
+        npcRoles = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show NPC roles", order = 5,
+            description = "Under the health bar of friendly NPCs, such as Innkeeper or Weapon Merchant, from QuestieDB. Needs QuestieDB and friendly NPC nameplates; nothing is shown in dungeons and raids.",
+        },
         guildFontSize = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Guild name size", order = 4,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Guild name and role size", order = 6,
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = ns.GUILD_FONT_MINIMUM, maximum = ns.GUILD_FONT_MAXIMUM, step = 1,
         },
@@ -1753,54 +2093,54 @@ ns.Registry.Register(FEATURE_ID, {
         -- scans them, and none of the labels says "dragon": the artwork is the
         -- game's own and may be a star or a skull on another flavour.
         rarityRings = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Rare and elite rings", order = 5,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Rare and elite rings", order = 7,
             description = "The game's own target-frame surround around the level badge: gold for an elite, silver for a rare or rare-elite, winged gold for a boss. Only on monsters you can attack, and off in dungeons and raids where nearly everything is elite.",
         },
         rarityRingSize = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring size", order = 6,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring size", order = 8,
             unit = ns.ConfigSchema.UNIT.FRACTION,
             minimum = ns.RARITY_RING_SIZE_MINIMUM, maximum = ns.RARITY_RING_SIZE_MAXIMUM,
             step = ns.RARITY_RING_SIZE_STEP,
         },
         rarityRingOffsetX = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring offset, left and right", order = 7,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring offset, left and right", order = 9,
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -ns.RARITY_RING_OFFSET_LIMIT, maximum = ns.RARITY_RING_OFFSET_LIMIT, step = 1,
         },
         rarityRingOffsetY = {
-            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring offset, up and down", order = 8,
+            kind = ns.ConfigSchema.KIND.NUMBER, label = "Ring offset, up and down", order = 10,
             unit = ns.ConfigSchema.UNIT.PIXELS,
             minimum = -ns.RARITY_RING_OFFSET_LIMIT, maximum = ns.RARITY_RING_OFFSET_LIMIT, step = 1,
         },
         yieldSelectedTarget = {
-            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 9,
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 11,
             description = "Stops contesting the bar colour on the unit you have selected. Turn this on if that plate flickers.",
         },
         colourOnPlayer = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking you", order = 10,
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking you", order = 12,
             group = "Colours, highest priority first",
             groupDescription = "The threat panel's bars use these colours too.",
         },
         -- R7 (Phase 11 section 3).
         colourAboutToPull = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "You are about to pull it", order = 11,
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "You are about to pull it", order = 13,
             group = "Colours, highest priority first",
             description = "Your threat is above the tank's, and the mob is not on you yet",
         },
         colourTapDenied = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "Tagged by a player outside your group", order = 12,
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Tagged by a player outside your group", order = 14,
             group = "Colours, highest priority first",
         },
         colourOnGroup = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking your group or pet", order = 13,
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "It is attacking your group or pet", order = 15,
             group = "Colours, highest priority first",
         },
         colourNeutral = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "Neutral, and on neither you nor your group", order = 14,
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Neutral, and on neither you nor your group", order = 16,
             group = "Colours, highest priority first",
         },
         colourElsewhere = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "Hostile, and attacking neither", order = 15,
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Hostile, and attacking neither", order = 17,
             group = "Colours, highest priority first",
         },
         -- Not curated: a frame-rate decision dressed as a preference.
@@ -1867,14 +2207,52 @@ ns.Nameplates = {
             barHeightTolerance = BAR_HEIGHT_TOLERANCE,
             guildNames = state.guildNames,
             guildFontSize = state.guildFontSize,
+            -- Plates whose one label shows a guild; roleLabels counts the others.
             guildLabels = (function()
                 local count = 0
                 for _, plate in pairs(state.plates) do
-                    if plate.label then count = count + 1 end
+                    if plate.label and plate.labelSource == LABEL_SOURCE.GUILD then
+                        count = count + 1
+                    end
                 end
                 return count
             end)(),
-            guildPoolCapacity = ns.GUILD_LABEL_POOL_CAPACITY,
+            -- Kept under its Phase 15 name (audit finding 13): one pool for both kinds.
+            guildPoolCapacity = ns.PLATE_LABEL_POOL_CAPACITY,
+            -- Phase 20 section 11.
+            labelPoolCapacity = ns.PLATE_LABEL_POOL_CAPACITY,
+            npcRoles = state.npcRoles,
+            roleLabels = (function()
+                local count = 0
+                for _, plate in pairs(state.plates) do
+                    if plate.label and plate.labelSource == LABEL_SOURCE.ROLE then
+                        count = count + 1
+                    end
+                end
+                return count
+            end)(),
+            roleReadsPlain = counters.roleReadsPlain or 0,
+            roleReadsNone = counters.roleReadsNone or 0,
+            roleReadsWithheld = counters.roleReadsWithheld or 0,
+            roleSkippedNotFriendly = counters.roleSkippedNotFriendly or 0,
+            roleBridgeUnavailable = counters.roleBridgeUnavailable or 0,
+            roleLabelsAttached = counters.roleLabelsAttached or 0,
+            roleBridge = ns.QuestieDBBridge.Describe(),
+            nameAlignLeft = state.nameAlignLeft,
+            nameAlignCapability = state.alignCapability,
+            nameAlignedNow = (function()
+                local count = 0
+                for _, plate in pairs(state.plates) do
+                    if plate.nameAligned then count = count + 1 end
+                end
+                return count
+            end)(),
+            nameAlignWrites = counters.nameAlignWrites or 0,
+            nameAlignUnchanged = counters.nameAlignUnchanged or 0,
+            nameAlignSkippedStyle = counters.nameAlignSkippedStyle or 0,
+            nameAlignSkippedNameOnly = counters.nameAlignSkippedNameOnly or 0,
+            nameAlignSkippedNoRegion = counters.nameAlignSkippedNoRegion or 0,
+            nameAlignWriteFailed = counters.nameAlignWriteFailed or 0,
             guildReadsPlain = counters.guildReadsPlain or 0,
             guildReadsNoGuild = counters.guildReadsNoGuild or 0,
             guildReadsWithheld = counters.guildReadsWithheld or 0,

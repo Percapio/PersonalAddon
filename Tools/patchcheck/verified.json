@@ -1,13 +1,13 @@
 {
- "acceptedAt": 1791737243.7552059,
- "acceptedBy": "Accepted",
+ "acceptedAt": 1792596182.8791547,
+ "acceptedBy": "AcceptedAfterReview",
  "client": {
-  "binaryModifiedAt": 1791645441.4638898,
-  "build": "1.60.1.70338"
+  "binaryModifiedAt": 1792205387.8312545,
+  "build": "1.60.1.70450"
  },
- "exportDigest": "62705aa5d4d8fbf56ce79a417a31b76e8b730b9a3a4169130f5187342baa35d7",
- "exportedAt": 1791736761.090258,
- "report": "2026-10-11-1.60.1.70338.md",
+ "exportDigest": "6baabdd9dca9e2021be53dcbbfc85ee950cf81a3018939f12437d61a2be8f89f",
+ "exportedAt": 1792209329.039382,
+ "report": "2026-10-16-1.60.1.70450.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
@@ -15,10 +15,16 @@
   "C_CVar.SetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
   ],
+  "C_Container.GetContainerItemID": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
   "C_Container.GetContainerItemInfo": [
    "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
   ],
   "C_Container.GetContainerNumSlots": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "C_Container.GetItemCooldown": [
    "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
   ],
   "C_Container.SortBags": [
@@ -36,6 +42,9 @@
   "C_DamageMeter.IsDamageMeterAvailable": [
    "Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua"
   ],
+  "C_Item.GetItemInfo": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
   "C_Item.GetItemInfoInstant": [
    "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
   ],
@@ -43,6 +52,9 @@
    "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
   ],
   "C_Item.GetItemQualityColor": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
+  "C_Item.GetItemSpell": [
    "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
   ],
   "C_MerchantFrame.GetNumJunkItems": [
@@ -66,6 +78,24 @@
   "C_PlayerInteractionManager.IsInteractingWithNpcOfType": [
    "Blizzard_APIDocumentationGenerated/PlayerInteractionManagerDocumentation.lua"
   ],
+  "C_QuestLog.GetLogIndexForQuestID": [
+   "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
+  ],
+  "C_QuestLog.GetNumQuestLogEntries": [
+   "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
+  ],
+  "C_QuestLog.GetQuestIDForLogIndex": [
+   "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
+  ],
+  "C_QuestLog.GetQuestObjectives": [
+   "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
+  ],
+  "C_QuestLog.IsComplete": [
+   "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
+  ],
+  "C_QuestLog.IsQuestFlaggedCompleted": [
+   "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
+  ],
   "C_RestrictedActions.IsAddOnRestrictionActive": [
    "Blizzard_APIDocumentationGenerated/RestrictedActionsDocumentation.lua"
   ],
@@ -75,11 +105,17 @@
   "C_Spell.GetSpellInfo": [
    "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
   ],
+  "C_Spell.GetSpellName": [
+   "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
+  ],
   "C_Spell.GetSpellPowerCost": [
    "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
   ],
   "C_Spell.GetSpellTexture": [
    "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
+  ],
+  "C_Texture.GetAtlasInfo": [
+   "Blizzard_APIDocumentationGenerated/TextureUtilsDocumentation.lua"
   ],
   "C_Timer.After": [
    "Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua"
@@ -89,6 +125,9 @@
   ],
   "C_Timer.NewTimer": [
    "Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua"
+  ],
+  "C_TooltipInfo.GetItemByID": [
+   "Blizzard_APIDocumentationGenerated/TooltipInfoDocumentation.lua"
   ],
   "CursorHasItem": [
    "Blizzard_APIDocumentationGenerated/GameCursorDocumentation.lua"
@@ -144,7 +183,13 @@
   "SimpleButtonAPI:SetText": [
    "Blizzard_APIDocumentationGenerated/SimpleButtonAPIDocumentation.lua"
   ],
+  "SimpleEditBoxAPI:GetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
+  ],
   "SimpleEditBoxAPI:SetEnabled": [
+   "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
+  ],
+  "SimpleEditBoxAPI:SetFont": [
    "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
   ],
   "SimpleEditBoxAPI:SetJustifyH": [
@@ -156,7 +201,13 @@
   "SimpleEditBoxAPI:SetTextColor": [
    "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
   ],
+  "SimpleFontAPI:GetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
   "SimpleFontAPI:SetAlpha": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
+  "SimpleFontAPI:SetFont": [
    "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
   ],
   "SimpleFontAPI:SetJustifyH": [
@@ -164,6 +215,12 @@
   ],
   "SimpleFontAPI:SetTextColor": [
    "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:GetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:SetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
   ],
   "SimpleFontStringAPI:SetFormattedText": [
    "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
@@ -228,6 +285,12 @@
   "SimpleFrameScriptObjectAPI:GetName": [
    "Blizzard_APIDocumentationGenerated/SimpleFrameScriptObjectAPIDocumentation.lua"
   ],
+  "SimpleHTMLAPI:GetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
+  ],
+  "SimpleHTMLAPI:SetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
+  ],
   "SimpleHTMLAPI:SetJustifyH": [
    "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
   ],
@@ -241,6 +304,12 @@
    "Blizzard_APIDocumentationGenerated/SimpleLineAPIDocumentation.lua"
   ],
   "SimpleMessageFrameAPI:AddMessage": [
+   "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
+  ],
+  "SimpleMessageFrameAPI:GetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
+  ],
+  "SimpleMessageFrameAPI:SetFont": [
    "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
   ],
   "SimpleMessageFrameAPI:SetJustifyH": [
@@ -294,6 +363,9 @@
   "SimpleScriptRegionResizingAPI:SetPoint": [
    "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
   ],
+  "SimpleScriptRegionResizingAPI:SetSize": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
+  ],
   "SimpleScriptRegionResizingAPI:SetWidth": [
    "Blizzard_APIDocumentationGenerated/SimpleScriptRegionResizingAPIDocumentation.lua"
   ],
@@ -321,6 +393,9 @@
   "SimpleStatusBarAPI:SetValue": [
    "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
   ],
+  "SimpleTextureBaseAPI:SetAtlas": [
+   "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
+  ],
   "SimpleTextureBaseAPI:SetColorTexture": [
    "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
   ],
@@ -334,6 +409,9 @@
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitCanAttack": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitClass": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitClassification": [
@@ -352,6 +430,9 @@
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitHealthMax": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitIsBossMob": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitIsDead": [
@@ -378,6 +459,9 @@
   "UnitPowerType": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
+  "UnitRace": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
   "UnitReaction": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
@@ -389,6 +473,12 @@
   ],
   "canaccessvalue": [
    "Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
+  ],
+  "event ACTIONBAR_SLOT_CHANGED": [
+   "Blizzard_APIDocumentationGenerated/ActionBarFrameDocumentation.lua"
+  ],
+  "event ACTION_RANGE_CHECK_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/ActionBarFrameDocumentation.lua"
   ],
   "event ADDON_ACTION_BLOCKED": [
    "Blizzard_APIDocumentationGenerated/RestrictedActionsDocumentation.lua"
@@ -406,6 +496,9 @@
    "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
   ],
   "event BAG_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
+  ],
+  "event BAG_UPDATE_COOLDOWN": [
    "Blizzard_APIDocumentationGenerated/ContainerDocumentation.lua"
   ],
   "event BAG_UPDATE_DELAYED": [
@@ -450,6 +543,9 @@
   "event PLAYER_GUILD_UPDATE": [
    "Blizzard_APIDocumentationGenerated/GuildInfoDocumentation.lua"
   ],
+  "event PLAYER_LEVEL_UP": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
   "event PLAYER_LOGIN": [
    "Blizzard_APIDocumentationGenerated/SystemDocumentation.lua"
   ],
@@ -462,6 +558,9 @@
   "event PLAYER_REGEN_ENABLED": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
+  "event QUEST_LOG_UPDATE": [
+   "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
+  ],
   "event UNIT_DISPLAYPOWER": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
@@ -473,6 +572,9 @@
   ],
   "event UNIT_SPELLCAST_SUCCEEDED": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "event UPDATE_MACROS": [
+   "Blizzard_APIDocumentationGenerated/UIMacrosDocumentation.lua"
   ],
   "issecrettable": [
    "Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
@@ -537,8 +639,14 @@
   "lua GameMenuFrame": [
    "Blizzard_GameMenu/Shared/GameMenuFrame.xml"
   ],
+  "lua GameTooltip_AddBlankLineToTooltip": [
+   "Blizzard_SharedXML/SharedTooltipTemplates.lua"
+  ],
   "lua GetCVar": [
    "Blizzard_SharedXMLBase/CvarUtil.lua"
+  ],
+  "lua GetQuestDifficultyColor": [
+   "Blizzard_FrameXMLUtil/Mainline/DifficultyUtil.lua"
   ],
   "lua GuildControlUI": [
    "Blizzard_GuildControlUI/Blizzard_GuildControlUI.xml"
@@ -557,6 +665,9 @@
   ],
   "lua LAST_ACTIVE_CHAT_EDIT_BOX": [
    "Blizzard_ChatFrameBase/Shared/ChatFrameUtil.lua"
+  ],
+  "lua MacroFrame": [
+   "Blizzard_MacroUI/Blizzard_MacroUI.xml"
   ],
   "lua MinimalSliderWithSteppersMixin": [
    "Blizzard_SharedXML/Shared/Slider/MinimalSlider.lua"
@@ -594,6 +705,9 @@
   "lua TooltipBorderedFrameTemplate": [
    "Blizzard_SharedXML/SharedTooltipTemplates.xml"
   ],
+  "lua TooltipDataProcessor": [
+   "Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua"
+  ],
   "lua print": [
    "Blizzard_PrintHandler/Blizzard_PrintHandler.lua"
   ],
@@ -624,6 +738,16 @@
    "Returns.success.Type": "\"bool\"",
    "SecretArguments": "\"NotAllowed\""
   },
+  "C_Container.GetContainerItemID": {
+   "Arguments.containerIndex.Nilable": "false",
+   "Arguments.containerIndex.Type": "\"BagIndex\"",
+   "Arguments.slotIndex.Nilable": "false",
+   "Arguments.slotIndex.Type": "\"luaIndex\"",
+   "MayReturnNothing": "true",
+   "Returns.containerID.Nilable": "false",
+   "Returns.containerID.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "C_Container.GetContainerItemInfo": {
    "Arguments.containerIndex.Nilable": "false",
    "Arguments.containerIndex.Type": "\"BagIndex\"",
@@ -639,6 +763,18 @@
    "Arguments.containerIndex.Type": "\"BagIndex\"",
    "Returns.numSlots.Nilable": "false",
    "Returns.numSlots.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Container.GetItemCooldown": {
+   "Arguments.itemID.Nilable": "false",
+   "Arguments.itemID.Type": "\"number\"",
+   "MayReturnNothing": "true",
+   "Returns.duration.Nilable": "false",
+   "Returns.duration.Type": "\"number\"",
+   "Returns.enable.Nilable": "false",
+   "Returns.enable.Type": "\"number\"",
+   "Returns.startTime.Nilable": "false",
+   "Returns.startTime.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "C_Container.SortBags": {},
@@ -679,6 +815,48 @@
    "Returns.isAvailable.Nilable": "false",
    "Returns.isAvailable.Type": "\"bool\""
   },
+  "C_Item.GetItemInfo": {
+   "Arguments.itemInfo.Nilable": "false",
+   "Arguments.itemInfo.Type": "\"ItemInfo\"",
+   "MayReturnNothing": "true",
+   "Returns.bindType.Nilable": "false",
+   "Returns.bindType.Type": "\"number\"",
+   "Returns.classID.Nilable": "false",
+   "Returns.classID.Type": "\"number\"",
+   "Returns.expansionID.Nilable": "false",
+   "Returns.expansionID.Type": "\"number\"",
+   "Returns.isCraftingReagent.Nilable": "false",
+   "Returns.isCraftingReagent.Type": "\"bool\"",
+   "Returns.itemDescription.Nilable": "false",
+   "Returns.itemDescription.Type": "\"cstring\"",
+   "Returns.itemEquipLoc.Nilable": "false",
+   "Returns.itemEquipLoc.Type": "\"cstring\"",
+   "Returns.itemLevel.Nilable": "false",
+   "Returns.itemLevel.Type": "\"number\"",
+   "Returns.itemLink.Nilable": "false",
+   "Returns.itemLink.Type": "\"cstring\"",
+   "Returns.itemMinLevel.Nilable": "false",
+   "Returns.itemMinLevel.Type": "\"number\"",
+   "Returns.itemName.Nilable": "false",
+   "Returns.itemName.Type": "\"cstring\"",
+   "Returns.itemQuality.Nilable": "false",
+   "Returns.itemQuality.Type": "\"ItemQuality\"",
+   "Returns.itemStackCount.Nilable": "false",
+   "Returns.itemStackCount.Type": "\"number\"",
+   "Returns.itemSubType.Nilable": "false",
+   "Returns.itemSubType.Type": "\"cstring\"",
+   "Returns.itemTexture.Nilable": "false",
+   "Returns.itemTexture.Type": "\"fileID\"",
+   "Returns.itemType.Nilable": "false",
+   "Returns.itemType.Type": "\"cstring\"",
+   "Returns.sellPrice.Nilable": "false",
+   "Returns.sellPrice.Type": "\"number\"",
+   "Returns.setID.Nilable": "true",
+   "Returns.setID.Type": "\"number\"",
+   "Returns.subclassID.Nilable": "false",
+   "Returns.subclassID.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "C_Item.GetItemInfoInstant": {
    "Arguments.itemInfo.Nilable": "false",
    "Arguments.itemInfo.Type": "\"ItemInfo\"",
@@ -717,6 +895,16 @@
    "Returns.colorRGBR.Type": "\"number\"",
    "Returns.qualityString.Nilable": "false",
    "Returns.qualityString.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Item.GetItemSpell": {
+   "Arguments.itemInfo.Nilable": "false",
+   "Arguments.itemInfo.Type": "\"ItemInfo\"",
+   "MayReturnNothing": "true",
+   "Returns.spellID.Nilable": "false",
+   "Returns.spellID.Type": "\"number\"",
+   "Returns.spellName.Nilable": "false",
+   "Returns.spellName.Type": "\"cstring\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "C_MerchantFrame.GetNumJunkItems": {
@@ -764,6 +952,49 @@
    "Returns.interacting.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "C_QuestLog.GetLogIndexForQuestID": {
+   "Arguments.questID.Nilable": "false",
+   "Arguments.questID.Type": "\"number\"",
+   "Returns.questLogIndex.Nilable": "true",
+   "Returns.questLogIndex.Type": "\"luaIndex\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_QuestLog.GetNumQuestLogEntries": {
+   "Returns.numQuests.Nilable": "false",
+   "Returns.numQuests.Type": "\"number\"",
+   "Returns.numShownEntries.Nilable": "false",
+   "Returns.numShownEntries.Type": "\"number\""
+  },
+  "C_QuestLog.GetQuestIDForLogIndex": {
+   "Arguments.questLogIndex.Nilable": "false",
+   "Arguments.questLogIndex.Type": "\"luaIndex\"",
+   "Returns.questID.Nilable": "true",
+   "Returns.questID.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_QuestLog.GetQuestObjectives": {
+   "Arguments.questID.Nilable": "false",
+   "Arguments.questID.Type": "\"number\"",
+   "MayReturnNothing": "true",
+   "Returns.objectives.InnerType": "\"QuestObjectiveInfo\"",
+   "Returns.objectives.Nilable": "false",
+   "Returns.objectives.Type": "\"table\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_QuestLog.IsComplete": {
+   "Arguments.questID.Nilable": "false",
+   "Arguments.questID.Type": "\"number\"",
+   "Returns.isComplete.Nilable": "false",
+   "Returns.isComplete.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_QuestLog.IsQuestFlaggedCompleted": {
+   "Arguments.questID.Nilable": "false",
+   "Arguments.questID.Type": "\"number\"",
+   "Returns.isCompleted.Nilable": "false",
+   "Returns.isCompleted.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "C_RestrictedActions.IsAddOnRestrictionActive": {
    "Arguments.type.Nilable": "false",
    "Arguments.type.Type": "\"AddOnRestrictionType\"",
@@ -786,6 +1017,14 @@
    "Returns.spellInfo.Type": "\"SpellInfo\"",
    "SecretArguments": "\"AllowedWhenTainted\""
   },
+  "C_Spell.GetSpellName": {
+   "Arguments.spellIdentifier.Nilable": "false",
+   "Arguments.spellIdentifier.Type": "\"SpellIdentifier\"",
+   "MayReturnNothing": "true",
+   "Returns.name.Nilable": "false",
+   "Returns.name.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
   "C_Spell.GetSpellPowerCost": {
    "Arguments.spellIdentifier.Nilable": "false",
    "Arguments.spellIdentifier.Type": "\"SpellIdentifier\"",
@@ -806,6 +1045,14 @@
    "Returns.originalIconID.Nilable": "false",
    "Returns.originalIconID.Type": "\"fileID\"",
    "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "C_Texture.GetAtlasInfo": {
+   "Arguments.atlas.Nilable": "false",
+   "Arguments.atlas.Type": "\"textureAtlas\"",
+   "MayReturnNothing": "true",
+   "Returns.info.Nilable": "false",
+   "Returns.info.Type": "\"AtlasInfo\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "C_Timer.After": {
    "Arguments.callback.Nilable": "false",
@@ -832,6 +1079,20 @@
    "Arguments.seconds.Type": "\"number\"",
    "Returns.cbObject.Nilable": "false",
    "Returns.cbObject.Type": "\"TickerCallback\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_TooltipInfo.GetItemByID": {
+   "Arguments.itemContext.Nilable": "true",
+   "Arguments.itemContext.Type": "\"number\"",
+   "Arguments.itemID.Nilable": "false",
+   "Arguments.itemID.Type": "\"number\"",
+   "Arguments.quality.Nilable": "true",
+   "Arguments.quality.Type": "\"number\"",
+   "Arguments.treasureContextLevel.Nilable": "true",
+   "Arguments.treasureContextLevel.Type": "\"number\"",
+   "MayReturnNothing": "true",
+   "Returns.data.Nilable": "false",
+   "Returns.data.Type": "\"TooltipData\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "CursorHasItem": {
@@ -953,10 +1214,31 @@
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Text }"
   },
+  "SimpleEditBoxAPI:GetFont": {
+   "Returns.flags.Nilable": "false",
+   "Returns.flags.Type": "\"TBFFlags\"",
+   "Returns.fontHeight.Nilable": "false",
+   "Returns.fontHeight.Type": "\"uiUnit\"",
+   "Returns.name.Nilable": "false",
+   "Returns.name.Type": "\"cstring\""
+  },
   "SimpleEditBoxAPI:SetEnabled": {
    "Arguments.enabled.Default": "false",
    "Arguments.enabled.Nilable": "false",
    "Arguments.enabled.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleEditBoxAPI:SetFont": {
+   "Arguments.flags.Nilable": "false",
+   "Arguments.flags.Type": "\"TBFFlags\"",
+   "Arguments.fontFile.Nilable": "false",
+   "Arguments.fontFile.Type": "\"cstring\"",
+   "Arguments.height.Nilable": "false",
+   "Arguments.height.Type": "\"uiFontHeight\"",
+   "RequiresValidFontAsset": "true",
+   "RequiresValidFontHeight": "true",
+   "Returns.success.Nilable": "false",
+   "Returns.success.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "SimpleEditBoxAPI:SetJustifyH": {
@@ -981,9 +1263,28 @@
    "Arguments.colorR.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "SimpleFontAPI:GetFont": {
+   "Returns.flags.Nilable": "false",
+   "Returns.flags.Type": "\"TBFFlags\"",
+   "Returns.fontFile.Nilable": "false",
+   "Returns.fontFile.Type": "\"cstring\"",
+   "Returns.height.Nilable": "false",
+   "Returns.height.Type": "\"uiFontHeight\""
+  },
   "SimpleFontAPI:SetAlpha": {
    "Arguments.alpha.Nilable": "false",
    "Arguments.alpha.Type": "\"SingleColorValue\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontAPI:SetFont": {
+   "Arguments.flags.Nilable": "false",
+   "Arguments.flags.Type": "\"TBFFlags\"",
+   "Arguments.fontFile.Nilable": "false",
+   "Arguments.fontFile.Type": "\"cstring\"",
+   "Arguments.height.Nilable": "false",
+   "Arguments.height.Type": "\"uiFontHeight\"",
+   "RequiresValidFontAsset": "true",
+   "RequiresValidFontHeight": "true",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "SimpleFontAPI:SetJustifyH": {
@@ -1000,6 +1301,27 @@
    "Arguments.colorG.Type": "\"number\"",
    "Arguments.colorR.Nilable": "false",
    "Arguments.colorR.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleFontStringAPI:GetFont": {
+   "Returns.flags.Nilable": "false",
+   "Returns.flags.Type": "\"TBFFlags\"",
+   "Returns.fontFile.Nilable": "true",
+   "Returns.fontFile.Type": "\"FontAsset\"",
+   "Returns.fontHeight.Nilable": "false",
+   "Returns.fontHeight.Type": "\"uiUnit\""
+  },
+  "SimpleFontStringAPI:SetFont": {
+   "Arguments.flags.Nilable": "true",
+   "Arguments.flags.Type": "\"TBFFlags\"",
+   "Arguments.fontFile.Nilable": "false",
+   "Arguments.fontFile.Type": "\"FontAsset\"",
+   "Arguments.fontHeight.Nilable": "false",
+   "Arguments.fontHeight.Type": "\"uiFontHeight\"",
+   "RequiresValidFontAsset": "true",
+   "RequiresValidFontHeight": "true",
+   "Returns.success.Nilable": "false",
+   "Returns.success.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "SimpleFontStringAPI:SetFormattedText": {
@@ -1139,6 +1461,31 @@
    "Returns.name.Type": "\"cstring\"",
    "SecretReturnsForAspect": "{ Enum.SecretAspect.ObjectName }"
   },
+  "SimpleHTMLAPI:GetFont": {
+   "Arguments.textType.Nilable": "false",
+   "Arguments.textType.Type": "\"HTMLTextType\"",
+   "ConstSecretAccessor": "true",
+   "Returns.flags.Nilable": "false",
+   "Returns.flags.Type": "\"TBFFlags\"",
+   "Returns.fontFile.Nilable": "false",
+   "Returns.fontFile.Type": "\"cstring\"",
+   "Returns.height.Nilable": "false",
+   "Returns.height.Type": "\"uiFontHeight\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleHTMLAPI:SetFont": {
+   "Arguments.flags.Nilable": "false",
+   "Arguments.flags.Type": "\"TBFFlags\"",
+   "Arguments.fontFile.Nilable": "false",
+   "Arguments.fontFile.Type": "\"cstring\"",
+   "Arguments.height.Nilable": "false",
+   "Arguments.height.Type": "\"uiFontHeight\"",
+   "Arguments.textType.Nilable": "false",
+   "Arguments.textType.Type": "\"HTMLTextType\"",
+   "RequiresValidFontAsset": "true",
+   "RequiresValidFontHeight": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "SimpleHTMLAPI:SetJustifyH": {
    "Arguments.justifyH.Nilable": "false",
    "Arguments.justifyH.Type": "\"JustifyHorizontal\"",
@@ -1184,6 +1531,25 @@
    "Arguments.messageID.Type": "\"number\"",
    "Arguments.text.Nilable": "false",
    "Arguments.text.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "SimpleMessageFrameAPI:GetFont": {
+   "Returns.flags.Nilable": "false",
+   "Returns.flags.Type": "\"TBFFlags\"",
+   "Returns.fontFile.Nilable": "false",
+   "Returns.fontFile.Type": "\"cstring\"",
+   "Returns.height.Nilable": "false",
+   "Returns.height.Type": "\"uiFontHeight\""
+  },
+  "SimpleMessageFrameAPI:SetFont": {
+   "Arguments.flags.Nilable": "false",
+   "Arguments.flags.Type": "\"TBFFlags\"",
+   "Arguments.fontFile.Nilable": "false",
+   "Arguments.fontFile.Type": "\"cstring\"",
+   "Arguments.height.Nilable": "false",
+   "Arguments.height.Type": "\"uiFontHeight\"",
+   "RequiresValidFontAsset": "true",
+   "RequiresValidFontHeight": "true",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "SimpleMessageFrameAPI:SetJustifyH": {
@@ -1313,6 +1679,14 @@
    "IsProtectedFunction": "true",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "SimpleScriptRegionResizingAPI:SetSize": {
+   "Arguments.x.Nilable": "false",
+   "Arguments.x.Type": "\"uiUnit\"",
+   "Arguments.y.Nilable": "false",
+   "Arguments.y.Type": "\"uiUnit\"",
+   "IsProtectedFunction": "true",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "SimpleScriptRegionResizingAPI:SetWidth": {
    "Arguments.width.Nilable": "false",
    "Arguments.width.Type": "\"uiUnit\"",
@@ -1392,6 +1766,27 @@
    "SecretArguments": "\"AllowedWhenTainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.BarValue }"
   },
+  "SimpleTextureBaseAPI:SetAtlas": {
+   "Arguments.atlas.Nilable": "false",
+   "Arguments.atlas.Type": "\"textureAtlas\"",
+   "Arguments.filterMode.NeverSecret": "true",
+   "Arguments.filterMode.Nilable": "true",
+   "Arguments.filterMode.Type": "\"FilterMode\"",
+   "Arguments.resetTexCoords.NeverSecret": "true",
+   "Arguments.resetTexCoords.Nilable": "true",
+   "Arguments.resetTexCoords.Type": "\"bool\"",
+   "Arguments.useAtlasSize.Default": "false",
+   "Arguments.useAtlasSize.NeverSecret": "true",
+   "Arguments.useAtlasSize.Nilable": "false",
+   "Arguments.useAtlasSize.Type": "\"bool\"",
+   "Arguments.wrapModeHorizontal.NeverSecret": "true",
+   "Arguments.wrapModeHorizontal.Nilable": "true",
+   "Arguments.wrapModeHorizontal.Type": "\"cstring\"",
+   "Arguments.wrapModeVertical.NeverSecret": "true",
+   "Arguments.wrapModeVertical.Nilable": "true",
+   "Arguments.wrapModeVertical.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
   "SimpleTextureBaseAPI:SetColorTexture": {
    "Arguments.a.Nilable": "true",
    "Arguments.a.Type": "\"SingleColorValue\"",
@@ -1444,6 +1839,20 @@
    "Returns.result.Nilable": "false",
    "Returns.result.Type": "\"bool\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitClass": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "MayReturnNothing": "true",
+   "Returns.classFilename.Nilable": "false",
+   "Returns.classFilename.Type": "\"cstring\"",
+   "Returns.classID.Nilable": "false",
+   "Returns.classID.Type": "\"number\"",
+   "Returns.className.ConditionalSecret": "true",
+   "Returns.className.Nilable": "false",
+   "Returns.className.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenUnitIdentityRestricted": "true"
   },
   "UnitClassification": {
    "Arguments.unit.Nilable": "false",
@@ -1504,6 +1913,13 @@
    "Returns.result.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretWhenUnitHealthMaxRestricted": "true"
+  },
+  "UnitIsBossMob": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "UnitIsDead": {
    "Arguments.unit.Nilable": "false",
@@ -1582,6 +1998,19 @@
    "Returns.rgbZ.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "UnitRace": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "MayReturnNothing": "true",
+   "Returns.englishRaceName.Nilable": "false",
+   "Returns.englishRaceName.Type": "\"cstring\"",
+   "Returns.localizedRaceName.Nilable": "false",
+   "Returns.localizedRaceName.Type": "\"cstring\"",
+   "Returns.raceID.Nilable": "false",
+   "Returns.raceID.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\"",
+   "SecretWhenUnitIdentityRestricted": "true"
+  },
   "UnitReaction": {
    "Arguments.target.Nilable": "false",
    "Arguments.target.Type": "\"UnitToken\"",
@@ -1617,6 +2046,20 @@
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecureHooksAllowed": "false"
   },
+  "event ACTIONBAR_SLOT_CHANGED": {
+   "Payload.slot.Nilable": "false",
+   "Payload.slot.Type": "\"number\"",
+   "SynchronousEvent": "true"
+  },
+  "event ACTION_RANGE_CHECK_UPDATE": {
+   "Payload.checksRange.Nilable": "false",
+   "Payload.checksRange.Type": "\"bool\"",
+   "Payload.isInRange.Nilable": "false",
+   "Payload.isInRange.Type": "\"bool\"",
+   "Payload.slot.Nilable": "false",
+   "Payload.slot.Type": "\"luaIndex\"",
+   "SynchronousEvent": "true"
+  },
   "event ADDON_ACTION_BLOCKED": {
    "Payload.function.Nilable": "false",
    "Payload.function.Type": "\"cstring\"",
@@ -1648,6 +2091,9 @@
    "Payload.bagID.Nilable": "false",
    "Payload.bagID.Type": "\"BagIndex\"",
    "SynchronousEvent": "true"
+  },
+  "event BAG_UPDATE_COOLDOWN": {
+   "UniqueEvent": "true"
   },
   "event BAG_UPDATE_DELAYED": {
    "UniqueEvent": "true"
@@ -1811,6 +2257,29 @@
    "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
    "SynchronousEvent": "true"
   },
+  "event PLAYER_LEVEL_UP": {
+   "Payload.agilityDelta.Nilable": "false",
+   "Payload.agilityDelta.Type": "\"number\"",
+   "Payload.healthDelta.Nilable": "false",
+   "Payload.healthDelta.Type": "\"number\"",
+   "Payload.intellectDelta.Nilable": "false",
+   "Payload.intellectDelta.Type": "\"number\"",
+   "Payload.level.Nilable": "false",
+   "Payload.level.Type": "\"number\"",
+   "Payload.numNewPvpTalentSlots.Nilable": "false",
+   "Payload.numNewPvpTalentSlots.Type": "\"number\"",
+   "Payload.numNewTalents.Nilable": "false",
+   "Payload.numNewTalents.Type": "\"number\"",
+   "Payload.powerDelta.Nilable": "false",
+   "Payload.powerDelta.Type": "\"number\"",
+   "Payload.spiritDelta.Nilable": "false",
+   "Payload.spiritDelta.Type": "\"number\"",
+   "Payload.staminaDelta.Nilable": "false",
+   "Payload.staminaDelta.Type": "\"number\"",
+   "Payload.strengthDelta.Nilable": "false",
+   "Payload.strengthDelta.Type": "\"number\"",
+   "SynchronousEvent": "true"
+  },
   "event PLAYER_LOGIN": {
    "SynchronousEvent": "true"
   },
@@ -1822,6 +2291,9 @@
   },
   "event PLAYER_REGEN_ENABLED": {
    "SynchronousEvent": "true"
+  },
+  "event QUEST_LOG_UPDATE": {
+   "UniqueEvent": "true"
   },
   "event UNIT_DISPLAYPOWER": {
    "Payload.unitTarget.Nilable": "false",
@@ -1851,6 +2323,9 @@
    "SecretWhenUnitSpellCastRestricted": "true",
    "SynchronousEvent": "true"
   },
+  "event UPDATE_MACROS": {
+   "SynchronousEvent": "true"
+  },
   "issecrettable": {
    "Arguments.table.Nilable": "false",
    "Arguments.table.Type": "\"LuaValueReference\"",
@@ -1869,31 +2344,31 @@
   }
  },
  "watchedHashes": {
-  "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua": "e62816d9f8edc63ac3b80c5a50540a62caba77586fcc4827f684fd74e0257c1e",
+  "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua": "a823e84f90fabe58d9ffe547ea17eae83708d451e593b4052bce002cc02ce5c1",
   "Blizzard_FrameXML/Mainline/AlertFrames.lua": "cbb1013acd8beed871e50009fc659654b8ba3f03600aff74a5729c6919b2a43f",
   "Blizzard_Game/Shared/EventImplementation.lua": "9314fccf86511c4dc21f48d4aa9cc37134c7b503eb66946db591593b062bafc7",
-  "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "4d40713f327cf0e102a6b3997e2e57800d1cf2861a9589d0889bf57e223cd810",
-  "Blizzard_GamepadActionBars/PageUnit.lua": "124d6821ea94ffa04d50bd4ce304494707753577437b2009f1a44672afdff11a",
-  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "6b302dade8185480b4e6a9f9284ccc6abe13e812a93d264e533d27113853449f",
+  "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "68c852c5ee148db8f9127318705458cd9436dd51c9d7e8e15709f1f713e8396f",
+  "Blizzard_GamepadActionBars/PageUnit.lua": "c3e74a9b7bcf1875137e5e5d02b1ec93bfb6041270e5209a98eded183ae4e2b0",
+  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "44841aad9e66211f0fb38962791f4d1ae99d04fdf80fe6858567eca1d84c98ce",
   "Blizzard_GamepadSharedUtility/FrameReformUtility.lua": "f7202f0a5b679f0d35ab04c57e8e26a1a25244e7e0e60fbbfb2c6dee85d03a2b",
   "Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua": "ef5beda0110e7213d86de6aebe3f838f4624bac36e3a6047f78b5954fbf36dbe",
   "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua": "27318d5b42f396b5f246cfde2fe2225d5bbfa39d61e4544eb3cd34ae29c26897",
   "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "d314e6b29f184aebc82247382acd1c3ddc6d8bb8ebeb218ab0f1c75bc7d4d669",
-  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "187b1fe25a05bb428381a23561bb389c1acc5776c9f0f30c5e26c09376066ab6",
-  "Blizzard_GamepadSmartNavigation/Utility.lua": "fee22413d6ff69ba861bae59c2f43818a09bfaea52c88f3133e7c05f4a986011",
+  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "46a5e291d17d0faefe2b62cde777b703c95f12f9e6d5018404312b7808f45788",
+  "Blizzard_GamepadSmartNavigation/Utility.lua": "9946126fe4c1e247462392586f372154274c4643980d43a6b6b0609fc6407654",
   "Blizzard_NamePlates/Blizzard_NamePlateBase.lua": "3221e4b6d770dbfbeb58d2a0707341a205531b13654516cf76b5b271ded65729",
   "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua": "f8249a9482680c366c2ca0e8f4add9d2473487d5988cd3c7be972c110ce17d72",
   "Blizzard_NamePlates/Blizzard_NamePlates.xml": "f7bc75866a5c24b4ad9cc237836d62608b0bd9c966e4561c8d87adcfea5834fd",
-  "Blizzard_Settings_Shared/Blizzard_Settings.lua": "76ab19d14675e4e3dcf4fb1b02af35898e253e254da3cfce0ef655eab475e293",
+  "Blizzard_Settings_Shared/Blizzard_Settings.lua": "daa9b9b36519ad4dfe28bfde040544ed84cc717faedfa80f1e17e3e73a31b4a0",
   "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua": "27f6db7d502104ad26d2893519fd810b4769616398a0ebb3fb08632f7745f4a7",
   "Blizzard_SharedXMLBase/FrameUtil.lua": "61de9061104e83dbd7e704ca129e9784143bade0437b2acbd337a604656bfdd1",
-  "Blizzard_StaticPopup/StaticPopupGamepad.lua": "eb4a1abd9b3d2471d4ffe36bf259eb443a47f7bd26c305ef66386139f1c60a27",
+  "Blizzard_StaticPopup/StaticPopupGamepad.lua": "e81f34940741f42b264624edff3508a7f374abc87cc992973c5ef1bcadc43e96",
   "Blizzard_TextStatusBar/TextStatusBar.lua": "8139222b91d434534d86d5b1ddb2c75c9ea4d43780a6e97e6c098c127836d462",
-  "Blizzard_UIPanels_Game/Camelot/BankFrame.lua": "990b432d120f85aaa8dea3c982e0e1384206078ce1ed330ef667c2965a08e503",
+  "Blizzard_UIPanels_Game/Camelot/BankFrame.lua": "9707815675332b187b09c7c7317af22429855aa7ce987bf4b65e1fb9ba41b989",
   "Blizzard_UIPanels_Game/Mainline/BankFrameTemplates.lua": "7d3496b42acc6adf4a6e42a5efa4f147d2185eff4d644f3da8d4b8e806c77030",
   "Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua": "dab48c237737ec71e1a40b024c851ace6c4d4c51f7671ae94683597f0ca2c310",
-  "Blizzard_UnitFrame/Camelot/PlayerFrame.lua": "fa850df2506d3bdd47e1c3a610e89cb87dab87a7d007c9102632352f25e6b9c9",
-  "Blizzard_UnitFrame/Mainline/PlayerFrame.lua": "492d25f7ec1ddf4b6fb4fbb7d8ee68bc0c2f37bfa4eb372be30bbf6c987f557b",
-  "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua": "23daeb08adabf241904e4d4b13136915ed486353b76b366700efa4af629efa6b"
+  "Blizzard_UnitFrame/Camelot/PlayerFrame.lua": "8b32a09d13d5268c97e499e07d3c0a887ad9b22a8eaf6b41c76e576293599ff8",
+  "Blizzard_UnitFrame/Mainline/PlayerFrame.lua": "170eb4e8b5e51546fae93cd9bc18bd1f87eaa7d794b5964145eb84907e7d0f63",
+  "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua": "4d78e6a064d454354e338c4a45315999b84322f959d10796ba54a7a84f90c047"
  }
 }

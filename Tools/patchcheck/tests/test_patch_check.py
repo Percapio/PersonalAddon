@@ -384,7 +384,7 @@ class RealExportTests(unittest.TestCase):
         # to be bumped by whichever phase adds one. It had rotted: Phases 13, 14 and
         # 15 took the register from 29 to 36 without touching this line, so T18 was
         # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2).
-        self.assertEqual(len(register), 74)
+        self.assertEqual(len(register), 86)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -485,6 +485,23 @@ class RealExportTests(unittest.TestCase):
                            "QUEST-OBJECTIVES-CARRY-FINISHED"):
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+
+    def test_t24_the_phase20_premises_hold_on_the_current_export(self):
+        # Architecture/20261021-Phase20.md section 12. SPELL-COST-ENTRY-FIELDS is the one
+        # audit finding 18 caught with its folder missing from the path, and the three
+        # FlagAbsent checks pin their entry names: a misspelt one reads Broken as "no
+        # longer documented", which is indistinguishable from a removed API.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        for premise_id in ("SPELL-COST-NIL-IS-FREE", "SPELL-COST-ENTRY-FIELDS", "GETMONEY-READABLE",
+                           "MERCHANT-INTERACTION-READABLE", "PLATE-NAME-JUSTIFY-FROM-OPTIONS",
+                           "PLATE-NAME-CENTRED-IN-CAMELOT", "PLATE-NAME-ANCHOR-STYLE",
+                           "PLATE-FRIENDLY-TEST", "UNIT-IS-FRIEND-READABLE",
+                           "OFFSCREEN-OPTION-PRESENT", "CLEANUP-BAGS-IS-SORTBAGS"):
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+        self.assertIn("MERCHANT-FRAME", by_id)
 
     def test_t15_every_file_in_running_stacks_is_in_the_load_set(self):
         loaded = {name.lower() for name in load_set.resolve_load_set(paths.EXPORT).files}

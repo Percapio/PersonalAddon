@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.9.0-phase19"
+ns.VERSION = "1.10.0-phase20"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -185,11 +185,13 @@ ns.MINIMUM_BAR_PIXELS = 4
 
 -- Phase 15 (Architecture/20261010-Phase15.md) ---------------------------------
 
--- One guild label per nameplate, from our own pool. Bounded by the client's
--- nameplate cap, which Phase 2 already assumes bounds the tracked set; the
--- threat panel's row pool is sized the same way. Exhaustion means the cap is
--- wrong and is reported, never absorbed (section 4.6).
-ns.GUILD_LABEL_POOL_CAPACITY = 48
+-- One label per nameplate -- a guild for a player, a role for a friendly NPC since
+-- Phase 20 -- from our own pool. Bounded by the client's nameplate cap, which Phase
+-- 2 already assumes bounds the tracked set. Exhaustion means the cap is wrong and is
+-- reported, never absorbed (Phase 15 section 4.6). 48 was guilds alone; with roles
+-- nearly every friendly plate in a city carries one, and 70450's sessions tracked
+-- up to 40 plates at once (Phase 20 section 7.6).
+ns.PLATE_LABEL_POOL_CAPACITY = 64
 -- The guild line's size, in points. Absolute rather than a share of Blizzard's,
 -- because the widget is ours and nothing else writes it (section 4.4).
 ns.GUILD_FONT_MINIMUM = 6
@@ -476,3 +478,26 @@ ns.RARITY_TIER_FOR_CLASSIFICATION = {
 -- surround is very nearly square, so this is the right guess when GetAtlasInfo
 -- answers without usable numbers.
 ns.RARITY_RING_ASPECT_FALLBACK = 1.0
+
+-- Phase 20 (Architecture/20261021-Phase20.md) --------------------------------------------
+
+-- The breakdown's header line: one GameFontHighlightSmall line above the rows, and
+-- the text in the "+N more" row's icon cell (section 3.4).
+ns.BREAKDOWN_HEADER_HEIGHT = 12
+ns.BREAKDOWN_MORE_FORMAT = "+%d"
+
+-- The merchant visit (section 6.3). Half a second of lag on a toast nobody waits for,
+-- against two cheap reads a second while trading. The settle is over three times
+-- Phase 8's measured 0.29 s, so a sale clicked just before walking away is paid
+-- before the money is read. The maximum bounds the poll if the interaction read
+-- never answers "left".
+ns.MERCHANT_VISIT_POLL_SECONDS = 0.5
+ns.MERCHANT_VISIT_SETTLE_SECONDS = 1.0
+ns.MERCHANT_VISIT_MAXIMUM_SECONDS = 600
+
+-- NPC role texts kept on our side of the bridge, with "has none" cached too: the
+-- quest bridge's size, for the same reason (section 7.4).
+ns.NPC_ROLE_CACHE_CAPACITY = 256
+
+-- What a left-aligned nameplate name is set to (section 8).
+ns.NAME_ALIGN_JUSTIFY = "LEFT"
