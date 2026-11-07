@@ -1,7 +1,10 @@
--- Offline stand-ins for objective progress, the atlas reader and the level badge
--- (Architecture/20261016-Phase19.md section 11.1).
+-- Offline stand-ins for objective progress and unit classification
+-- (Architecture/20261016-Phase19.md section 11.1). The atlas reader and the level badge
+-- that stood in for the rare/elite ring went with the ring
+-- (Architecture/20261104-Patch02.md section 5.3); the classification wrapper stays,
+-- because the threat panel's +/r tags are checked against it in other sessions.
 --
--- Three subjects, three knobs each, because the design's failure arms differ:
+-- The knobs, because the design's failure arms differ:
 --
 --   HARNESS.clientObjectives[questId]   the rows GetQuestObjectives answers with,
 --                                       each {type=, finished=}. nil means the call
@@ -10,10 +13,6 @@
 --   HARNESS.objectivesSecret[questId]   the call answers a withheld value instead
 --   HARNESS.questComplete[questId]      what IsComplete answers
 --   HARNESS.completeSecret[questId]     IsComplete answers a withheld value
---
---   HARNESS.atlases[name]               { width =, height = } for GetAtlasInfo, or
---                                       nil for an atlas this client does not carry
---   HARNESS.atlasReaderPresent          false removes C_Texture.GetAtlasInfo entirely
 --
 --   HARNESS.classifications[token]      what UnitClassification answers
 --   HARNESS.bossMobs[token]             what UnitIsBossMob answers
@@ -68,40 +67,6 @@ function HARNESS.setClientObjectives(questId, rows)
     HARNESS.clientObjectives[questId] = rows
 end
 
--- The atlas database ---------------------------------------------------------------------
-
-HARNESS.atlasReaderPresent = true
-HARNESS.atlasCalls = 0
-HARNESS.atlases = {
-    -- Squarish gold surround, winged variants wider than tall, as the real art is.
-    ["UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold"] = { width = 64, height = 64 },
-    ["UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Silver-Winged"] = { width = 80, height = 56 },
-    ["UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold-Winged"] = { width = 80, height = 56 },
-}
-
-C_Texture = C_Texture or {}
-
-local function installAtlasReader()
-    if not HARNESS.atlasReaderPresent then
-        C_Texture.GetAtlasInfo = nil
-        return
-    end
-    C_Texture.GetAtlasInfo = function(name)
-        HARNESS.atlasCalls = HARNESS.atlasCalls + 1
-        local entry = HARNESS.atlases[name]
-        if entry == nil then
-            -- MayReturnNothing again: an atlas this client does not carry.
-            return nil
-        end
-        if entry == HARNESS.SECRET then
-            return HARNESS.SECRET
-        end
-        return { elementName = name, width = entry.width, height = entry.height }
-    end
-end
-HARNESS.installAtlasReader = installAtlasReader
-installAtlasReader()
-
 -- Classification -------------------------------------------------------------------------
 
 HARNESS.classifications = {}
@@ -129,25 +94,6 @@ function UnitIsBossMob(token)
         return HARNESS.bossMobs[token] == true
     end
     return priorUnitIsBossMob and priorUnitIsBossMob(token) or false
-end
-
--- The level badge ------------------------------------------------------------------------
---
--- A stand-in for PlayerLevelDiffFrame: the frame the ring is measured from and
--- centred on. Its width is what SetSize wrote, not what the XML anchors fix, which
--- is the distinction section 4.2 turns on.
-
-function HARNESS.newLevelBadge(width)
-    local badge = { width = width or 28, shown = true, points = {} }
-    function badge:GetWidth()
-        if self.widthSecret then
-            return HARNESS.SECRET
-        end
-        return self.width
-    end
-    function badge:IsShown() return self.shown end
-    function badge:GetHeight() return 16 end
-    return badge
 end
 
 -- LibQuestieDB.ObjectiveFirst -------------------------------------------------------------

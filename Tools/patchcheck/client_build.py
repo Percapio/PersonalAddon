@@ -1,11 +1,16 @@
-"""The client's identity: its build, read from WowB.exe's version resource, and the
-binary's modification time (Architecture/20261002-Phase10.md section 6.1).
+"""The client's identity: its build, read from the client binary's version resource,
+and the binary's modification time (Architecture/20261002-Phase10.md section 6.1).
 
 The build is the FileVersion string ("1.60.1.70205"). The fixed version numbers
 cannot hold it: 70205 does not fit in 16 bits.
+
+Which file is the client binary is configuration (Tools/config.toml client_binary,
+Architecture/20261104-Patch02.md section 2.4). A missing one is reported as
+ClientMissing rather than as whatever os.path.getmtime happens to raise.
 """
 import ctypes
 import os
+import pathlib
 import re
 import struct
 from dataclasses import dataclass
@@ -13,6 +18,14 @@ from typing import Optional
 
 NO_VERSION_RESOURCE = "NoVersionResource"
 UNPARSABLE = "Unparsable"
+
+
+class ClientMissing(Exception):
+    """There is no file where the configured client binary should be."""
+
+    def __init__(self, binary):
+        super().__init__(f"no client binary at {binary}")
+        self.binary = pathlib.Path(binary)
 
 
 @dataclass
@@ -68,6 +81,11 @@ def read_client_build(binary):
 
 
 def identify(binary, build_reader=read_client_build):
-    """The client's identity and, when the build was unreadable, why."""
+    """The client's identity and, when the build was unreadable, why.
+
+    Raises ClientMissing when there is no file at binary: no build is read and no
+    file time is taken from a file that is not there."""
+    if not os.path.isfile(binary):
+        raise ClientMissing(binary)
     build, reason = build_reader(binary)
     return ClientIdentity(build, os.path.getmtime(binary)), reason

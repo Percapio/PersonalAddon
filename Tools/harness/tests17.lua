@@ -606,11 +606,24 @@ ns.Registry.SetEnabled("questMarkers", false)
 HARNESS.questiePresent = false
 HARNESS.buildQuestie()
 Bridge.Reset()
+local q1Mark = #HARNESS.chat
 local okQuests = ns.Registry.SetEnabled("npcQuests", true)
 local okMarkers = ns.Registry.SetEnabled("questMarkers", true)
 check("Q1 both features refuse to enable without the provider, and do not fault",
     okQuests ~= true and okMarkers ~= true,
     format("%s / %s", tostring(okQuests), tostring(okMarkers)))
+-- Patch 02 section 4.5 (audit finding 11): refusing for want of a provider is
+-- UNAVAILABLE, not FAULTED, and nothing said about it reads as a fault.
+local q1Lines = {}
+for index = q1Mark + 1, #HARNESS.chat do
+    q1Lines[#q1Lines + 1] = tostring(HARNESS.chat[index])
+end
+local q1Chat = table.concat(q1Lines, " | ")
+check("Q1 and both are UNAVAILABLE, not FAULTED",
+    ns.Registry.State("npcQuests") == ns.FEATURE_STATE.UNAVAILABLE
+        and ns.Registry.State("questMarkers") == ns.FEATURE_STATE.UNAVAILABLE,
+    format("%s / %s", tostring(ns.Registry.State("npcQuests")), tostring(ns.Registry.State("questMarkers"))))
+check("Q1 and no chat line calls it a fault", q1Chat:find("faulted", 1, true) == nil, q1Chat)
 HARNESS.questiePresent = true
 HARNESS.buildQuestie()
 Bridge.Reset()

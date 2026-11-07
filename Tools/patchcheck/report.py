@@ -60,7 +60,8 @@ def render_markdown(report, config):
     out = [f"# Patch check: {report['client']['label']}", ""]
     out.append(f"**Verdict: {verdict['kind']}.** Checked {_when(report['checkedAt'])}.")
     out.append("")
-    out.append(f"- Client: build {report['client']['build'] or 'unreadable'}; `WowB.exe` of "
+    out.append(f"- Client: build {report['client']['build'] or 'unreadable'}; "
+               f"`{report.get('binaryName') or 'the client binary'}` of "
                f"{_when(report['client']['binaryModifiedAt'])}"
                + (f" ({report['buildNote']}; clients compared by file time)" if report["buildNote"] else ""))
     out.append(f"- Baseline: {report['baseline']['label']}"

@@ -70,7 +70,12 @@ end
 -- An Absent field rejects the quests whose test needs it. A QuestieDB mask of 0
 -- means "any race", so defaulting an unreadable race to 0 would offer every
 -- race-restricted quest to everyone -- the opposite of safe.
-local function playerFacts()
+--
+-- classMask is the plain number MaskHolds receives; classMaskSource says where it came
+-- from ("Published", "ByExpansion") or why there is none, for /pa quests (Patch 02
+-- section 4.3). countUnreadable is false only for a /pa quests report, which must not
+-- move a counter that counts tooltips.
+local function playerFacts(countUnreadable)
     local facts = {}
 
     local levelKind, level = ClientRead.Call(_G.UnitLevel, "number", "player")
@@ -97,10 +102,11 @@ local function playerFacts()
     -- UnitClass's second return is the file name ("WARRIOR"), which classKeys uses.
     local ok, _, fileName = pcall(_G.UnitClass, "player")
     if ok and ClientRead.Classify(fileName, "string") == ClientRead.PLAIN then
-        facts.classMask = Bridge.ClassMask(fileName)
+        facts.classMask, facts.classMaskSource = Bridge.ClassMask(fileName)
     end
 
-    if facts.level == nil or facts.raceMask == nil or facts.classMask == nil then
+    if countUnreadable ~= false
+        and (facts.level == nil or facts.raceMask == nil or facts.classMask == nil) then
         bump("playerFactUnreadable")
     end
     return facts
@@ -387,13 +393,12 @@ local function enable()
         return nil, "this client has no tooltip data processor"
     end
 
-    local bridgeState, detail = Bridge.State()
+    -- Patch 02 sections 4.4 and 4.5: the bridge prints the one QuestieDB line, and a
+    -- missing provider leaves this feature UNAVAILABLE rather than faulted.
+    local bridgeState, detail = Bridge.Require(FEATURE_ID)
     if bridgeState ~= ns.QuestieDBBridge.STATE.AVAILABLE then
-        ns.Log.Once("npcquests:bridge:" .. tostring(bridgeState), format(
-            "available quests on tooltips need the QuestieDB addon: %s",
-            ns.EscapeGuard.Neutralize(Bridge.Describe())))
         return nil, format("QuestieDB is %s%s", tostring(bridgeState),
-            detail and (" -- " .. tostring(detail)) or "")
+            detail and (" -- " .. tostring(detail)) or ""), ns.ENABLE_OUTCOME.UNAVAILABLE
     end
 
     -- At most once per UI load. There is no RemoveTooltipPostCall, so registering
@@ -453,7 +458,13 @@ ns.NPCQuests = {
             rejected[#rejected + 1] = format("%d=%s", questId, tostring(reason))
         end
         table.sort(rejected)
-        local player = state.lastPlayer or {}
+        -- Audit finding 7: before any NPC has been hovered there is no last tooltip to
+        -- report, and the facts used to print "unreadable" whether or not they were. They
+        -- are read now instead, without counting playerFactUnreadable.
+        local player, playerFresh = state.lastPlayer, false
+        if not player then
+            player, playerFresh = playerFacts(false), true
+        end
         return {
             enabled = state.enabled,
             registered = registered,
@@ -464,6 +475,8 @@ ns.NPCQuests = {
             playerLevel = player.level or "unreadable",
             playerRaceMask = player.raceMask or "unreadable",
             playerClassMask = player.classMask or "unreadable",
+            playerClassMaskSource = player.classMaskSource,
+            playerFactsFresh = playerFresh,
         }
     end,
 }

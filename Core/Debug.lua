@@ -128,6 +128,10 @@ local function commandSetEnabled(featureId, enabled)
     if ok then
         ns.Log.Info(format("%s -> %s%s", featureId, tostring(state),
             detail and (" (" .. tostring(detail) .. ")") or ""))
+    elseif state == ns.FEATURE_STATE.UNAVAILABLE then
+        -- Patch 02 section 4.5: an optional provider is missing. The feature did not
+        -- enable, but nothing here is at fault, so it is not printed as an error.
+        ns.Log.Info(format("%s -> %s: %s", featureId, tostring(state), tostring(detail)))
     else
         ns.Log.Error(format("%s -> %s: %s", featureId, tostring(state), tostring(detail)))
     end
@@ -257,29 +261,7 @@ local function commandPlates()
             view.barHeightCompareWithheld, view.barHeightRefused))
     end
 
-    -- Phase 19 section 7. The art line is the one to read first when no ring
-    -- appears: "missing" means this client does not carry that atlas, which is a
-    -- different problem from no elites being around.
-    if view.rarityRings == false then
-        ns.Log.Info("  rarity rings: off")
-    else
-        local byTier = view.ringsByTier or {}
-        local art = view.ringArt or {}
-        ns.Log.Info(format("  rarity rings: %d drawn (gold=%d silver=%d boss=%d)  art: gold=%s silver=%s boss=%s",
-            view.ringsDrawnNow or 0, byTier.Gold or 0, byTier.Silver or 0, byTier.Boss or 0,
-            tostring(art.Gold), tostring(art.Silver), tostring(art.Boss)))
-        local seen = view.ringTiersSeen or {}
-        ns.Log.Info(format("    tiers seen: gold=%d silver=%d boss=%d  size=%.2f offset=%d,%d",
-            seen.Gold or 0, seen.Silver or 0, seen.Boss or 0,
-            view.rarityRingSize or 1, view.rarityRingOffsetX or 0, view.rarityRingOffsetY or 0))
-        ns.Log.Info(format("    badge: missing=%d hidden=%d unmeasured=%d  pool: %d of %d (exhausted %d)",
-            view.ringBadgeMissing or 0, view.ringBadgeHidden or 0,
-            view.ringBadgeUnmeasured or 0, view.ringsDrawnNow or 0,
-            view.ringPoolCapacity or 0, view.ringPoolExhausted or 0))
-        if view.ringsAllowed == false then
-            ns.Log.Info("    rings are off here: this map restricts addons")
-        end
-    end
+    -- Phase 19's rarity ring lines are gone with the ring (Patch 02 section 5).
     -- Phase 15.
     if view.guildNames then
         ns.Log.Info(format("  guild names: on, size %s; labels %d of %d pooled",
@@ -304,9 +286,14 @@ local function commandPlates()
     if view.npcRoles then
         ns.Log.Info(format("  roles: on, QuestieDB %s; labels %d", tostring(view.roleBridge),
             view.roleLabels or 0))
-        ns.Log.Info(format("    reads: plain=%d none=%d withheld=%d notFriendly=%d unavailable=%d",
+        -- Patch 02 section 4.6: the capability is decided once, at enable or when the
+        -- toggle changes; StoodDown means no plate asks again before /reload.
+        ns.Log.Info(format("    roleCapability=%s%s", tostring(view.roleCapability),
+            view.roleCapabilityReason
+                and (" (" .. ns.EscapeGuard.Neutralize(tostring(view.roleCapabilityReason)) .. ")") or ""))
+        ns.Log.Info(format("    reads: plain=%d none=%d withheld=%d notFriendly=%d failed=%d",
             view.roleReadsPlain or 0, view.roleReadsNone or 0, view.roleReadsWithheld or 0,
-            view.roleSkippedNotFriendly or 0, view.roleBridgeUnavailable or 0))
+            view.roleSkippedNotFriendly or 0, view.roleReadsFailed or 0))
     else
         ns.Log.Info("  roles: off")
     end
@@ -492,6 +479,14 @@ local function commandBags()
         .. (view.lastSkip and (" (last: " .. view.lastSkip .. ")") or ""))
     ns.Log.Info("  inside the last sort: " .. (view.lastInline or "nothing yet"))
     ns.Log.Info("  listening now: " .. ns.EscapeGuard.Neutralize(tostring(view.listenersNow)))
+    -- Patch 02 section 3.4 and audit findings 2 and 5: what held the last sort back,
+    -- and how often each kind of owner did.
+    ns.Log.Info("  last held back by: " .. (view.lastListeners
+        and ns.EscapeGuard.Neutralize(tostring(view.lastListeners)) or "nothing yet"))
+    ns.Log.Info(format("  held back: addon=%d blizzard=%d unknown=%d  owner unread: withheld=%d noLocation=%d unparsed=%d",
+        view.holdBacksByAddOn or 0, view.holdBacksByBlizzard or 0, view.holdBacksByUnknown or 0,
+        view.listenerOriginWithheld or 0, view.listenerOriginNoLocation or 0,
+        view.listenerOriginUnparsed or 0))
 end
 
 -- Phase 8 section 7.2: the last sale and why any visit was skipped.
@@ -563,6 +558,10 @@ local function commandQuests()
         return
     end
     ns.Log.Info("QuestieDB: " .. ns.EscapeGuard.Neutralize(tostring(bridge.described)))
+    -- Patch 02 section 4.4: the features that asked for QuestieDB and did not get it.
+    if #(bridge.unmetConsumers or {}) > 0 then
+        ns.Log.Warn("  off for want of it: " .. table.concat(bridge.unmetConsumers, ", "))
+    end
     ns.Log.Info(format("  reads=%d cacheHits=%d cached: %d NPCs, %d quests, %d target lists",
         bridge.reads or 0, bridge.hits or 0, bridge.cachedNpcs or 0,
         bridge.cachedQuests or 0, bridge.cachedTargets or 0))
@@ -581,9 +580,13 @@ local function commandQuests()
         local view = ns.NPCQuests.Inspect()
         ns.Log.Info(format("tooltips: enabled=%s registered=%s (there is no way to unregister)",
             tostring(view.enabled), tostring(view.registered)))
-        ns.Log.Info(format("  player: level=%s raceMask=%s classMask=%s",
+        -- Patch 02 section 4.3: the class mask's source, and whether these facts were
+        -- read now because nothing has been hovered yet (audit finding 7).
+        ns.Log.Info(format("  player: level=%s raceMask=%s classMask=%s%s%s",
             tostring(view.playerLevel), tostring(view.playerRaceMask),
-            tostring(view.playerClassMask)))
+            tostring(view.playerClassMask),
+            view.playerClassMaskSource and (" (" .. tostring(view.playerClassMaskSource) .. ")") or "",
+            view.playerFactsFresh and "  [read now: nothing hovered yet]" or ""))
         if view.lastNpcId then
             ns.Log.Info(format("  last hovered: %d %s", view.lastNpcId,
                 tostring(view.lastNpcName or "<no name>")))
@@ -782,7 +785,7 @@ local function commandTaint(subject)
     -- tainted, and level 4 helped one session flood until it disconnected.
     ns.Log.Info("for the propagation path, which names the line that spread it:")
     ns.Log.Info("  keep BugGrabber installed, then /console taintLog 1, /reload, reproduce once, and quit")
-    ns.Log.Info("  in _classic_beta_/Logs/taint.log the line above each \"An action was blocked\"")
+    ns.Log.Info("  in Logs/taint.log, in the game folder, the line above each \"An action was blocked\"")
     ns.Log.Info("  is where that execution became tainted; copy the file before logging in again")
     ns.Log.Info("  /console taintLog 0   turns it back off; never use level 4")
 end

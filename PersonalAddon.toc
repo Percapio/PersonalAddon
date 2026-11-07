@@ -2,7 +2,7 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 1.10.0
+## Version: 1.10.1
 ## IconTexture: Interface\AddOns\PersonalAddon\Images\logo.png
 ## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their
@@ -14,7 +14,7 @@
 ## X-Phase: 20
 
 # Interface number follows Blizzard's major*10000 + minor*100 + patch
-# convention for the stated client version 1.60.1. If the beta reports a
+# convention for the stated client version 1.60.1. If the client reports a
 # different number, only this line changes.
 
 # Load order is significant: substrate must execute before features, because

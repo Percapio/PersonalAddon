@@ -1,11 +1,11 @@
 -- Core/Constants.lua
--- Every tunable number lives here, named, so a beta patch that moves one is a
+-- Every tunable number lives here, named, so a client patch that moves one is a
 -- one-line change rather than a hunt through a phase calculation (§11.5).
 
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.10.0-phase20"
+ns.VERSION = "1.10.1-patch02"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -21,13 +21,21 @@ ns.CURRENT_SCHEMA_VERSION = 1
 -- observable tick. See Architecture section 11.1a.
 ns.FSR_WINDOW = 5.0
 
+-- UNAVAILABLE (Architecture/20261104-Patch02.md section 4.5): enable found an optional
+-- provider missing. Not a fault: no error line, and the provider says so once itself.
 ns.FEATURE_STATE = {
     REGISTERED = "REGISTERED",
     DISABLED = "DISABLED",
     ENABLING = "ENABLING",
     ENABLED = "ENABLED",
+    UNAVAILABLE = "UNAVAILABLE",
     FAULTED = "FAULTED",
 }
+
+-- What an enable returns as its THIRD value to say "unavailable, not failed":
+-- return nil, reason, ns.ENABLE_OUTCOME.UNAVAILABLE. A two-value nil, reason keeps
+-- meaning a failure, so no feature that predates Patch 02 changes.
+ns.ENABLE_OUTCOME = { UNAVAILABLE = "Unavailable" }
 
 ns.DROP_POLICY = {
     SURFACE_AND_FAIL = "SURFACE_AND_FAIL",
@@ -317,6 +325,10 @@ ns.EMPTY_CLAIM_SHAPE = {
 ns.QUESTIE_REQUIRED_CONTRACT = 3
 ns.QUESTIE_REQUIRED_FLAVOR = "Forever"
 
+-- The one line a missing or unusable QuestieDB prints per UI load, whichever feature
+-- asks first (Architecture/20261104-Patch02.md section 4.4).
+ns.QUESTIE_UNMET_NOTICE_KEY = "questiedb:unmet"
+
 -- Entities cached per id for the UI load. QuestieDB's data is baked into a TOC and
 -- static for the session, so nothing is invalidated; the cap is there because a
 -- session can hover a lot of NPCs (section 2.4).
@@ -423,61 +435,9 @@ ns.KNOWN_OBJECTIVE_TYPES = {
 -- (section 2.3, audit finding 2).
 ns.QUEST_CLAIM_QUEST_LEVEL = 0
 
--- Phase 19: the rare and elite ring (section 4) ----------------------------------------
-
--- One ring per plate, sized as the guild label's pool and for the same reason.
-ns.RARITY_RING_POOL_CAPACITY = 48
-
--- The ring's width as a multiple of the level badge's MEASURED width. The badge is
--- wider than it is tall, so a square ring sized from the width surrounds it and
--- crosses the bar's top and bottom edges (decision D5); sizing from the height
--- would instead track our own bar-height setting, which section 4.2 rejects.
-ns.RARITY_RING_WIDTH_FACTOR = 1.25
-
-ns.RARITY_RING_SIZE_MINIMUM = 0.6
-ns.RARITY_RING_SIZE_MAXIMUM = 2.0
-ns.RARITY_RING_SIZE_STEP = 0.05
-
--- Tighter than the marker's +-40: the badge is 28 wide and a ring further out than
--- this is no longer on it.
-ns.RARITY_RING_OFFSET_LIMIT = 24
-
--- The ring must draw OVER the badge's own box, or its inner edge is hidden behind
--- it. Our frames are UIParent children, so the plate's strata governs whether this
--- is enough; it is the single knob if the in-game check fails (section 12).
-ns.RARITY_RING_STRATA = "HIGH"
-
--- Blizzard's LEVEL_INDICATOR_WIDTH (Blizzard_NamePlateConstants.lua), used only
--- when the badge's own GetWidth does not answer.
-ns.LEVEL_INDICATOR_WIDTH_FALLBACK = 28
-
-ns.RARITY_TIER = { BOSS = "Boss", SILVER = "Silver", GOLD = "Gold" }
-
--- The artwork, from Camelot's own target frame
--- (Blizzard_UnitFrame/Camelot/TargetFrameUtils.lua:9-19 via Mainline/TargetFrame.lua:423).
--- Verified by use rather than by name: this client sets these three every time the
--- player targets an elite. Rare and rare-elite share the silver surround because
--- that file's ShouldUseSilverUnitFrame does (section 4.3).
-ns.RARITY_RING_ATLAS = {
-    Boss = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold-Winged",
-    Silver = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Silver-Winged",
-    Gold = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold",
-}
-
--- The classification strings that earn a ring, mapped to their tier. "worldboss"
--- is here as well as UnitIsBossMob because the two are not the same question and
--- either one answering yes is a boss (section 4.5).
-ns.RARITY_TIER_FOR_CLASSIFICATION = {
-    worldboss = "Boss",
-    rare = "Silver",
-    rareelite = "Silver",
-    elite = "Gold",
-}
-
--- A ring whose aspect could not be read is drawn square. The target-frame gold
--- surround is very nearly square, so this is the right guess when GetAtlasInfo
--- answers without usable numbers.
-ns.RARITY_RING_ASPECT_FALLBACK = 1.0
+-- Phase 19's rare and elite ring (section 4) was retired by Patch 02 section 5: build
+-- 1.60.1.70790 turned Blizzard's own nameplate rarity icon back on in this flavour, so
+-- the ring's constants went with it.
 
 -- Phase 20 (Architecture/20261021-Phase20.md) --------------------------------------------
 
@@ -498,6 +458,19 @@ ns.MERCHANT_VISIT_MAXIMUM_SECONDS = 600
 -- NPC role texts kept on our side of the bridge, with "has none" cached too: the
 -- quest bridge's size, for the same reason (section 7.4).
 ns.NPC_ROLE_CACHE_CAPACITY = 256
+
+-- Patch 02 (Architecture/20261104-Patch02.md) ---------------------------------------------
+
+-- Who created a frame that listens to what a sort delivers inside the call, read
+-- from ScriptRegion:GetSourceLocation (section 3.3). Words only: any listener that
+-- is not ours holds the sort whatever these say (decision D1). Matched without
+-- regard to case, after backslashes become forward slashes.
+ns.BLIZZARD_SOURCE_ROOTS = { "interface/framexml/", "interface/sharedxml/", "interface/gluexml/" }
+-- A Lua pattern matched against the lower-cased location. Its two position captures
+-- bracket the addon's folder, which is then cut from the ORIGINAL string, so the name
+-- keeps the case the client gave it ("QuestieTrace", not "questietrace").
+ns.ADDON_FOLDER_PATTERN = "interface/addons/()[^/]+()/"
+ns.BLIZZARD_FOLDER_PREFIX = "blizzard_"
 
 -- What a left-aligned nameplate name is set to (section 8).
 ns.NAME_ALIGN_JUSTIFY = "LEFT"

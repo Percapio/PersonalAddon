@@ -4,7 +4,7 @@
   <img src="Images/logo.png" alt="PersonalAddon Logo" width="220" />
 </p>
 
-A modular, controller-first quality-of-life addon developed for the World of Warcraft Forever Beta (API 1.60.1). PersonalAddon selectively cherry-picks essential features from larger interface suites and rebuilds them natively to match the client's visual language and execution model. It is designed specifically for, and tested against, Blizzard's Gamepad UI (Alpha).
+A modular, controller-first quality-of-life addon developed for World of Warcraft Forever (API 1.60.1). It was built during the beta and has been maintained against the live client since build 1.60.1.70790. PersonalAddon selectively cherry-picks essential features from larger interface suites and rebuilds them natively to match the client's visual language and execution model. It is designed specifically for, and tested against, Blizzard's Gamepad UI (Alpha).
 
 ---
 
@@ -128,7 +128,7 @@ World quest integration built around lightweight database bridges and clean visu
 
 - **NPC Tooltip Quest Lists:** Appends accepted and available quests with difficulty coloring directly into the unit tooltip during Blizzard's layout pre-calculation pass.
 - **Nameplate Quest Markers:** Positions quest target indicators above relevant hostile units; automatically suspends itself in dungeons and raids where unit GUIDs are restricted by the client.
-- **Bridge Architecture:** Interfaces with QuestieDB queries via [`Core/QuestieDBBridge.lua`](Core/QuestieDBBridge.lua) without requiring the full Questie interface suite.
+- **Bridge Architecture:** Interfaces with QuestieDB queries via [`Core/QuestieDBBridge.lua`](Core/QuestieDBBridge.lua) without requiring the full Questie interface suite. QuestieDB is its own addon; Questie itself may stay disabled.
 - **Implementations:** [`Features/NPCQuests.lua`](Features/NPCQuests.lua) and [`Features/QuestMarkers.lua`](Features/QuestMarkers.lua).
 
 ---
@@ -141,9 +141,10 @@ World quest integration built around lightweight database bridges and clean visu
    ```
 2. Place the `PersonalAddon` directory inside your client's addon directory:
    ```text
-   _classic_beta_/Interface/AddOns/PersonalAddon/
+   _forever_/Interface/AddOns/PersonalAddon/
    ```
-3. Launch the game and verify that **PersonalAddon** is checked in the AddOns menu.
+3. Optional, for the NPC quest tooltips, the quest markers and NPC roles: install **QuestieDB**. It is a separate addon, and an addon manager may install Questie without it (the live launch's update removed it). Questie itself is not needed. `/pa quests` reports whether QuestieDB is usable.
+4. Launch the game and verify that **PersonalAddon** is checked in the AddOns menu.
 
 All configuration options are accessible in-game via **Options > AddOns > PersonalAddon**, through subcategory menus (**Combat**, **Nameplates**, **Bags & loot**, **Consumables**, **Quests**), or via `/pa` slash commands.
 
@@ -192,8 +193,6 @@ All configuration options are accessible in-game via **Options > AddOns > Person
   Scales nameplate bar height from 30% to 100% of Blizzard's base layout, automatically adapting to the player's selected UI Style and Global Scale.
 - **Quest Markers on Nameplates ([`Features/QuestMarkers.lua`](Features/QuestMarkers.lua)):**
   Renders an indicator beside the nameplates of monsters an active quest objective still wants. The marker **clears as soon as that objective is satisfied** — the kill count filled, or enough of the item collected — including on the creatures that drop a quest item rather than only on named kill targets. A setting keeps markers until the quest leaves the log instead, for farming a mob whose objective is already done. Requires QuestieDB and enemy nameplates enabled. **Automatically disabled in dungeons and raids** where the client withholds unit GUIDs to prevent misleading false negatives.
-- **Rare and Elite Rings on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
-  Encircles the nameplate level badge with the client's own target-frame surround: gold for an elite, silver for a rare or rare-elite, winged gold for a world boss. Drawn only on attackable units, and **off in dungeons and raids** where nearly every monster is elite and the ring would carry no information. Size and position are configurable; the artwork is resolved at runtime and the tier simply goes undrawn on a client that does not carry it.
 
 ### Bags & Loot
 
@@ -202,7 +201,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Custom Toast Alerts ([`Features/Toasts.lua`](Features/Toasts.lua)):**
   Surfaces popups for looted currency, green-or-better items, and quest objects. When you leave a merchant richer than you arrived, one toast shows the gold gained over the visit — items sold by hand and junk sold automatically alike. The game's own "You gained" chat line still prints. A visit that only bought things shows nothing, and quest rewards and crafted items never trigger a toast. Screen duration, offset, and categories are configurable; "Gold gained at a merchant" switches the visit toast off and brings back a junk sale's own toast.
 - **Automated Bag Consolidation ([`Features/AutoSortBags.lua`](Features/AutoSortBags.lua)):**
-  Executes native `Clean Up Bags` upon closing inventory frames. It is `C_Container.SortBags`, the same call as the bag's Clean Up Bags button, so a bag you set to Ignore Cleanup is left alone. Throttled to at most once per 60 seconds, blocked in combat, and suspended while item locks or Cooldown Manager updates are active.
+  Executes native `Clean Up Bags` upon closing inventory frames. It is `C_Container.SortBags`, the same call as the bag's Clean Up Bags button, so a bag you set to Ignore Cleanup is left alone. Throttled to at most once per 60 seconds and blocked in combat. Held back while items are locked, and while anything else listens for item-lock events: a Cooldown Manager bag item, the bag tutorial, an open panel, or another addon (QuestieTrace listens from load). One chat line names what holds it back, and `/pa bags` names it too.
 - **Junk Liquidation ([`Features/AutoSellJunk.lua`](Features/AutoSellJunk.lua)):**
   Triggers Blizzard's `Sell All Junk` handler upon interacting with merchant frames without confirmation modals, reporting total proceeds in the merchant visit toast, or on its own toast when that is switched off (in chat when toasts are off).
 
@@ -221,7 +220,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
   Macros update **strictly out of combat** and only when bag inventory changes. They are never placed automatically; players bind them manually using the Action Bar Editor.
   
   > [!NOTE]
-  > **Well Fed Filtering:** By default, food providing Well Fed is permitted because nearly all Forever Beta food applies this buff. Disabling this would invalidate food selection.
+  > **Well Fed Filtering:** By default, food providing Well Fed is permitted because nearly all Forever food applies this buff. Disabling this would invalidate food selection.
 
   > [!IMPORTANT]
   > **Action Bar Writer Guard:** Rewriting action-bar-docked macros triggers internal Blizzard range-check handlers. PersonalAddon monitors the Gamepad action bar's `activeBar` variable after each write. If taint attribution is detected, macro synchronization suspends for the remainder of the session to prevent controller button refusal until `/reload`.
@@ -251,10 +250,10 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 | `/pa get <feature>`, `/pa set <feature> <k> <v>` | Reads or updates a specific configuration key |
 | `/pa skills` | Dumps current skills panel layout and tracked values to chat |
 | `/pa toasts`, `/pa toasts test` | Summarizes toast metrics and the merchant visit in progress; emits one synthetic toast of each kind, merchant visit included |
-| `/pa bags`, `/pa vend` | Reports last container sort or vendor event, including skip reasons |
+| `/pa bags`, `/pa vend` | Reports last container sort or vendor event, including skip reasons and what holds a sort back |
 | `/pa consumables` | Summarizes active consumable bindings and assignment diagnostics |
-| `/pa quests` | Displays QuestieDB bridge status, offered NPC quests, and marker targets |
-| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles, name alignment and its capability), and FSR tracker (casts that spent mana, cost nothing, or could not be priced) |
+| `/pa quests` | Displays QuestieDB bridge status, offered NPC quests, and marker targets, and which features are waiting for QuestieDB |
+| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles and whether they can be read, name alignment and its capability), and FSR tracker (casts that spent mana, cost nothing, or could not be priced) |
 | `/pa preview [on\|off\|threat\|dps]` | Manages visual adjustment preview mode and toggles active HUD anchor |
 | `/pa panel` | Inspects settings registration tree and category building diagnostics |
 | `/pa blocked` | Outputs protected function refusals attributed to PersonalAddon |
@@ -274,6 +273,24 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Symptoms:** Subsequent controller inputs (such as updating interact icons via `SetPreferredGamepadInteractTarget`, jumping, or Game Menu navigation) are refused. The client attributes taint to whichever addon last modified the execution state.
 - **Verification:** When this defect triggers, `/pa blocked` displays a call stack passing through Blizzard's `MainActionBarFrame.lua` or `FrameControlsManager.lua` rather than addon source files. Diagnostic counters increment `refusalsOurs` accompanied by `knownDefectHintShown`.
 - **Workaround:** Enter `/reload` in chat. Detailed architectural analysis is documented in [`Architecture/20261002-GAPBugs01.md`](Architecture/20261002-GAPBugs01.md).
+- **Still present on the live client** (1.60.1.70790, 2026-11-04): BlockWatch recorded these refusals, attributed to another addon, on launch day.
+
+### Tidy Bags Never Runs
+
+- **Mechanism:** A sort delivers `ITEM_LOCK_CHANGED` inside the call, so anything listening for it would run inside this addon's execution. Tidy bags therefore holds back while anything else listens, whoever it belongs to.
+- **Symptom:** One chat line naming what listens, such as `tidy bags is off while QuestieTrace listens for item locks`. `/pa bags` shows it as well.
+- **Fix:** Disable the addon it names. QuestieTrace, installed alongside Questie 12.6.0, listens from load whether or not you consented to its data collection. Or use Clean Up Bags from the bag menu yourself. Details in [`Architecture/20261104-Patch02.md`](Architecture/20261104-Patch02.md) §3.
+
+### Quest Tooltips, Quest Markers and NPC Roles Are Off
+
+- **Mechanism:** QuestieDB is missing or unusable. It is a separate addon, and addon managers do not always install it with Questie.
+- **Symptom:** One chat line at login saying so. `/pa status` shows the quest features as `UNAVAILABLE`, and `/pa quests` lists what is off.
+- **Fix:** Install QuestieDB, enable it in the AddOns list, then `/reload`.
+
+### Pulling Back in Combat Turns the Character Around
+
+- **Mechanism:** The live launch started every gamepad setting from its default, so values tuned on the beta did not carry over. The combat face-movement angle defaults to 105, which strafes sideways but turns you around when you pull back.
+- **Fix:** **Options → Gamepad → Camera** → set the combat face-movement angle to 180. If a full pull back still turns you, raise the backpedal threshold beside it. PersonalAddon has never controlled movement ([`Architecture/20260926-Phase07.md`](Architecture/20260926-Phase07.md) §4).
 
 ### A Mob Vanished from the Threat Panel
 
@@ -290,7 +307,8 @@ To eliminate redundant execution overhead, PersonalAddon intentionally omits fea
 - Quest acceptance, dialogue progression, and reward selection.
 - Automatic distance-based sorting of tracked quests upon zone transitions.
 - Underlying combat damage meter infrastructure (which [`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua) reads directly).
-- Directional strafing/backpedaling angles configured via Options → Gamepad.
+- Strafing and backpedaling in combat: **Options → Gamepad → Camera** → the combat face-movement angle. At 0 you always turn to face where the stick points; at 180 you never do, so you strafe and backpedal. The live default, 105, strafes but turns you around when you pull back. The backpedal threshold beside it sets how hard a pull turns you instead. PersonalAddon never changes these; they are yours to set.
+- A rarity icon on enemy nameplates: **Options → Nameplates → Rarity Icon**. Forever turned it on in build 1.60.1.70790, and PersonalAddon's rare/elite ring was retired for it ([`Architecture/20261104-Patch02.md`](Architecture/20261104-Patch02.md) §5).
 - Container cleanup accessible through the bag Manage menu.
 - Native vendor junk selling and transaction summaries, and the "You gained" chat receipt on leaving a merchant (PersonalAddon shows the same figure as a toast).
 
@@ -313,7 +331,7 @@ Architectural decisions and experiments evaluated across development phases and 
 | Reactive Control Greying | Requires runtime modify predicates called by Blizzard on each render pass; resolved by structural subcategory indentation | [Phase 12](Architecture/20261006-Phase12.md) §3.4, build 1.60.1.70291 |
 | Dungeon/Raid Quest Markers | Client withholds unit GUIDs on restricted maps; partial marker rendering would produce misleading false negatives | [Phase 17](Architecture/20261011-Phase17.md) §4.3, build 1.60.1.70338 |
 | Tooltip Anchored to Plates | Moving game tooltip risks triggering empty render loops warned by Blizzard source; requires full custom tooltip framework | [Phase 18](Architecture/20261011-Phase18.md) §4, build 1.60.1.70338 |
-| Nameplate Rarity Icons via Client Feature | Client ships the whole feature (`NamePlateClassificationFrameMixin`) and this flavour disables it in two places: the enemy frame option is false and the settings checkbox is hidden. Enabling it requires writing Blizzard's option table, which Rule 2 forbids; the ring is drawn as an addon-owned frame instead | [Phase 19](Architecture/20261016-Phase19.md) §1.3, build 1.60.1.70450 |
+| Target-Gated Combat Strafing | Strafing only while a hostile target is selected, with a delay before switching back, means owning the client's face-movement settings: a secure-setting refusal, `CVAR_UPDATE` listeners (the settings panel among them), and losing the user's own value. The static version is a client setting (see What the Game Already Does) | [Phase 7](Architecture/20260926-Phase07.md) §4.2 |
 | Restoration-Ranked Consumables | Restore quantities exist only as localized tooltip strings; ranking relies on required level | [Phase 16](Architecture/20261011-Phase16.md) §4.5, build 1.60.1.70338 |
 | Hidden Action Button Indirection | `/click` fails against addon frames with `ScriptedInput` constraints; macros must name items directly | [Phase 16](Architecture/20261011-Phase16.md) §6.1, build 1.60.1.70338 |
 | Bandage First Aid Verification | Item APIs do not expose First Aid rank prerequisites; invalid usages report native error feedback | [Phase 16](Architecture/20261011-Phase16.md) §4.4, build 1.60.1.70338 |
@@ -400,7 +418,7 @@ python Tools/patchcheck/patch_check.py status
 
 - **[`Tools/harness/`](Tools/harness/):** Runs the full addon suite offline in a pure Lua 5.1 environment with mocked Blizzard APIs.
 - **[`Tools/lint/`](Tools/lint/):** AST lint verifying all client API calls route through [`Core/ClientRead.lua`](Core/ClientRead.lua).
-- **[`Tools/patchcheck/`](Tools/patchcheck/):** Compares code premises in [`Tools/patchcheck/premises.toml`](Tools/patchcheck/premises.toml) against Blizzard UI exports. Refer to [`Tools/README.md`](Tools/README.md) for update workflows.
+- **[`Tools/patchcheck/`](Tools/patchcheck/):** Compares code premises in [`Tools/patchcheck/premises.toml`](Tools/patchcheck/premises.toml) against Blizzard UI exports. It finds the client binary by the name `client_binary` gives in [`Tools/config.toml`](Tools/config.toml) (default `Wow.exe`). Refer to [`Tools/README.md`](Tools/README.md) for update workflows.
 
 ---
 

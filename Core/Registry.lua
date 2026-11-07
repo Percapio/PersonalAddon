@@ -40,6 +40,8 @@ function Registry.Register(featureId, defaults, lifecycle)
         defaults = defaults,
         lifecycle = lifecycle,
         state = STATE.REGISTERED,
+        -- Why the feature is not ENABLED: a fault's reason, or since Patch 02 section
+        -- 4.5 an UNAVAILABLE feature's. Registry.State returns it either way.
         faultReason = nil,
         -- Audience, not capability. An internal feature is enabled, disabled and
         -- configured exactly like any other; it is simply not offered to someone
@@ -93,10 +95,20 @@ local function enterEnabled(record)
     record.state = STATE.ENABLING
 
     local config = ns.ConfigStore.Feature(record.id)
-    local ok, success, reason = ns.Isolation.Call(record.lifecycle.enable, config)
+    local ok, success, reason, outcome = ns.Isolation.Call(record.lifecycle.enable, config)
 
     if not ok then
         enterFault(record, "enable raised", success)
+        return false
+    end
+    -- Patch 02 section 4.5: an optional provider is missing. That is a fact about the
+    -- setup, not a defect here, so there is no error line -- the provider prints the
+    -- one line itself -- but whatever the attempt subscribed is released, exactly as a
+    -- fault would release it. The stored preference is untouched, as for a fault.
+    if success ~= true and outcome == ns.ENABLE_OUTCOME.UNAVAILABLE then
+        releaseFeature(record)
+        record.state = STATE.UNAVAILABLE
+        record.faultReason = tostring(reason or "unavailable")
         return false
     end
     if success ~= true then
@@ -210,6 +222,7 @@ function Registry.SetEnabled(featureId, enabled)
 
     if record.state == STATE.ENABLED
         or record.state == STATE.ENABLING
+        or record.state == STATE.UNAVAILABLE
         or record.state == STATE.FAULTED then
         releaseFeature(record)
     end

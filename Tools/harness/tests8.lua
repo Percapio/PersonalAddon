@@ -446,12 +446,16 @@ else
         if frame.allEvents then anyAllEvents = true end
     end
     check("window frame holds nothing afterwards", not anyAllEvents)
+    -- Patch 02 section 3.3: a listener is a record { label, origin, ... } now, so the
+    -- detail is built through Describe and the name is read from .label (audit finding 3).
     local own = ns.CallWindow.Listeners({ "CHAT_MSG_LOOT" })
     check("listener read leaves out our Dispatch frame", own and #own.CHAT_MSG_LOOT == 0,
-        own and table.concat(own.CHAT_MSG_LOOT, ","))
+        own and ns.CallWindow.Describe(own))
     local merchantListeners = ns.CallWindow.Listeners({ "BAG_UPDATE" })
     check("listener read names another frame", merchantListeners
-        and merchantListeners.BAG_UPDATE[1] == "MerchantFrame")
+        and merchantListeners.BAG_UPDATE[1] ~= nil
+        and merchantListeners.BAG_UPDATE[1].label == "MerchantFrame",
+        merchantListeners and ns.CallWindow.Describe(merchantListeners))
 
     -- Tidy bags (section 7.1) ------------------------------------------------------------
     local function closeBag()
@@ -506,7 +510,8 @@ else
     HARNESS.frame()
     check("a listener holds the sort back", HARNESS.sortCalls == 1
         and ns.AutoSortBags.Inspect().lastSkip == "ListenersPresent", ns.AutoSortBags.Inspect().lastSkip)
-    check("the listener is named", chatSince(mark):find("ITEM_LOCK_CHANGED: CooldownViewerBagItem1", 1, true) ~= nil,
+    -- Patch 02 section 3.3: the Blizzard-side row of the notice names the frame.
+    check("the listener is named", chatSince(mark):find("CooldownViewerBagItem1 listens for item locks", 1, true) ~= nil,
         chatSince(mark))
     cooldownItem:UnregisterEvent("ITEM_LOCK_CHANGED")
     closeBag()

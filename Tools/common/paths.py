@@ -12,7 +12,10 @@ TOOLS = pathlib.Path(__file__).resolve().parents[1]
 REPO = TOOLS.parent
 CLIENT = REPO.parents[2]
 EXPORT = CLIENT / "BlizzardInterfaceCode"
-BINARY = CLIENT / "WowB.exe"
+# The binary's name is configuration, not a literal: the beta's WowB.exe became the
+# live client's Wow.exe, and the literal left the patch check unable to run at all
+# (Architecture/20261104-Patch02.md section 2.4). client_binary() reads the key.
+DEFAULT_CLIENT_BINARY = "Wow.exe"
 
 ADDONS_SUBPATH = pathlib.Path("Interface") / "AddOns"
 DOCS_FOLDER = "Blizzard_APIDocumentationGenerated"
@@ -37,6 +40,13 @@ def load_config():
         with open(local, "rb") as handle:
             config = _merge(config, tomllib.load(handle))
     return config
+
+
+def client_binary(config=None):
+    """The client binary: the client folder joined with config's client_binary, or with
+    Wow.exe when an older config.local.toml predates the key."""
+    config = config if config is not None else load_config()
+    return CLIENT / config.get("client_binary", DEFAULT_CLIENT_BINARY)
 
 
 def addons_root(export_root):

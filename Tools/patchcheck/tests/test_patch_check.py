@@ -1,6 +1,8 @@
 """The patch check's tests, T1-T15 (Architecture/20261002-Phase10.md section 10.1),
-T16-T18 (Architecture/20261005-Phase11.md section 10.2) and T19
-(Architecture/20261006-Phase12.md section 14.2).
+T16-T18 (Architecture/20261005-Phase11.md section 10.2), T19
+(Architecture/20261006-Phase12.md section 14.2), and t25-t28
+(Architecture/20261104-Patch02.md section 9.1: the configured client binary, a missing
+one refused, the name in messages, and Patch 02's premise).
 
 T1, T2, T15, T18 and T19 use the real exports and are skipped when one is missing. T2
 also needs the current export to be the 10-02 UI source, and is skipped otherwise. The
@@ -56,7 +58,9 @@ class FixtureCase(unittest.TestCase):
         self.temporary = pathlib.Path(tempfile.mkdtemp(prefix="patchcheck-"))
         shutil.copytree(FIXTURE, self.temporary, dirs_exist_ok=True)
         self.export = self.temporary / "export"
-        self.binary = self.temporary / "WowB.exe"
+        # Named as the tools would look for it (Patch 02 section 2.4), so the messages
+        # t27 reads carry the configured name rather than a literal.
+        self.binary = self.temporary / paths.client_binary(paths.load_config()).name
         self.binary.write_bytes(b"not a real client")
         self.age_binary()
         self.paths = patch_check.ToolPaths(
@@ -249,7 +253,7 @@ class FixtureTests(FixtureCase):
         self.assertIsNone(record["client"]["build"])
         kind, lines = patch_check.status(self.paths, build_reader=unreadable_build)
         self.assertEqual(kind, "UpToDate")
-        self.assertTrue(any("compared by WowB.exe's time" in line for line in lines))
+        self.assertTrue(any(f"compared by {self.binary.name}'s time" in line for line in lines), lines)
         result = self.check(build_reader=unreadable_build)
         self.assertTrue(result["report"].endswith(f"unknown-{int(os.path.getmtime(self.binary))}.md"))
         later = os.path.getmtime(self.binary) - 10
@@ -314,6 +318,58 @@ class FixtureTests(FixtureCase):
         with self.assertRaises(premises.RegisterInvalid) as raised:
             premises.load_register(self.paths.register)
         self.assertIn("FlagEquals needs entry, flag and value", " | ".join(raised.exception.faults))
+
+    def test_t25_the_binary_comes_from_client_binary(self):
+        # Architecture/20261104-Patch02.md section 2.4: a key, not a literal, with Wow.exe
+        # when an older config.local.toml predates the key.
+        config = dict(paths.load_config())
+        self.assertEqual(paths.client_binary(config), paths.CLIENT / config["client_binary"])
+        config["client_binary"] = "WowT.exe"
+        self.assertEqual(paths.client_binary(config), paths.CLIENT / "WowT.exe")
+        del config["client_binary"]
+        self.assertEqual(paths.client_binary(config).name, paths.DEFAULT_CLIENT_BINARY)
+        self.assertEqual(patch_check.default_paths().binary, paths.client_binary(paths.load_config()))
+
+    def test_t26_a_missing_binary_is_refused_not_raised(self):
+        # Section 2.4 and audit finding 13: status answers ClientMissing, and the two
+        # commands that identify the client, check and adopt, refuse it.
+        self.binary.unlink()
+        with self.assertRaises(patch_check.Refused) as raised:
+            self.adopt()
+        self.assertEqual(raised.exception.kind, "ClientMissing")
+        self.assertIn("client_binary", raised.exception.message)
+        self.binary.write_bytes(b"not a real client")
+        self.age_binary()
+        self.adopt()
+        self.binary.unlink()
+        kind, lines = patch_check.status(self.paths, build_reader=known_build)
+        self.assertEqual(kind, "ClientMissing")
+        self.assertTrue(any(str(self.binary) in line for line in lines), lines)
+        with self.assertRaises(patch_check.Refused) as raised:
+            self.check()
+        self.assertEqual(raised.exception.kind, "ClientMissing")
+        code = patch_check.main(["status", "--export", str(self.export), "--binary", str(self.binary),
+                                 "--store", str(self.paths.store), "--verified", str(self.paths.verified),
+                                 "--register", str(self.paths.register), "--reports", str(self.paths.reports)])
+        self.assertEqual(code, 2)
+
+    def test_t27_messages_and_the_report_name_the_configured_binary(self):
+        name = self.binary.name
+        self.assertEqual(name, paths.client_binary(paths.load_config()).name)
+        self.adopt()
+        newest = views.newest_mtime(self.export)
+        os.utime(self.binary, (newest + 60, newest + 60))
+        kind, lines = patch_check.status(self.paths, build_reader=known_build)
+        self.assertEqual(kind, "ExportStale")
+        self.assertTrue(any(line.startswith(f"{name} (") for line in lines), lines)
+        with self.assertRaises(patch_check.Refused) as raised:
+            self.check()
+        self.assertTrue(raised.exception.message.startswith(f"{name} is newer"), raised.exception.message)
+        self.age_binary()
+        result = self.check()
+        self.assertEqual(result["binaryName"], name)
+        report = (self.paths.reports / result["report"]).read_text(encoding="utf-8")
+        self.assertIn(f"`{name}` of", report)
 
     def test_classic_only_file_is_outside_the_load_set(self):
         loaded = load_set.resolve_load_set(self.export, self.paths.config)
@@ -383,8 +439,9 @@ class RealExportTests(unittest.TestCase):
         # The count guards against a premise being dropped, so it is exact and has
         # to be bumped by whichever phase adds one. It had rotted: Phases 13, 14 and
         # 15 took the register from 29 to 36 without touching this line, so T18 was
-        # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2).
-        self.assertEqual(len(register), 86)
+        # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2). Patch 02
+        # retired five ring premises and added one: 86 - 5 + 1 (Patch 02 section 2.3).
+        self.assertEqual(len(register), 82)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -475,14 +532,13 @@ class RealExportTests(unittest.TestCase):
         # written with the addon directory missing from their file path -- audit
         # finding 13 -- which would have come back Broken for "file not found"
         # rather than for a moved premise, so the paths are what this test really
-        # pins. LEVEL-BADGE-ANCHORED-TO-BAR is the one build 70450 moved.
+        # pins. Patch 02 (section 2.3) retired the five that served only the rare/elite
+        # ring, once build 70790 turned Blizzard's own rarity icon back on; the two left
+        # serve the threat panel and the quest markers.
         register = premises.load_register(patch_check.default_paths().register)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
-        for premise_id in ("LEVEL-BADGE-FRAME", "LEVEL-BADGE-ANCHORED-TO-BAR",
-                           "LEVEL-INDICATOR-WIDTH", "RARITY-ICON-OFF-IN-CAMELOT",
-                           "BOSS-PORTRAIT-ATLASES", "UNITCLASSIFICATION-READABLE",
-                           "QUEST-OBJECTIVES-CARRY-FINISHED"):
+        for premise_id in ("UNITCLASSIFICATION-READABLE", "QUEST-OBJECTIVES-CARRY-FINISHED"):
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
 
@@ -502,6 +558,18 @@ class RealExportTests(unittest.TestCase):
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
         self.assertIn("MERCHANT-FRAME", by_id)
+
+    def test_t28_the_patch02_premise_holds_and_the_ring_premises_are_gone(self):
+        # Architecture/20261104-Patch02.md section 2.3. FlagAbsent pins the entry name
+        # too: a misspelt one would read Broken as "no longer documented".
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        outcome = premises.evaluate_premise(by_id["SOURCE-LOCATION-NOT-SECRET"], current, None)
+        self.assertEqual(outcome.status, premises.HOLDS, outcome.evidence)
+        for retired in ("LEVEL-BADGE-FRAME", "LEVEL-BADGE-ANCHORED-TO-BAR", "LEVEL-INDICATOR-WIDTH",
+                        "RARITY-ICON-OFF-IN-CAMELOT", "BOSS-PORTRAIT-ATLASES"):
+            self.assertNotIn(retired, by_id)
 
     def test_t15_every_file_in_running_stacks_is_in_the_load_set(self):
         loaded = {name.lower() for name in load_set.resolve_load_set(paths.EXPORT).files}

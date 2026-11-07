@@ -1,13 +1,13 @@
 {
- "acceptedAt": 1792596182.8791547,
+ "acceptedAt": 1794024529.5222814,
  "acceptedBy": "AcceptedAfterReview",
  "client": {
-  "binaryModifiedAt": 1792205387.8312545,
-  "build": "1.60.1.70450"
+  "binaryModifiedAt": 1794018331.4774103,
+  "build": "1.60.1.70840"
  },
- "exportDigest": "6baabdd9dca9e2021be53dcbbfc85ee950cf81a3018939f12437d61a2be8f89f",
- "exportedAt": 1792209329.039382,
- "report": "2026-10-16-1.60.1.70450.md",
+ "exportDigest": "c227cbc66a9ce93223620283923314233d7b60a4ed5ed56be69d53975cbe927b",
+ "exportedAt": 1794019817.2858708,
+ "report": "2026-11-06-1.60.1.70840.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
@@ -186,6 +186,9 @@
   "SimpleEditBoxAPI:GetFont": [
    "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
   ],
+  "SimpleEditBoxAPI:GetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
+  ],
   "SimpleEditBoxAPI:SetEnabled": [
    "Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua"
   ],
@@ -204,6 +207,9 @@
   "SimpleFontAPI:GetFont": [
    "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
   ],
+  "SimpleFontAPI:GetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
+  ],
   "SimpleFontAPI:SetAlpha": [
    "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
   ],
@@ -217,6 +223,9 @@
    "Blizzard_APIDocumentationGenerated/SimpleFontAPIDocumentation.lua"
   ],
   "SimpleFontStringAPI:GetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
+  ],
+  "SimpleFontStringAPI:GetJustifyH": [
    "Blizzard_APIDocumentationGenerated/SimpleFontStringAPIDocumentation.lua"
   ],
   "SimpleFontStringAPI:SetFont": [
@@ -288,6 +297,9 @@
   "SimpleHTMLAPI:GetFont": [
    "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
   ],
+  "SimpleHTMLAPI:GetJustifyH": [
+   "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
+  ],
   "SimpleHTMLAPI:SetFont": [
    "Blizzard_APIDocumentationGenerated/SimpleHTMLAPIDocumentation.lua"
   ],
@@ -307,6 +319,9 @@
    "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
   ],
   "SimpleMessageFrameAPI:GetFont": [
+   "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
+  ],
+  "SimpleMessageFrameAPI:GetJustifyH": [
    "Blizzard_APIDocumentationGenerated/SimpleMessageFrameAPIDocumentation.lua"
   ],
   "SimpleMessageFrameAPI:SetFont": [
@@ -436,6 +451,9 @@
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitIsDead": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitIsFriend": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitIsPlayer": [
@@ -674,6 +692,9 @@
   ],
   "lua NUM_BAG_SLOTS": [
    "Blizzard_FrameXMLBase/Constants.lua"
+  ],
+  "lua NamePlateConstants": [
+   "Blizzard_NamePlates/Camelot/Blizzard_NamePlateConstants.lua"
   ],
   "lua NamePlateSetupOptions": [
    "Blizzard_NamePlates/Blizzard_NamePlateFrameOptions.lua"
@@ -1222,6 +1243,10 @@
    "Returns.name.Nilable": "false",
    "Returns.name.Type": "\"cstring\""
   },
+  "SimpleEditBoxAPI:GetJustifyH": {
+   "Returns.justifyH.Nilable": "false",
+   "Returns.justifyH.Type": "\"JustifyHorizontal\""
+  },
   "SimpleEditBoxAPI:SetEnabled": {
    "Arguments.enabled.Default": "false",
    "Arguments.enabled.Nilable": "false",
@@ -1271,6 +1296,10 @@
    "Returns.height.Nilable": "false",
    "Returns.height.Type": "\"uiFontHeight\""
   },
+  "SimpleFontAPI:GetJustifyH": {
+   "Returns.justifyH.Nilable": "false",
+   "Returns.justifyH.Type": "\"JustifyHorizontal\""
+  },
   "SimpleFontAPI:SetAlpha": {
    "Arguments.alpha.Nilable": "false",
    "Arguments.alpha.Type": "\"SingleColorValue\"",
@@ -1310,6 +1339,10 @@
    "Returns.fontFile.Type": "\"FontAsset\"",
    "Returns.fontHeight.Nilable": "false",
    "Returns.fontHeight.Type": "\"uiUnit\""
+  },
+  "SimpleFontStringAPI:GetJustifyH": {
+   "Returns.justifyH.Nilable": "false",
+   "Returns.justifyH.Type": "\"JustifyHorizontal\""
   },
   "SimpleFontStringAPI:SetFont": {
    "Arguments.flags.Nilable": "true",
@@ -1473,6 +1506,14 @@
    "Returns.height.Type": "\"uiFontHeight\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "SimpleHTMLAPI:GetJustifyH": {
+   "Arguments.textType.Nilable": "false",
+   "Arguments.textType.Type": "\"HTMLTextType\"",
+   "ConstSecretAccessor": "true",
+   "Returns.justifyH.Nilable": "false",
+   "Returns.justifyH.Type": "\"JustifyHorizontal\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "SimpleHTMLAPI:SetFont": {
    "Arguments.flags.Nilable": "false",
    "Arguments.flags.Type": "\"TBFFlags\"",
@@ -1540,6 +1581,10 @@
    "Returns.fontFile.Type": "\"cstring\"",
    "Returns.height.Nilable": "false",
    "Returns.height.Type": "\"uiFontHeight\""
+  },
+  "SimpleMessageFrameAPI:GetJustifyH": {
+   "Returns.justifyH.Nilable": "false",
+   "Returns.justifyH.Type": "\"JustifyHorizontal\""
   },
   "SimpleMessageFrameAPI:SetFont": {
    "Arguments.flags.Nilable": "false",
@@ -1922,6 +1967,15 @@
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "UnitIsDead": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "UnitIsFriend": {
+   "Arguments.target.Nilable": "false",
+   "Arguments.target.Type": "\"UnitToken\"",
    "Arguments.unit.Nilable": "false",
    "Arguments.unit.Type": "\"UnitToken\"",
    "Returns.result.Nilable": "false",
@@ -2344,28 +2398,29 @@
   }
  },
  "watchedHashes": {
-  "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua": "a823e84f90fabe58d9ffe547ea17eae83708d451e593b4052bce002cc02ce5c1",
+  "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua": "93004ac1b260127741471b7861360cdf7536afcb18d4c1db73b7259faa43e61c",
   "Blizzard_FrameXML/Mainline/AlertFrames.lua": "cbb1013acd8beed871e50009fc659654b8ba3f03600aff74a5729c6919b2a43f",
   "Blizzard_Game/Shared/EventImplementation.lua": "9314fccf86511c4dc21f48d4aa9cc37134c7b503eb66946db591593b062bafc7",
-  "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "68c852c5ee148db8f9127318705458cd9436dd51c9d7e8e15709f1f713e8396f",
+  "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "820d278342f822e35afea9dca4ceb1f1523b7905aabc00e4ce765738b61ce69f",
   "Blizzard_GamepadActionBars/PageUnit.lua": "c3e74a9b7bcf1875137e5e5d02b1ec93bfb6041270e5209a98eded183ae4e2b0",
-  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "44841aad9e66211f0fb38962791f4d1ae99d04fdf80fe6858567eca1d84c98ce",
+  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "40c417c75d7598aa0a72929740a77a55ed4e1e2d2c57312c23219e9077e4092e",
   "Blizzard_GamepadSharedUtility/FrameReformUtility.lua": "f7202f0a5b679f0d35ab04c57e8e26a1a25244e7e0e60fbbfb2c6dee85d03a2b",
   "Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua": "ef5beda0110e7213d86de6aebe3f838f4624bac36e3a6047f78b5954fbf36dbe",
   "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua": "27318d5b42f396b5f246cfde2fe2225d5bbfa39d61e4544eb3cd34ae29c26897",
-  "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "d314e6b29f184aebc82247382acd1c3ddc6d8bb8ebeb218ab0f1c75bc7d4d669",
-  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "46a5e291d17d0faefe2b62cde777b703c95f12f9e6d5018404312b7808f45788",
-  "Blizzard_GamepadSmartNavigation/Utility.lua": "9946126fe4c1e247462392586f372154274c4643980d43a6b6b0609fc6407654",
+  "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "7e0d964592b95f1fe637aacde7f54cb4651beb5c9c2851eb1f88537e651f7955",
+  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "0db1370b0518abd6a106a8a8d5d2cb456630823d5764760367cf5fdcb98ef613",
+  "Blizzard_GamepadSmartNavigation/Utility.lua": "d60c46b8246bfa18be905e31b570f7ce5879cb69d0e38fb5ee7232ffe7057150",
   "Blizzard_NamePlates/Blizzard_NamePlateBase.lua": "3221e4b6d770dbfbeb58d2a0707341a205531b13654516cf76b5b271ded65729",
   "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua": "f8249a9482680c366c2ca0e8f4add9d2473487d5988cd3c7be972c110ce17d72",
   "Blizzard_NamePlates/Blizzard_NamePlates.xml": "f7bc75866a5c24b4ad9cc237836d62608b0bd9c966e4561c8d87adcfea5834fd",
   "Blizzard_Settings_Shared/Blizzard_Settings.lua": "daa9b9b36519ad4dfe28bfde040544ed84cc717faedfa80f1e17e3e73a31b4a0",
   "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua": "27f6db7d502104ad26d2893519fd810b4769616398a0ebb3fb08632f7745f4a7",
   "Blizzard_SharedXMLBase/FrameUtil.lua": "61de9061104e83dbd7e704ca129e9784143bade0437b2acbd337a604656bfdd1",
-  "Blizzard_StaticPopup/StaticPopupGamepad.lua": "e81f34940741f42b264624edff3508a7f374abc87cc992973c5ef1bcadc43e96",
+  "Blizzard_StaticPopup/StaticPopupGamepad.lua": "7e62842fdc76289fe8366241838b97ed39d2b999d85e51a8fa7cad9612454bba",
   "Blizzard_TextStatusBar/TextStatusBar.lua": "8139222b91d434534d86d5b1ddb2c75c9ea4d43780a6e97e6c098c127836d462",
   "Blizzard_UIPanels_Game/Camelot/BankFrame.lua": "9707815675332b187b09c7c7317af22429855aa7ce987bf4b65e1fb9ba41b989",
   "Blizzard_UIPanels_Game/Mainline/BankFrameTemplates.lua": "7d3496b42acc6adf4a6e42a5efa4f147d2185eff4d644f3da8d4b8e806c77030",
+  "Blizzard_UIPanels_Game/Mainline/MerchantFrame.lua": "b68710794a24d8cf1f33d2c06d293b7f49fdb34d1b963d36cbd415afa836a6dd",
   "Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua": "dab48c237737ec71e1a40b024c851ace6c4d4c51f7671ae94683597f0ca2c310",
   "Blizzard_UnitFrame/Camelot/PlayerFrame.lua": "8b32a09d13d5268c97e499e07d3c0a887ad9b22a8eaf6b41c76e576293599ff8",
   "Blizzard_UnitFrame/Mainline/PlayerFrame.lua": "170eb4e8b5e51546fae93cd9bc18bd1f87eaa7d794b5964145eb84907e7d0f63",

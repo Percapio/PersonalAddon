@@ -954,12 +954,15 @@ HARNESS.addPlate20("nameplate8", { npcId = NO_ROLE, spawn = 2, friend = true })
 check("R9 no role is an answer, and cached", HARNESS.subNameCalls == calls + 1
     and plates().roleReadsNone == noneBefore + 2 and record("nameplate7").label == nil,
     HARNESS.subNameCalls - calls)
+-- Patch 02 section 4.6 (audit finding 9): with the provider there, one NPC's failed read
+-- is counted per plate as roleReadsFailed. roleBridgeUnavailable is retired.
 calls = HARNESS.subNameCalls
-local unavailableBefore = plates().roleBridgeUnavailable
+local failedBefore = plates().roleReadsFailed
 HARNESS.addPlate20("nameplate9", { npcId = ROLE_RAISES, friend = true })
 HARNESS.addPlate20("nameplate10", { npcId = ROLE_RAISES, spawn = 2, friend = true })
 check("R9 a raising getter is not an answer, and is not cached", HARNESS.subNameCalls == calls + 2
-    and plates().roleBridgeUnavailable == unavailableBefore + 2 and record("nameplate9").label == nil,
+    and plates().roleReadsFailed == failedBefore + 2 and record("nameplate9").label == nil
+    and plates().roleCapability == "Available",
     HARNESS.subNameCalls - calls)
 
 -- R12: the shared size.
@@ -1040,20 +1043,34 @@ end
 view = plates()
 check("R13 and removing the plates returns their labels", view.guildLabels + view.roleLabels == live)
 
--- R10: QuestieDB missing.
+-- R10: QuestieDB missing. Patch 02 section 4.6 (audit finding 9): the capability is
+-- decided when the roles toggle changes, as a /reload would decide it, so the toggle
+-- is turned off and on after the provider goes. From then on no plate asks the bridge.
 HARNESS.questiePresent = false
 HARNESS.buildQuestie()
 Bridge.Reset()
-local unavailable = plates().roleBridgeUnavailable
+setSetting("nameplates", "npcRoles", false)
+setSetting("nameplates", "npcRoles", true)
+local stoodDownBefore = plates().roleCapabilityStoodDown
+local failedBeforeR10 = plates().roleReadsFailed
 HARNESS.addPlate20("nameplate15", { npcId = INNKEEPER, spawn = 9, friend = true })
-check("R10 QuestieDB missing: no label", record("nameplate15").label == nil
-    and plates().roleBridgeUnavailable == unavailable + 1)
+check("R10 QuestieDB missing: no label, and the roles have stood down",
+    record("nameplate15").label == nil and plates().roleCapability == "StoodDown"
+        and plates().roleReadsFailed == failedBeforeR10,
+    tostring(plates().roleCapability))
+check("R10 and the stand-down is counted once, not per plate",
+    stoodDownBefore >= 1 and plates().roleCapabilityStoodDown == stoodDownBefore,
+    tostring(plates().roleCapabilityStoodDown))
 mark = chatMark()
 slash("plates")
 check("R10 and /pa plates says why", chatSince(mark):find("ProviderMissing", 1, true) ~= nil, chatSince(mark))
 HARNESS.questiePresent = true
 HARNESS.buildQuestie()
 Bridge.Reset()
+setSetting("nameplates", "npcRoles", false)
+setSetting("nameplates", "npcRoles", true)
+check("R10 and with the provider back the roles are available again",
+    plates().roleCapability == "Available", tostring(plates().roleCapability))
 HARNESS.removePlate("nameplate15")
 
 -- A: names at the left end of the bar (section 8) ------------------------------------------

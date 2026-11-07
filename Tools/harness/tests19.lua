@@ -89,10 +89,10 @@ check("T0 the marker feature and the nameplates feature are both enabled",
     format("%s / %s", tostring(ns.Registry.State("questMarkers")),
         tostring(ns.Registry.State("nameplates"))))
 
--- Blizzard's update path, for T25. These globals are absent when the TOC loads, so
--- the first enable finds nothing to hook and leaves hookInstalled false; defining
--- them and re-enabling makes the feature install for real, which is what lets T25
--- drive the hot path rather than assert about it.
+-- Blizzard's update path. These globals are absent when the TOC loads, so the first
+-- enable finds nothing to hook and leaves hookInstalled false; defining them and
+-- re-enabling makes the feature install for real. (T25's ring hot-path checks went
+-- with the ring in Patch 02; this installation check stays.)
 function CompactUnitFrame_SetUnit(_unitFrame, _token) end
 function CompactUnitFrame_UpdateHealth(_unitFrame) end
 function CompactUnitFrame_UpdateAll(_unitFrame) end
@@ -129,7 +129,6 @@ local function addPlate(token, npcId, tier, attackable)
     function container:SetHeight(value) self.height = value end
     function container:GetWidth() return 190 end
     frame.UnitFrame.HealthBarsContainer = container
-    frame.UnitFrame.PlayerLevelDiffFrame = HARNESS.newLevelBadge(28)
     HARNESS.fire("NAME_PLATE_UNIT_ADDED", token)
     HARNESS.frame()
     return frame
@@ -144,20 +143,6 @@ local function markerOn(plateRecord)
             and record.shown and record.points then
             for _, point in ipairs(record.points) do
                 if point[2] == plateRecord.UnitFrame.HealthBarsContainer then
-                    return record
-                end
-            end
-        end
-    end
-    return nil
-end
-
-local function ringOn(plateRecord)
-    local badge = plateRecord.UnitFrame.PlayerLevelDiffFrame
-    for _, record in pairs(HARNESS.frames) do
-        if record.parent == UIParent and record.shown and record.points then
-            for _, point in ipairs(record.points) do
-                if point[2] == badge then
                     return record
                 end
             end
@@ -420,173 +405,6 @@ check("T26 a rejected pairing returns every claim it was given",
     format("%d claims from %d rows", view.claimCount or -1,
         #shape.claims + #shape.extraNpcIds))
 
--- T17-T22, T33: the ring (section 4) ------------------------------------------------------
-
--- Every plate the marker checks left on screen goes first: the tier counters below
--- count attaches, and a leftover elite would be indistinguishable from a defect.
-for index = 1, 4 do
-    HARNESS.fire("NAME_PLATE_UNIT_REMOVED", "nameplate" .. index)
-end
-HARNESS.frame()
-check("T17 the screen is clear before the ring checks",
-    ns.Nameplates.Inspect().ringsDrawnNow == 0, ns.Nameplates.Inspect().ringsDrawnNow)
-
-rebuild(KILL)
-local ringTiersBase = ns.Nameplates.Inspect().ringTiersSeen or {}
-local goldBase = ringTiersBase.Gold or 0
-local elitePlate = addPlate("nameplate5", WOLF, "elite")
-local rarePlate = addPlate("nameplate6", RARE_MOB, "rare")
-local rareElitePlate = addPlate("nameplate7", 106, "rareelite")
-local bossPlate = addPlate("nameplate8", 107, "boss")
-local normalPlate = addPlate("nameplate9", 108)
-local plates = ns.Nameplates.Inspect()
-
-check("T17 an elite gets the gold surround",
-    (plates.ringsByTier or {}).Gold == 1, (plates.ringsByTier or {}).Gold)
-check("T17 rare and rare-elite share the silver one",
-    (plates.ringsByTier or {}).Silver == 2, (plates.ringsByTier or {}).Silver)
-check("T17 a boss mob gets the winged gold",
-    (plates.ringsByTier or {}).Boss == 1, (plates.ringsByTier or {}).Boss)
-check("T17 a normal mob gets nothing", ringOn(normalPlate) == nil)
-check("T17 and the tier was counted at attach, not on a sweep",
-    (plates.ringTiersSeen or {}).Gold > goldBase, (plates.ringTiersSeen or {}).Gold)
-
-local ring = ringOn(elitePlate)
-check("T17 the ring is our own frame under UIParent, not the plate's child",
-    ring ~= nil and ring.parent == UIParent)
-check("T17 and it is sized from the badge's width times the factor",
-    ring ~= nil and math.abs(ring.width - 28 * ns.RARITY_RING_WIDTH_FACTOR) < 0.01,
-    ring and ring.width)
-
-local nonAttackable = addPlate("nameplate10", 109, "elite", false)
-check("T18 an elite you cannot attack gets no ring", ringOn(nonAttackable) == nil)
-
--- The probe runs once per UI load, so the atlas has to be gone before it runs.
--- Disabling the feature clears the probe cache, which is the only way back to an
--- unprobed state inside one session.
-HARNESS.atlases["UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold"] = nil
-ns.Registry.SetEnabled("nameplates", false)
-ns.Registry.SetEnabled("nameplates", true)
-HARNESS.frame()
-local afterMissing = addPlate("nameplate11", 110, "elite")
-local afterMissingSilver = addPlate("nameplate16", 115, "rare")
-check("T20 a tier whose atlas is missing draws nothing", ringOn(afterMissing) == nil)
-check("T20 and it is counted and said once, not guessed at",
-    ns.Nameplates.Inspect().ringArtMissing > 0, ns.Nameplates.Inspect().ringArtMissing)
-check("T20 and the other tiers still draw", ringOn(afterMissingSilver) ~= nil)
-HARNESS.atlases["UI-HUD-UnitFrame-Target-PortraitOn-Boss-Gold"] = { width = 64, height = 64 }
-ns.Registry.SetEnabled("nameplates", false)
-ns.Registry.SetEnabled("nameplates", true)
-HARNESS.frame()
-local restored = addPlate("nameplate17", 116, "elite")
-check("T20 and the tier draws again once the client carries the atlas",
-    ringOn(restored) ~= nil)
-
-local badgeless = addPlate("nameplate12", 111, "elite")
-badgeless.UnitFrame.PlayerLevelDiffFrame = nil
-HARNESS.fire("NAME_PLATE_UNIT_ADDED", "nameplate12")
-HARNESS.frame()
-check("T22 a plate with no badge frame draws no ring and does not raise",
-    ringOn(badgeless) == nil)
-
-local hiddenBadge = addPlate("nameplate13", 112, "rare")
-check("T22 a visible badge has a ring to start with", ringOn(hiddenBadge) ~= nil)
-hiddenBadge.UnitFrame.PlayerLevelDiffFrame.shown = false
-HARNESS.advance(0.3)
-check("T22 a badge that hides under a live unit loses its ring on the next sweep",
-    ringOn(hiddenBadge) == nil)
-
-local unmeasured = addPlate("nameplate14", 113, "elite")
-unmeasured.UnitFrame.PlayerLevelDiffFrame.widthSecret = true
-setSetting("nameplates", "rarityRingSize", 1.1)
-check("T21 a badge whose width is withheld still gets a ring, at the fallback width",
-    ringOn(unmeasured) ~= nil and ns.Nameplates.Inspect().ringBadgeUnmeasured > 0,
-    ns.Nameplates.Inspect().ringBadgeUnmeasured)
-setSetting("nameplates", "rarityRingSize", 1.0)
-
-local sizedRing = ringOn(rarePlate)
-local sizedWidth = sizedRing and sizedRing.width
-setSetting("nameplates", "rarityRingSize", 1.5)
-local resized = ringOn(rarePlate)
-check("T24 a slider change re-places the rings already on screen",
-    resized ~= nil and sizedWidth ~= nil and resized.width > sizedWidth,
-    format("%s -> %s", tostring(sizedWidth), tostring(resized and resized.width)))
-setSetting("nameplates", "rarityRingSize", 1.0)
-
-setSetting("nameplates", "rarityRings", false)
-check("T33 the toggle off releases every ring",
-    ringOn(rarePlate) == nil and ns.Nameplates.Inspect().ringsDrawnNow == 0,
-    ns.Nameplates.Inspect().ringsDrawnNow)
-setSetting("nameplates", "rarityRings", true)
-check("T33 and on places them again without waiting for a plate",
-    ringOn(rarePlate) ~= nil, ns.Nameplates.Inspect().ringsDrawnNow)
-
--- A unit that stops being attackable while its plate is up.
-HARNESS.units["nameplate6"].canAttack = false
-HARNESS.fire("UNIT_FACTION", "nameplate6")
-HARNESS.frame()
-check("T33 rescoping to non-attackable releases the ring", ringOn(rarePlate) == nil)
-HARNESS.units["nameplate6"].canAttack = true
-HARNESS.fire("UNIT_FACTION", "nameplate6")
-HARNESS.frame()
-check("T33 and it comes back when the unit is attackable again", ringOn(rarePlate) ~= nil)
-
--- T19: the restricted-map stand-down ------------------------------------------------------
-
-HARNESS.restrictedMap = true
-HARNESS.fire("PLAYER_ENTERING_WORLD")
-HARNESS.frame()
-check("T19 a restricted map releases every ring",
-    ringOn(elitePlate) == nil and ns.Nameplates.Inspect().ringsAllowed == false,
-    tostring(ns.Nameplates.Inspect().ringsAllowed))
-HARNESS.restrictedMap = false
-HARNESS.fire("PLAYER_ENTERING_WORLD")
-HARNESS.frame()
-check("T19 and leaving it brings them back", ringOn(elitePlate) ~= nil)
-
-HARNESS.restrictionReadable = false
-HARNESS.fire("PLAYER_ENTERING_WORLD")
-HARNESS.frame()
-check("T19 an unreadable map restriction also stands down, never guesses",
-    ringOn(elitePlate) == nil)
-HARNESS.restrictionReadable = true
-HARNESS.fire("PLAYER_ENTERING_WORLD")
-HARNESS.frame()
-
--- T23: release on untrack -----------------------------------------------------------------
-
-local recycled = addPlate("nameplate15", 114, "elite")
-check("T23 the plate has a ring before it is recycled", ringOn(recycled) ~= nil)
-HARNESS.fire("NAME_PLATE_UNIT_REMOVED", "nameplate15")
-HARNESS.frame()
-check("T23 untracking releases it, so the next unit cannot inherit a rank",
-    ringOn(recycled) == nil)
-
--- T25: the hot path stays cold ------------------------------------------------------------
-
-local atlasBefore = HARNESS.atlasCalls
-local before = ns.Nameplates.Inspect().ringsDrawn
-for _ = 1, 20 do
-    CompactUnitFrame_UpdateHealthColor(elitePlate.UnitFrame)
-    CompactUnitFrame_UpdateHealth(elitePlate.UnitFrame)
-end
-check("T25 reasserting a plate's colour draws no ring and reads no atlas",
-    ns.Nameplates.Inspect().ringsDrawn == before and HARNESS.atlasCalls == atlasBefore,
-    format("%d -> %d draws, %d -> %d atlas reads", before,
-        ns.Nameplates.Inspect().ringsDrawn, atlasBefore, HARNESS.atlasCalls))
-
--- And the two expensive reads stay off the SWEEP as well: the tier is read once per
--- attach and the artwork probed once per UI load, however many sweeps run.
-local tiersBefore = (ns.Nameplates.Inspect().ringTiersSeen or {}).Gold
-for _ = 1, 10 do
-    HARNESS.advance(0.3)
-end
-check("T25 ten sweeps re-read no tier and no atlas",
-    (ns.Nameplates.Inspect().ringTiersSeen or {}).Gold == tiersBefore
-        and HARNESS.atlasCalls == atlasBefore,
-    format("tiers %s -> %s", tostring(tiersBefore),
-        tostring((ns.Nameplates.Inspect().ringTiersSeen or {}).Gold)))
-
 -- The reports -----------------------------------------------------------------------------
 
 HARNESS.chat = {}
@@ -596,7 +414,9 @@ check("T34 /pa quests prints the objective types it saw",
     questsText == "" or questsText:find("objective types seen", 1, true) ~= nil,
     questsText:sub(1, 160))
 SlashCmdList.PERSONALADDON_DEBUG("plates")
-check("T34 /pa plates runs with rings on", true)
+-- Patch 02 section 5: the rare and elite ring checks (T17-T25, T33) went with the
+-- ring; Blizzard's own rarity icon replaced it in build 1.60.1.70790.
+check("T34 /pa plates runs", true)
 
 HARNESS_RESULT = { passed = passed, failures = failures,
                    errors = HARNESS.errors or {}, chat = HARNESS.chat or {} }

@@ -104,10 +104,53 @@ end
 
 -- The sort (section 7.1) ---------------------------------------------------------
 
+local function counters()
+    return ns.Diagnostics.CountersFor(FEATURE_ID)
+end
+
+-- record_skip (Architecture/20261104-Patch02.md section 3.4). The skip is counted in
+-- memory for /pa bags, as before, and now also where it survives a reload, so /pa diag
+-- shows what held tidy bags back in earlier sessions. Counter names are the fixed
+-- REASON values with a prefix, never third-party text.
 local function skip(reason)
     state.skips[reason] = (state.skips[reason] or 0) + 1
     state.lastSkip = reason
+    ns.Diagnostics.Bump(counters(), "skip" .. reason)
     return reason
+end
+
+-- hold_back (section 3.4; decision D1: any listener that is not ours holds the sort,
+-- whatever its origin). The origin only chooses the words and the counters. The first
+-- time a description is seen this UI load: one line naming the owners (section 3.3)
+-- and one Diagnostics note carrying the description, which NoteFault neutralizes,
+-- truncates and bounds.
+local function holdBack(listeners)
+    local CallWindow = ns.CallWindow
+    local ORIGIN = CallWindow.ORIGIN
+    local described = CallWindow.Describe(listeners)
+    state.lastListeners = described
+
+    local diag = counters()
+    local byAddOn, byBlizzard = false, false
+    for _, entries in pairs(listeners) do
+        for index = 1, #entries do
+            local listener = entries[index]
+            if listener.origin == ORIGIN.ADDON then
+                byAddOn = true
+            elseif listener.origin == ORIGIN.BLIZZARD then
+                byBlizzard = true
+            else
+                ns.Diagnostics.Bump(diag, "listenerOrigin" .. tostring(listener.reason))
+            end
+        end
+    end
+    ns.Diagnostics.Bump(diag, byAddOn and "holdBacksByAddOn"
+        or (byBlizzard and "holdBacksByBlizzard" or "holdBacksByUnknown"))
+
+    if ns.Log.Once("autosort:listeners:" .. described, CallWindow.HoldBackNotice(listeners)) then
+        ns.Diagnostics.NoteFault(FEATURE_ID, "tidy bags held back: " .. described)
+    end
+    return skip(REASON.LISTENERS)
 end
 
 local function sortIfSettled()
@@ -135,12 +178,7 @@ local function sortIfSettled()
         return skip(REASON.LISTENERS_UNKNOWN)
     end
     if ns.CallWindow.AnyListener(listeners) then
-        local described = ns.CallWindow.Describe(listeners)
-        state.lastListeners = described
-        ns.Log.Once("autosort:listeners:" .. described, format(
-            "tidy bags is holding back while something listens to what a sort delivers inside the call -- %s",
-            ns.EscapeGuard.Neutralize(described)))
-        return skip(REASON.LISTENERS)
+        return holdBack(listeners)
     end
 
     local names, ok, err = ns.CallWindow.Capture(_G.C_Container.SortBags)
@@ -244,7 +282,15 @@ ns.AutoSortBags = {
             skips[#skips + 1] = format("%s=%d", reason, count)
         end
         table.sort(skips)
+        local diag = counters()
         return {
+            -- Patch 02 section 3.4: what held the sort back, by origin, this UI load.
+            holdBacksByAddOn = diag.holdBacksByAddOn or 0,
+            holdBacksByBlizzard = diag.holdBacksByBlizzard or 0,
+            holdBacksByUnknown = diag.holdBacksByUnknown or 0,
+            listenerOriginWithheld = diag.listenerOriginWithheld or 0,
+            listenerOriginNoLocation = diag.listenerOriginNoLocation or 0,
+            listenerOriginUnparsed = diag.listenerOriginUnparsed or 0,
             enabled = state.enabled,
             sorts = state.sorts,
             secondsSinceSort = state.lastSortAt and (now() - state.lastSortAt) or nil,

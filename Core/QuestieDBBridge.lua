@@ -3,8 +3,10 @@
 --
 -- QuestieDB is a separate addon that ships the database Questie consumes, and it
 -- loads without Questie: its src/api.lua says so outright ("Questie is the first
--- consumer, but nothing here assumes it"). On this machine it is 1.0.5, contract 3,
--- baked mode, Forever flavour.
+-- consumer, but nothing here assumes it"). On this machine it is 1.0.10, supporting
+-- contracts 1 to 4, baked mode, Forever flavour (Architecture/20261104-Patch02.md
+-- section 4.2). It is a separate install: the live launch's addon update removed it,
+-- and Questie 12.6.0 does not bundle it.
 --
 -- WHY A BRIDGE RATHER THAN CALLS FROM EACH FEATURE.
 --
@@ -56,6 +58,11 @@ local state = {
     -- Phase 20 section 7.4: npcId -> role text, or false for "QuestieDB says none".
     rolesByNpc = {},
     rolesCount = 0,
+
+    -- Patch 02 section 4.4: the features that asked for QuestieDB and did not get it,
+    -- in the order they asked. Ids are this addon's own constants, so the list is
+    -- bounded by the code: three consumers today.
+    unmetConsumers = {},
 
     reads = 0,
     hits = 0,
@@ -143,6 +150,49 @@ function QuestieDBBridge.Describe()
     return detail and format("%s: %s", kind, tostring(detail)) or tostring(kind)
 end
 
+-- The one line an unmet provider prints (Patch 02 section 4.4). Built from the state's
+-- kind and its RAW detail, never from Describe, which already prefixes the kind (audit
+-- finding 10). The detail is QuestieDB's own text -- its contract message, or the
+-- flavour it loaded -- so it is neutralized before it reaches chat.
+local function unmetNotice(kind, detail)
+    local raw = ns.EscapeGuard.Neutralize(tostring(detail or "?"))
+    if kind == STATE.PROVIDER_MISSING then
+        return "QuestieDB is not loaded. It is a separate addon that Questie does not bundle: "
+            .. "install it, enable it in the AddOns list, then /reload. Until then, /pa quests "
+            .. "lists what is off."
+    elseif kind == STATE.CONTRACT_MISMATCH then
+        return format("QuestieDB refused this addon's contract: %s. /pa quests lists what is off.", raw)
+    elseif kind == STATE.WRONG_FLAVOR then
+        return format("QuestieDB loaded its %s data, not Forever's: reinstall QuestieDB for WoW "
+            .. "Forever, then /reload.", raw)
+    end
+    return "QuestieDB's contract check raised; /pa quests has the detail and lists what is off."
+end
+
+-- One consumer's need for QuestieDB (Patch 02 section 4.4). Returns the resolved state.
+-- When it is not Available, the consumer joins unmetConsumers, and the first such call
+-- in a UI load prints the one notice; later calls print nothing. The bridge learns its
+-- consumers from these calls, so Core never names a feature. consumer is a constant id
+-- from this addon's own code, never third-party text.
+function QuestieDBBridge.Require(consumer)
+    local kind, detail = resolveState()
+    if kind == STATE.AVAILABLE then
+        return kind
+    end
+    local seen = false
+    for index = 1, #state.unmetConsumers do
+        if state.unmetConsumers[index] == consumer then
+            seen = true
+            break
+        end
+    end
+    if not seen then
+        state.unmetConsumers[#state.unmetConsumers + 1] = tostring(consumer)
+    end
+    ns.Log.Once(ns.QUESTIE_UNMET_NOTICE_KEY, unmetNotice(kind, detail))
+    return kind, detail
+end
+
 -- A mask test that survives Forever's bits 32 and 33 (section 2.2).
 --
 -- QuestieDB's expansions.lua:33 says why: "Adding distinct bits avoids truncating
@@ -173,31 +223,72 @@ function QuestieDBBridge.RaceMask(raceId)
     return maskKind == ClientRead.PLAIN and mask or nil
 end
 
-function QuestieDBBridge.ClassMask(classFileName)
-    if not QuestieDBBridge.IsAvailable() or type(classFileName) ~= "string" then
+-- Where a class mask came from, or why there is none (Patch 02 section 4.3).
+QuestieDBBridge.CLASS_MASK_SOURCE = {
+    PUBLISHED = "Published",
+    BY_EXPANSION = "ByExpansion",
+    BRIDGE_UNAVAILABLE = "BridgeUnavailable",
+    NO_CLASS_KEYS = "NoClassKeys",
+    NOT_IN_CLASS_KEYS = "NotInClassKeys",
+}
+local CLASS_MASK_SOURCE = QuestieDBBridge.CLASS_MASK_SOURCE
+
+-- One field of a QuestieDB table, or nil. An absent container or key reads as nil
+-- too, so a chain of these never indexes anything it has not seen to be a table
+-- (audit finding 6). ClientRead.Field does the indexing (rule 10).
+local function readField(container, key, expectedType)
+    if container == nil or key == nil then
         return nil
+    end
+    local kind, value = ClientRead.Field(container, key, expectedType)
+    return kind == ClientRead.PLAIN and value or nil
+end
+
+-- The player's class in QuestieDB's class-bit numbering. Returns the mask and its
+-- source, or nil and the reason there is none: two values, so no table is built per
+-- tooltip.
+--
+-- PATCH 02 SECTION 4.3: QuestieDB 1.0.10 has no classKeys for Forever under
+-- Enum.byExpansion -- its expansions.lua gives Forever npcFlags and raceKeys only.
+-- QuestieDB itself falls back to the flavour's rules ("Classic") and PUBLISHES the
+-- result as Enum.classKeys (src/api.lua:66-76). Reading only byExpansion answered nil
+-- for every class, and every class-restricted quest was rejected Unreadable with no
+-- message. The published table is read first; byExpansion stays as the path for
+-- providers that predate it. A published table that lacks the class is QuestieDB's
+-- answer, so it does not fall back.
+function QuestieDBBridge.ClassMask(classFileName)
+    if not QuestieDBBridge.IsAvailable() then
+        ns.Diagnostics.Bump(counters(), "classMaskUnavailable")
+        return nil, CLASS_MASK_SOURCE.BRIDGE_UNAVAILABLE
+    end
+    if type(classFileName) ~= "string" then
+        ns.Diagnostics.Bump(counters(), "classMaskUnavailable")
+        return nil, CLASS_MASK_SOURCE.NOT_IN_CLASS_KEYS
     end
     local lib = _G.LibQuestieDB
-    local enumKind, enum = ClientRead.Field(lib, "Enum", "table")
-    local flavorKind, flavor = ClientRead.Field(lib, "flavor", "table")
-    if enumKind ~= ClientRead.PLAIN or flavorKind ~= ClientRead.PLAIN then
-        return nil
+    local enum = readField(lib, "Enum", "table")
+
+    local keys, source = readField(enum, "classKeys", "table"), CLASS_MASK_SOURCE.PUBLISHED
+    if not keys then
+        local flavor = readField(lib, "flavor", "table")
+        local expansion = readField(flavor, "expansion", "string")
+        local byExpansion = readField(enum, "byExpansion", "table")
+        local set = readField(byExpansion, expansion, "table")
+        keys, source = readField(set, "classKeys", "table"), CLASS_MASK_SOURCE.BY_EXPANSION
     end
-    local expansionKind, expansion = ClientRead.Field(flavor, "expansion", "string")
-    local byExpansionKind, byExpansion = ClientRead.Field(enum, "byExpansion", "table")
-    if expansionKind ~= ClientRead.PLAIN or byExpansionKind ~= ClientRead.PLAIN then
-        return nil
+    if not keys then
+        ns.Diagnostics.Bump(counters(), "classMaskUnavailable")
+        return nil, CLASS_MASK_SOURCE.NO_CLASS_KEYS
     end
-    local setKind, set = ClientRead.Field(byExpansion, expansion, "table")
-    if setKind ~= ClientRead.PLAIN then
-        return nil
+
+    local mask = readField(keys, classFileName, "number")
+    if not mask then
+        ns.Diagnostics.Bump(counters(), "classMaskUnavailable")
+        return nil, CLASS_MASK_SOURCE.NOT_IN_CLASS_KEYS
     end
-    local keysKind, keys = ClientRead.Field(set, "classKeys", "table")
-    if keysKind ~= ClientRead.PLAIN then
-        return nil
-    end
-    local maskKind, mask = ClientRead.Field(keys, classFileName, "number")
-    return maskKind == ClientRead.PLAIN and mask or nil
+    ns.Diagnostics.Bump(counters(), source == CLASS_MASK_SOURCE.PUBLISHED
+        and "classMaskPublished" or "classMaskByExpansion")
+    return mask, source
 end
 
 -- Reads, each cached (section 2.4) ----------------------------------------------------
@@ -782,6 +873,14 @@ function QuestieDBBridge.Inspect()
         cachedQuests = state.factsCount,
         cachedTargets = state.claimsCount,
         cachedRoles = state.rolesCount,
+        -- Patch 02 section 4.4: who asked and did not get it, as a copy.
+        unmetConsumers = (function()
+            local copy = {}
+            for index = 1, #state.unmetConsumers do
+                copy[index] = state.unmetConsumers[index]
+            end
+            return copy
+        end)(),
     }
 end
 
@@ -794,5 +893,7 @@ function QuestieDBBridge.Reset()
     state.factsByQuest, state.factsCount = {}, 0
     state.claimsByQuest, state.claimsCount = {}, 0
     state.rolesByNpc, state.rolesCount = {}, 0
+    -- Audit finding 9: a session that resets the provider starts with no consumers.
+    state.unmetConsumers = {}
     state.reads, state.hits = 0, 0
 end

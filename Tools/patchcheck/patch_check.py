@@ -55,7 +55,7 @@ class ToolPaths:
 def default_paths(config=None):
     config = config or paths.load_config()
     here = TOOLS / "patchcheck"
-    return ToolPaths(paths.REPO, paths.EXPORT, paths.BINARY, pathlib.Path(config["store"]["path"]),
+    return ToolPaths(paths.REPO, paths.EXPORT, paths.client_binary(config), pathlib.Path(config["store"]["path"]),
                      here / "premises.toml", here / "reports", here / "verified.json",
                      secret_lint.ALLOWLIST, config)
 
@@ -76,10 +76,24 @@ def _require_export(tool_paths):
         raise Refused("ExportMissing", f"no export at {tool_paths.export}")
 
 
+def _missing_client_message(binary):
+    return (f"no client binary at {binary}: set client_binary in Tools/config.local.toml, "
+            "or pass --binary")
+
+
+def _identify(tool_paths, build_reader):
+    """The client's identity for the commands that need one (check and adopt). A missing
+    binary is refused rather than raised (Architecture/20261104-Patch02.md section 2.4)."""
+    try:
+        return client_build.identify(tool_paths.binary, build_reader)
+    except client_build.ClientMissing as missing:
+        raise Refused("ClientMissing", _missing_client_message(missing.binary)) from None
+
+
 def _require_fresh(tool_paths, client):
     exported_at = views.newest_mtime(tool_paths.export)
     if client.binary_modified_at > exported_at:
-        raise Refused("ExportStale", "WowB.exe is newer than the export: export the UI again "
+        raise Refused("ExportStale", f"{tool_paths.binary.name} is newer than the export: export the UI again "
                       "(launch with -console; at the login screen, exportInterfaceFiles code)")
     return exported_at
 
@@ -104,12 +118,16 @@ def status(tool_paths, build_reader=client_build.read_client_build):
         return "BaselineMissing", ["no verified record: run adopt once"]
     if incomplete:
         return "AcceptIncomplete", [resume_line]
-    client, reason = client_build.identify(tool_paths.binary, build_reader)
-    notes = [f"build unreadable ({reason}); clients compared by WowB.exe's time"] if reason else []
+    try:
+        client, reason = client_build.identify(tool_paths.binary, build_reader)
+    except client_build.ClientMissing as missing:
+        return "ClientMissing", [_missing_client_message(missing.binary)]
+    binary_name = tool_paths.binary.name
+    notes = [f"build unreadable ({reason}); clients compared by {binary_name}'s time"] if reason else []
     exported_at = views.newest_mtime(tool_paths.export)
     verified_client = client_build.ClientIdentity.from_json(verified["client"])
     if client.binary_modified_at > exported_at:
-        return "ExportStale", notes + [f"WowB.exe ({_when(client.binary_modified_at)}) is newer than the export "
+        return "ExportStale", notes + [f"{binary_name} ({_when(client.binary_modified_at)}) is newer than the export "
                                        f"({_when(exported_at)}): export the UI again, then check"]
     if client_build.differs(client, verified_client):
         return "CheckDue", notes + [f"client {client.label()} differs from the verified {verified_client.label()}: "
@@ -192,7 +210,7 @@ def run_check(tool_paths, now=time.time, build_reader=client_build.read_client_b
     _recover(tool_paths, out)
     register = premises.load_register(tool_paths.register)
     _require_export(tool_paths)
-    client, reason = client_build.identify(tool_paths.binary, build_reader)
+    client, reason = _identify(tool_paths, build_reader)
     _require_fresh(tool_paths, client)
     verified = store.read_json(tool_paths.verified)
     config = tool_paths.config
@@ -252,6 +270,7 @@ def run_check(tool_paths, now=time.time, build_reader=client_build.read_client_b
         "formatVersion": 1,
         "checkedAt": checked_at,
         "client": dict(client.to_json(), label=client.label()),
+        "binaryName": tool_paths.binary.name,
         "buildNote": reason,
         "baseline": baseline_identity,
         "exportDigest": views.export_digest(current.hashes),
@@ -324,7 +343,7 @@ def adopt(tool_paths, now=time.time, build_reader=client_build.read_client_build
         raise Refused("BaselineExists", "a baseline already exists; adopt runs only once")
     register = premises.load_register(tool_paths.register)
     _require_export(tool_paths)
-    client, reason = client_build.identify(tool_paths.binary, build_reader)
+    client, reason = _identify(tool_paths, build_reader)
     exported_at = _require_fresh(tool_paths, client)
     current = views.build_view(tool_paths.export, tool_paths.config, premises.call_names(register))
     names_on_surface = surface.derive_surface(tool_paths.repo, [current.docs], set(current.lua.definitions),

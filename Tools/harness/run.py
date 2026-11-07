@@ -53,6 +53,10 @@ SESSIONS = [
     ("phase19", "tests19.lua"),
     ("phase20", "tests20.lua"),
     ("phase20-nocostapi", "tests20.lua"),
+    # Architecture/20261104-Patch02.md section 9.1.
+    ("patch02", "testsPatch02.lua"),
+    ("patch02-oldprovider", "testsPatch02.lua"),
+    ("patch02-noprovider", "testsPatch02.lua"),
 ]
 
 # A chat line naming one of these alongside "raised" or "faulted" is an error.
@@ -81,6 +85,7 @@ def run_session(session, tests):
     lua.execute((HERE / "stubs18.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubs19.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubs20.lua").read_text(encoding="utf-8"))
+    lua.execute((HERE / "stubsPatch02.lua").read_text(encoding="utf-8"))
     lua.globals().HARNESS_SESSION = session
     load = lua.eval(
         "function(src, name) local f, err = loadstring(src, '@' .. name) "

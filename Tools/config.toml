@@ -12,6 +12,12 @@ text_locale = "enUS"
 family_folder = "Mainline"
 game_folder = "Camelot"
 
+# The client binary, in the client folder three levels above the repo
+# (Architecture/20261104-Patch02.md section 2.4). The beta shipped WowB.exe and the
+# live client ships Wow.exe; a PTR or a renamed binary goes in config.local.toml.
+# The patch check's --binary option overrides this for one run.
+client_binary = "Wow.exe"
+
 [store]
 # The baseline store: the last accepted UI export (46 MB) and its manifest.
 # Kept outside the repo (Phase 10 section 6.3).

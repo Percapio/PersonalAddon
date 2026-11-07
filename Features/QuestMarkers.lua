@@ -738,12 +738,11 @@ end
 
 local function enable(config)
     readSettings(config)
-    local bridgeState = Bridge.State()
+    -- Patch 02 sections 4.4 and 4.5: the bridge prints the one QuestieDB line, and a
+    -- missing provider leaves this feature UNAVAILABLE rather than faulted.
+    local bridgeState = Bridge.Require(FEATURE_ID)
     if bridgeState ~= ns.QuestieDBBridge.STATE.AVAILABLE then
-        ns.Log.Once("questmarkers:bridge:" .. tostring(bridgeState), format(
-            "quest markers need the QuestieDB addon: %s",
-            ns.EscapeGuard.Neutralize(Bridge.Describe())))
-        return nil, format("QuestieDB is %s", tostring(bridgeState))
+        return nil, format("QuestieDB is %s", tostring(bridgeState)), ns.ENABLE_OUTCOME.UNAVAILABLE
     end
 
     -- QUEST_LOG_UPDATE only, and it is a UniqueEvent so it cannot arrive inside a

@@ -6,7 +6,7 @@ the files `PersonalAddon.toc` lists. The design is
 
 | Folder | What it does |
 |---|---|
-| `harness/` | Loads the addon into a real Lua 5.1 over stubbed client APIs and runs the Phase 7–12 checks, one fresh runtime per session: seventeen sessions, 439 checks |
+| `harness/` | Loads the addon into a real Lua 5.1 over stubbed client APIs and runs the checks of every phase and patch since Phase 7, one fresh runtime per session: thirty sessions, 1,176 checks after Patch 02 |
 | `lint/` | The secret-read lint (README rule 10): fails any read of a value the client may make secret that bypasses `ClientRead` |
 | `patchcheck/` | The patch check (README rule 11): after a client patch, tests every fact our designs rely on about Blizzard's code against the new UI export |
 | `common/` | What they share: paths, the API docs parser, the load set, the Lua index |
@@ -24,6 +24,9 @@ C:\tmp\PersonalAddonVenv\Scripts\pip install -r Tools\requirements.txt
 Every path is worked out from where the tools sit, three folders below the client.
 To override one, such as the baseline store's location, put the key in
 `Tools/config.local.toml`, which git ignores. `Tools/config.toml` lists the keys.
+The client binary is found by name through `client_binary` (default `Wow.exe`; the
+beta's was `WowB.exe`), and the patch check's `--binary` overrides it for one run
+(Architecture/20261104-Patch02.md section 2.4).
 
 ## Commands
 

@@ -11,7 +11,7 @@
 -- Why Blizzard-stored settings and not proxy settings. A proxy setting hands the
 -- settings panel our getter and setter, and the panel calls them inline: for every
 -- value it draws, and in the close-time commit loop. Our code on Blizzard's stack
--- is taint, whatever that code does. On this beta, closing Options after a change
+-- is taint, whatever that code does. On the beta, closing Options after a change
 -- left the gamepad binding state tainted, and controller presses -- action,
 -- cancel, targeting -- were refused until a reload (Patch01Implementation
 -- section 2.1). A Blizzard-stored setting reads and writes a field of panelValues
