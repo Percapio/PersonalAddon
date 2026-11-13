@@ -1115,6 +1115,11 @@ ns.Registry.Register(FEATURE_ID, {
 
 ns.DamageBreakdown = {
     Refresh = refreshNow,
+    -- Phase 21 section 6.2: Upkeep attaches beside this panel. Read-only; nil until
+    -- the first enable builds the panel. This feature never learns who asked.
+    Frame = function()
+        return state.panel
+    end,
     Inspect = function()
         local constructed, live, free, capacity = 0, 0, 0, 0
         if state.rowPool then

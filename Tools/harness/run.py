@@ -57,12 +57,16 @@ SESSIONS = [
     ("patch02", "testsPatch02.lua"),
     ("patch02-oldprovider", "testsPatch02.lua"),
     ("patch02-noprovider", "testsPatch02.lua"),
+    # Architecture/20261112-Phase21.md section 16.1.
+    ("phase21", "tests21.lua"),
+    ("phase21-hidden", "tests21.lua"),
+    ("phase21-noapi", "tests21.lua"),
 ]
 
 # A chat line naming one of these alongside "raised" or "faulted" is an error.
 WATCHED = ("nameplates", "settingsPanel", "equippedSkills", "toasts", "autoSortBags",
            "autoSellJunk", "damageBreakdown", "threatPanel", "Dispatch", "CallWindow",
-           "fiveSecondRule", "questieBridge")
+           "fiveSecondRule", "questieBridge", "upkeep", "rareAlerts", "Upkeep", "rare alert")
 
 
 def toc_files():
@@ -86,6 +90,7 @@ def run_session(session, tests):
     lua.execute((HERE / "stubs19.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubs20.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubsPatch02.lua").read_text(encoding="utf-8"))
+    lua.execute((HERE / "stubs21.lua").read_text(encoding="utf-8"))
     lua.globals().HARNESS_SESSION = session
     load = lua.eval(
         "function(src, name) local f, err = loadstring(src, '@' .. name) "

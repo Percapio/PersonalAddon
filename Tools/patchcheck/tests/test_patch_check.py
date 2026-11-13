@@ -441,7 +441,8 @@ class RealExportTests(unittest.TestCase):
         # 15 took the register from 29 to 36 without touching this line, so T18 was
         # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2). Patch 02
         # retired five ring premises and added one: 86 - 5 + 1 (Patch 02 section 2.3).
-        self.assertEqual(len(register), 82)
+        # Phase 21 added thirteen, premises 87-99 (Phase 21 section 12).
+        self.assertEqual(len(register), 95)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -570,6 +571,26 @@ class RealExportTests(unittest.TestCase):
         for retired in ("LEVEL-BADGE-FRAME", "LEVEL-BADGE-ANCHORED-TO-BAR", "LEVEL-INDICATOR-WIDTH",
                         "RARITY-ICON-OFF-IN-CAMELOT", "BOSS-PORTRAIT-ATLASES"):
             self.assertNotIn(retired, by_id)
+
+    def test_t29_the_phase21_premises_hold_on_the_current_export(self):
+        # Architecture/20261112-Phase21.md section 12. Two were corrected by the audit:
+        # NO-SHARD-POWER-IN-CAMELOT names a LOADED file (a .toc never is, and Pattern
+        # reads Unknown outside the load set), and PLAY-SOUND-UNRESTRICTED names
+        # C_Sound.PlaySound, the only name the docs index it under. The FlagAbsent
+        # checks pin their entry names, so a misspelt one reads Broken here.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        for premise_id in ("AURA-SECRECY-NOT-MAP", "UNIT-USES-AMMO-READABLE",
+                           "AMMO-SLOT-FOLLOWS-USES-AMMO", "ITEM-COUNT-READABLE",
+                           "WEAPON-ENCHANT-READABLE", "WEAPON-ENCHANT-MILLISECONDS",
+                           "WEAPON-SLOT-INVENTORY-SLOTS", "INVSLOT-AMMO-ZERO",
+                           "NO-SHARD-POWER-IN-CAMELOT", "RARE-CLASSIFICATION-ATLASES",
+                           "UNIT-IS-TAP-DENIED-READABLE", "RAID-WARNING-SOUND",
+                           "PLAY-SOUND-UNRESTRICTED"):
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+        self.assertIn(by_id["NO-SHARD-POWER-IN-CAMELOT"].check["file"], current.load_set.files)
 
     def test_t15_every_file_in_running_stacks_is_in_the_load_set(self):
         loaded = {name.lower() for name in load_set.resolve_load_set(paths.EXPORT).files}

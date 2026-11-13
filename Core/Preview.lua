@@ -2,7 +2,7 @@
 -- This addon's windows on screen with sample contents, so their settings can be
 -- adjusted and the result seen at once (Phase 13 section 2).
 --
--- TWO TABLES WITH DIFFERENT LIFETIMES. `WINDOWS` is static: it names the four
+-- TWO TABLES WITH DIFFERENT LIFETIMES. `WINDOWS` is static: it names the five
 -- windows, the place on screen each is drawn in, and the feature that owns it.
 -- A REGISTRATION is transient -- a feature adds one at its enable and drops it
 -- at its disable, because the frames a registration points at are built at
@@ -54,14 +54,20 @@ local WINDOWS = {
         { group = GROUP.BAGS, featureId = "equippedSkills", order = 1 },
     [PANEL.TOASTS] =
         { group = GROUP.SCREEN, featureId = "toasts", order = 1 },
+    -- Phase 21 section 6.3: its own group, so it is drawn beside the threat panel's
+    -- samples instead of taking turns with them.
+    [PANEL.UPKEEP] =
+        { group = GROUP.UPKEEP, featureId = "upkeep", order = 1 },
 }
 
--- The order SetEnabled and /pa preview report in.
+-- The order SetEnabled and /pa preview report in. Upkeep is appended, so no older
+-- window's position moves.
 local WINDOW_ORDER = {
     PANEL.THREAT_PANEL,
     PANEL.DAMAGE_BREAKDOWN,
     PANEL.EQUIPPED_SKILLS,
     PANEL.TOASTS,
+    PANEL.UPKEEP,
 }
 
 local GROUP_MEMBERS = {}
@@ -92,6 +98,7 @@ local state = {
 state.focus[GROUP.PLAYER_FRAME] = ns.PREVIEW_INITIAL_FOCUS
 state.focus[GROUP.BAGS] = PANEL.EQUIPPED_SKILLS
 state.focus[GROUP.SCREEN] = PANEL.TOASTS
+state.focus[GROUP.UPKEEP] = PANEL.UPKEEP
 
 -- Reporting -------------------------------------------------------------------
 

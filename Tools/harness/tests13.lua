@@ -127,7 +127,8 @@ check("P4 the toggle reaches no config key",
     ns.ConfigStore.Get("preview", "showAll") == nil)
 
 -- P5: every window registered at login --------------------------------------------
-check("P5 four windows known", #ns.Preview.Inspect().windows == 4,
+-- Phase 21 section 16.1: Upkeep's window makes five.
+check("P5 five windows known", #ns.Preview.Inspect().windows == 5,
     #ns.Preview.Inspect().windows)
 check("P6 preview starts off", ns.Preview.IsEnabled() == false)
 check("P7 initial focus is the threat panel",
@@ -432,7 +433,7 @@ ns.Preview.SetEnabled(false)
 -- P56: unknown windows are refused, not crashed ---------------------------------------------
 ns.Preview.Register({ panelId = "NoSuchWindow", show = function() return 0 end,
     clear = function() end })
-check("P56 an unknown window is ignored", #ns.Preview.Inspect().windows == 4)
+check("P56 an unknown window is ignored", #ns.Preview.Inspect().windows == 5)
 ns.Preview.Focus("NoSuchWindow")
 check("P57 focusing an unknown window is ignored",
     ns.Preview.Inspect().focus[GROUP.PLAYER_FRAME] == PANEL.THREAT_PANEL)

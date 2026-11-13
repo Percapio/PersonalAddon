@@ -641,3 +641,105 @@ statement = "ScriptRegion:GetSourceLocation is secret only per object (SecretRet
 source = "Patch 02 section 3.3"
 consequence = "Tidy bags stops naming the addon that holds it back and falls back to frame labels such as <unnamed>. No decision depends on it (Core/CallWindow.lua, Features/AutoSortBags.lua)"
 check = { kind = "FlagAbsent", entry = "SimpleScriptRegionAPI:GetSourceLocation", flag = "SecretReturns" }
+
+# Phase 21 (Architecture/20261112-Phase21.md section 12). Premises 87-99, numbered on
+# from Phase 20's 86; Patch 02's SOURCE-LOCATION-NOT-SECRET was never numbered.
+#
+# Upkeep reads auras only out of combat, enchants and supplies in and out of it, and
+# rare alerts read a plate's unit and play one sound. A broken premise here degrades a
+# display or a count; only premise 99 guards a rule (7).
+
+[[premise]]
+id = "AURA-SECRECY-NOT-MAP"
+statement = "Aura data turns secret under combat, encounter, challenge-mode and PvP-match restrictions; the map restriction is not among them"
+source = "Phase 21 section 3.1"
+consequence = "Upkeep's buff section may read Hidden between pulls in dungeons; auraReadsWithheld climbs and README's dungeon sentence is wrong. Re-read section 3.1 (Features/Upkeep.lua)"
+check = { kind = "Pattern", file = "Blizzard_APIDocumentationGenerated/SecretPredicatesDocumentation.lua", regex = 'Name = "SecretWhenUnitAuraRestricted",[\s\S]{0,120}?when combat, encounter, challenge mode, or PvP match addon restrictions are in effect\.', expect = "Present" }
+
+[[premise]]
+id = "UNIT-USES-AMMO-READABLE"
+statement = "Whether the player uses ammo is never secret"
+source = "Phase 21 section 5.1"
+consequence = "The ammo counter reads Unreadable and stays off; ammoApplicabilityWithheld climbs (Features/Upkeep.lua)"
+check = { kind = "FlagAbsent", entry = "UnitUsesAmmo", flag = "SecretReturns" }
+
+[[premise]]
+id = "AMMO-SLOT-FOLLOWS-USES-AMMO"
+statement = "The character pane shows its ammo slot exactly when UnitUsesAmmo(\"player\") is true"
+source = "Phase 21 section 5.1, decision D16"
+consequence = "Upkeep's idea of who uses ammo stops matching the character pane's. Re-read section 5.1 (Features/Upkeep.lua)"
+check = { kind = "Pattern", file = "Blizzard_UIPanels_Game/Camelot/PaperDollFrame.lua", regex = 'CharacterAmmoSlot:SetShown\(UnitUsesAmmo\("player"\)\)', expect = "Present" }
+
+[[premise]]
+id = "ITEM-COUNT-READABLE"
+statement = "Item counts are never secret"
+source = "Phase 21 sections 5.1 and 5.4"
+consequence = "Counts read Unreadable: no counter, and no low-supply toast, never a false one. Section 5.4's taint argument is unaffected (Features/Upkeep.lua)"
+check = { kind = "FlagAbsent", entry = "C_Item.GetItemCount", flag = "SecretReturns" }
+
+[[premise]]
+id = "WEAPON-ENCHANT-READABLE"
+statement = "Temporary weapon enchant info is never secret"
+source = "Phase 21 section 4.2"
+consequence = "Enchant reads are Hidden; no enchant cells; enchantReadsWithheld climbs (Features/Upkeep.lua)"
+check = { kind = "FlagAbsent", entry = "C_Item.GetWeaponEnchantInfo", flag = "SecretReturns" }
+
+[[premise]]
+id = "WEAPON-ENCHANT-MILLISECONDS"
+statement = "A weapon enchant's timeLeft is in milliseconds"
+source = "Phase 21 section 4.2"
+consequence = "Enchant countdowns are off by a factor of a thousand. Re-read section 4.2 (Features/Upkeep.lua)"
+check = { kind = "Pattern", file = "Blizzard_BuffFrame/BuffFrame.lua", regex = 'enchant\.timeLeft = enchant\.timeLeft / 1000;', expect = "Present" }
+
+[[premise]]
+id = "WEAPON-SLOT-INVENTORY-SLOTS"
+statement = "Weapon slots 0, 1 and 2 are inventory slots 16, 17 and 18"
+source = "Phase 21 sections 4.2 and 4.4"
+consequence = "An enchant shows the wrong weapon's icon, and the same-weapon test reads the wrong slot (Features/Upkeep.lua)"
+check = { kind = "Pattern", file = "Blizzard_BuffFrame/BuffFrame.lua", regex = 'local textureMapping = \{\s*\n\s*\[1\] = 16,[^\n]*\n\s*\[2\] = 17,[^\n]*\n\s*\[3\] = 18,', expect = "Present" }
+
+[[premise]]
+id = "INVSLOT-AMMO-ZERO"
+statement = "The ammo slot is inventory slot 0"
+source = "Phase 21 section 5.1"
+consequence = "The ammo counter reads the wrong slot. Re-read section 5.1 (Features/Upkeep.lua)"
+check = { kind = "Pattern", file = "Blizzard_FrameXMLBase/Constants.lua", regex = 'INVSLOT_AMMO\s*= 0;', expect = "Present" }
+
+# Audit finding 11: the .toc this premise first named is never in the load set, and
+# Pattern and Watch both read Unknown there. Camelot's own class-resource override is
+# loaded, and says the same thing.
+[[premise]]
+id = "NO-SHARD-POWER-IN-CAMELOT"
+statement = "Camelot's class-resource bars cover rogues and druids only: there is no warlock shard bar, so soul shards are an item"
+source = "Phase 21 section 5.1, decision D11"
+consequence = "Shards may have become a power, and the item count may read 0 for a warlock with shards. Re-read section 5.1 and D11 (Features/Upkeep.lua)"
+check = { kind = "Pattern", file = "Blizzard_PersonalResourceDisplay/Camelot/Blizzard_PersonalResourceDisplay.lua", regex = 'UICharacterClasses\.Warlock', expect = "Absent" }
+
+[[premise]]
+id = "RARE-CLASSIFICATION-ATLASES"
+statement = "Blizzard's nameplate marks \"rare\" and \"rareelite\" with the two atlases Phase 21 section 10.1 names"
+source = "Phase 21 sections 8.2 and 9"
+consequence = "The rare toast may name an atlas that no longer exists (it falls back to the question mark), or the classification strings rare alerts match have moved. Re-read sections 8.2 and 9 (Features/RareAlerts.lua, Features/Toasts.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateClassificationFrame.lua", regex = 'classification == "rare" then\s*\n\s*return "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Star";\s*\n\s*elseif classification == "rareelite" then\s*\n\s*return "nameplates-icon-elite-silver";', expect = "Present" }
+
+[[premise]]
+id = "UNIT-IS-TAP-DENIED-READABLE"
+statement = "Whether a unit is tapped by another player is never secret"
+source = "Phase 21 section 8.2"
+consequence = "Tapped rares read Withheld and still alert, by design; suppressionUnreadable climbs (Features/RareAlerts.lua)"
+check = { kind = "FlagAbsent", entry = "UnitIsTapDenied", flag = "SecretReturns" }
+
+[[premise]]
+id = "RAID-WARNING-SOUND"
+statement = "SOUNDKIT.RAID_WARNING is 8959"
+source = "Phase 21 section 8.4"
+consequence = "The rare alert is silent or plays another sound; soundUnavailable says which (Features/RareAlerts.lua)"
+check = { kind = "Pattern", file = "Blizzard_SharedXML/Mainline/SoundKitConstants.lua", regex = 'RAID_WARNING = 8959,', expect = "Present" }
+
+# Audit finding 10: the docs index the call only under its namespace.
+[[premise]]
+id = "PLAY-SOUND-UNRESTRICTED"
+statement = "C_Sound.PlaySound is not a restricted call"
+source = "Phase 21 section 8.4"
+consequence = "Rule 7: the rare alert's sound would be a refusal. Switch playSound's default off and re-read section 8.4 before the next build (Features/RareAlerts.lua)"
+check = { kind = "FlagAbsent", entry = "C_Sound.PlaySound", flag = "HasRestrictions" }

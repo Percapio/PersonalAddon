@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.10.1-patch02"
+ns.VERSION = "1.11.0-phase21"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -474,3 +474,66 @@ ns.BLIZZARD_FOLDER_PREFIX = "blizzard_"
 
 -- What a left-aligned nameplate name is set to (section 8).
 ns.NAME_ALIGN_JUSTIFY = "LEFT"
+
+-- Phase 21 (Architecture/20261112-Phase21.md) --------------------------------------------
+
+-- Upkeep's own preview window, in a group of its own so it is drawn beside the threat
+-- panel's samples rather than taking turns with them (section 6.3).
+ns.PREVIEW_PANEL.UPKEEP = "Upkeep"
+ns.PREVIEW_GROUP.UPKEEP = "Upkeep"
+
+-- Countdowns are whole seconds, so a fifth of a second never skips a number (section 6.4).
+ns.UPKEEP_TICK_SECONDS = 0.2
+-- The roster's bound. One more is requested, which is how truncation is noticed (4.1).
+ns.UPKEEP_AURA_READ_CAPACITY = 40
+-- The client answers a list per weapon slot (section 4.2).
+ns.UPKEEP_ENCHANTS_PER_SLOT = 2
+-- maximumIcons' largest value, 10, plus the two supply cells (section 6.1).
+ns.UPKEEP_CELL_CAPACITY = 12
+ns.UPKEEP_ICON_SIZE = 24
+-- Wide enough for a four-digit ammo count under the icon.
+ns.UPKEEP_CELL_WIDTH = 32
+ns.UPKEEP_CELL_HEIGHT = 38
+ns.UPKEEP_CELL_SPACING = 2
+-- The threat panel's padding, so the two read as one family (decision D7).
+ns.UPKEEP_PADDING = 6
+-- Between Upkeep and the panel it attaches to (section 6.2).
+ns.UPKEEP_ATTACH_GAP = 4
+-- Both combat panels default to this anchorOffsetY on PlayerFrame's corner, so
+-- detaching moves nothing in the default layout.
+ns.UPKEEP_DETACHED_BASE_Y = 8
+-- The server's removal of an aura against our own clock (section 4.4).
+ns.UPKEEP_EXPIRY_TOLERANCE_SECONDS = 1.0
+-- Reads after the first, when the restriction lifts late after a fight (section 4.4).
+ns.UPKEEP_POST_FIGHT_RETRIES = 3
+ns.UPKEEP_POST_FIGHT_RETRY_SECONDS = 0.5
+-- A hidden aura read out of combat (a PvP match) is retried at most this often (6.4).
+ns.UPKEEP_WITHHELD_RETRY_SECONDS = 5
+-- The longest the wake timer sleeps, so the panel re-checks at least this often.
+ns.UPKEEP_MAXIMUM_WAKE_SECONDS = 300
+-- One low-supply toast per supply per minute at most (section 5.3).
+ns.UPKEEP_LOW_SUPPLY_COOLDOWN_SECONDS = 60
+-- Decision D4's dark red, on a desaturated icon.
+ns.UPKEEP_EXPIRED_TINT = { 0.55, 0.06, 0.06 }
+-- Red is the threat palette's "on you" (Core/Threat.lua), so red means the same thing.
+ns.UPKEEP_AMBER = { 1.0, 0.69, 0.0 }
+ns.UPKEEP_RED = { 1.0, 0.25, 0.25 }
+ns.UPKEEP_FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+-- INVSLOT_AMMO and the three weapon slots, WeaponSlot + 1 (premises 93 and 94).
+ns.UPKEEP_AMMO_SLOT = 0
+ns.UPKEEP_WEAPON_INVENTORY_SLOTS = { 16, 17, 18 }
+-- The Soul Shard on Forever: C_Item.GetItemInfoInstant("Soul Shard") answered 6265 on
+-- the user's client, 2026-11-12, with icon fileID 134075 (decision D11).
+ns.SOUL_SHARD_ITEM_ID = 6265
+
+-- Rare alerts (section 8). Plates added in one frame on entering a city; the alerted
+-- creatures remembered; the sound; the plate's own art for each class (premise 96).
+ns.RARE_ALERT_PENDING_CAPACITY = 128
+ns.RARE_ALERT_MEMORY_CAPACITY = 64
+ns.RARE_ALERT_SOUND_KEY = "RAID_WARNING"
+ns.RARE_ALERT_ATLAS = {
+    Rare = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Star",
+    RareElite = "nameplates-icon-elite-silver",
+}
+-- How many alerts /pa rares lists.
+ns.RARE_ALERT_RECENT = 5

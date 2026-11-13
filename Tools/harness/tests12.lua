@@ -103,9 +103,10 @@ if HARNESS_SESSION == "phase12" then
 
     -- A2: every feature on its page, in its declared order.
     local combat, plates, bags = pageNamed("Combat"), pageNamed("Nameplates"), pageNamed("Bags & loot")
-    check("A2 combat", switchNames(combat) == "Five-second rule indicator,Damage breakdown,Threat panel",
+    -- Phase 21 section 16.1: Upkeep joins Combat and rare alerts join Nameplates.
+    check("A2 combat", switchNames(combat) == "Five-second rule indicator,Damage breakdown,Threat panel,Upkeep",
         switchNames(combat))
-    check("A2 nameplates", switchNames(plates) == "Nameplates", switchNames(plates))
+    check("A2 nameplates", switchNames(plates) == "Nameplates,Rare alerts", switchNames(plates))
     check("A2 bags and loot",
         switchNames(bags) == "Equipped skills,Toasts,Tidy bags when closed,Sell junk automatically",
         switchNames(bags))
@@ -117,7 +118,7 @@ if HARNESS_SESSION == "phase12" then
 
     -- A3: headers. A page with two or more features heads each one; the intro heads
     -- the parent; the colours get one group header, right before the first colour.
-    check("A3 combat headed", headerNames(combat) == "Five-second rule indicator,Damage breakdown,Threat panel",
+    check("A3 combat headed", headerNames(combat) == "Five-second rule indicator,Damage breakdown,Threat panel,Upkeep",
         headerNames(combat))
     for index, initializer in ipairs(combat.layout.initializers) do
         if initializer.kind == "header" then
@@ -127,11 +128,16 @@ if HARNESS_SESSION == "phase12" then
                 nextOne and nextOne.name)
         end
     end
-    check("A3 nameplates: only the group header", headerNames(plates) == "Colours, highest priority first",
+    -- Phase 21 section 16.1: with rare alerts on the page, each feature gets a header and
+    -- the colour group sits inside the first.
+    check("A3 nameplates: one header per feature, the colour group inside the first",
+        headerNames(plates) == "Nameplates,Colours, highest priority first,Rare alerts",
         headerNames(plates))
+    -- Phase 21 audit finding 12: select the colour group's header by name. The loop used
+    -- to keep the LAST header on the page, which is now the "Rare alerts" feature header.
     local groupHeader, afterGroup
     for index, initializer in ipairs(plates.layout.initializers) do
-        if initializer.kind == "header" then
+        if initializer.kind == "header" and initializer.name == "Colours, highest priority first" then
             groupHeader, afterGroup = initializer, plates.layout.initializers[index + 1]
         end
     end

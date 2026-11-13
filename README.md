@@ -65,7 +65,8 @@ Combat modules provide low-overhead combat telemetry while respecting Blizzard's
 - **Damage Breakdown:** Renders the last fight's damage by spell directly above the player frame: a header with the fight's length and DPS, then each spell's icon, DPS, and share, with shares that always add up to 100%. Reads Blizzard's internal meter rather than processing combat log text strings.
 - **Threat Panel:** Displays attacking mobs, current threat margins, target markers, and health bars in the same HUD anchor during encounters.
 - **Five-Second Rule (FSR):** Smooth status sweep texture mapped across the mana bar tracking spirit regeneration windows for casters. Only a cast that spends mana starts it; wand shots, Auto Shot, and potions leave it alone.
-- **Implementations:** [`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua), [`Features/ThreatPanel.lua`](Features/ThreatPanel.lua), and [`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua).
+- **Upkeep:** Out of combat, the buffs and weapon enchants about to run out, and your ammo or soul shards, beside the damage and threat panels.
+- **Implementations:** [`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua), [`Features/ThreatPanel.lua`](Features/ThreatPanel.lua), [`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua), and [`Features/Upkeep.lua`](Features/Upkeep.lua).
 
 ---
 
@@ -167,6 +168,14 @@ All configuration options are accessible in-game via **Options > AddOns > Person
   > **Turn on Options → Nameplates → Offscreen Nameplates.** The panel lists mobs that have a nameplate. Without this option, a mob whose nameplate leaves the screen — behind you, say — drops off the panel while it is still fighting you; with it, the client keeps the plate of anything in combat with you or your group.
 - **Damage Breakdown HUD ([`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua)):**
   Your damage by spell after each fight: a header with the fight's length and DPS, then icon, DPS, and share. The shares always add up to 100%: a spell that hit several enemies counts once, and spells past the row limit are summed in a final "+N more" row. Directly reads Blizzard's internal damage meter engine to maintain numerical parity. By default hides in combat to yield screen position to the Threat Panel.
+- **Upkeep ([`Features/Upkeep.lua`](Features/Upkeep.lua)):**
+  A small row of icons, out of combat only, showing what you maintain between pulls:
+  - **Buffs about to run out:** any buff on you with 30 seconds or less left, soonest first. Buffs that last a minute or less are ignored, judged by the duration the game itself reports, so short procs and heals-over-time never crowd it.
+  - **Temporary weapon enchants:** the weapon's icon, its countdown, and its charges if it has any.
+  - **What ran out:** an icon turns dark red for 10 seconds. Whatever ran out during a fight shows in dark red when the fight ends, which is when you can rebuff.
+  - **Ammo and soul shards:** an ammo count whenever the game says you use ammo (the same test the character pane uses for its ammo slot), and a soul shard count on a warlock. Amber below 200 ammo or 3 shards, red below 50 ammo or at 0 shards. Dropping into red posts one toast, in combat too.
+  - **Hidden in combat:** the game hides buff timers from addons during combat, so the panel steps aside rather than show stale numbers.
+  - **Placement:** one checkbox attaches it to the left of the damage breakdown, or the threat panel when the breakdown is off. Otherwise it sits by the player frame. Offsets, scale and opacity are in its settings, and *"Show all windows for adjusting"* shows it with sample icons.
 
 ### Nameplates
 
@@ -191,6 +200,8 @@ All configuration options are accessible in-game via **Options > AddOns > Person
   On the Thin and Cast Focus styles the game centres each nameplate's name above the bar; this option moves it to the bar's left end. Only the name's alignment changes and no anchor is moved, which is why a free x-offset is not offered (see [Tried and Not Possible](#tried-and-not-possible)). The Large and Block styles already put the name inside the bar on the left and are left alone, as are name-only plates. The first plate is tested once per session: `/pa plates` shows `capability=Verified` when the client keeps the alignment, and `Refused` or `Unverifiable`, with the setting standing down, when it does not.
 - **Nameplate Health Bar Height ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Scales nameplate bar height from 30% to 100% of Blizzard's base layout, automatically adapting to the player's selected UI Style and Global Scale.
+- **Rare Alerts ([`Features/RareAlerts.lua`](Features/RareAlerts.lua)):**
+  A toast with the name and level, and the raid-warning sound, when a rare or rare-elite mob gets a nameplate in the open world. World bosses don't count. Each creature alerts once every 10 minutes (a setting), and dead rares and ones another player has tagged are skipped. The toast carries the same rarity art the nameplate shows, and the sound has its own switch. Needs enemy nameplates on. **Nothing fires in dungeons and raids.**
 - **Quest Markers on Nameplates ([`Features/QuestMarkers.lua`](Features/QuestMarkers.lua)):**
   Renders an indicator beside the nameplates of monsters an active quest objective still wants. The marker **clears as soon as that objective is satisfied** — the kill count filled, or enough of the item collected — including on the creatures that drop a quest item rather than only on named kill targets. A setting keeps markers until the quest leaves the log instead, for farming a mob whose objective is already done. Requires QuestieDB and enemy nameplates enabled. **Automatically disabled in dungeons and raids** where the client withholds unit GUIDs to prevent misleading false negatives.
 
@@ -235,7 +246,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 ### Developer & Preview Tools
 
 - **Comprehensive Preview Mode ([`Core/Preview.lua`](Core/Preview.lua)):**
-  Activating *"Show all windows for adjusting"* renders mock instances of the skills panel, damage breakdown/threat HUD, and toast notifications above the settings interface to facilitate spatial positioning. Automatically dismisses upon entering combat.
+  Activating *"Show all windows for adjusting"* renders mock instances of the skills panel, damage breakdown/threat HUD, Upkeep, and toast notifications above the settings interface to facilitate spatial positioning. Upkeep's samples show beside the threat HUD's, not in turn with them. Automatically dismisses upon entering combat.
 - **Fast UI Reload ([`Features/ReloadCommand.lua`](Features/ReloadCommand.lua)):**
   Provides `/rl` to reload the user interface.
 
@@ -249,7 +260,9 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 | `/pa on <feature>`, `/pa off <feature>` | Toggles specific feature modules on or off |
 | `/pa get <feature>`, `/pa set <feature> <k> <v>` | Reads or updates a specific configuration key |
 | `/pa skills` | Dumps current skills panel layout and tracked values to chat |
-| `/pa toasts`, `/pa toasts test` | Summarizes toast metrics and the merchant visit in progress; emits one synthetic toast of each kind, merchant visit included |
+| `/pa toasts`, `/pa toasts test` | Summarizes toast metrics and the merchant visit in progress; emits one synthetic toast of each of the six kinds, merchant visit, rare and low supply included |
+| `/pa upkeep`, `/pa upkeep test` | Reports what Upkeep shows and why: whether buffs and enchants could be read, the ammo and shard counts, the anchor, and its counters; `test` posts a sample low-supply toast |
+| `/pa rares`, `/pa rares test` | Reports the map reading, whether enemy nameplates are on, the rares announced this session, and the counters; `test` posts a sample rare toast and plays the sound |
 | `/pa bags`, `/pa vend` | Reports last container sort or vendor event, including skip reasons and what holds a sort back |
 | `/pa consumables` | Summarizes active consumable bindings and assignment diagnostics |
 | `/pa quests` | Displays QuestieDB bridge status, offered NPC quests, and marker targets, and which features are waiting for QuestieDB |
@@ -292,6 +305,17 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Mechanism:** The live launch started every gamepad setting from its default, so values tuned on the beta did not carry over. The combat face-movement angle defaults to 105, which strafes sideways but turns you around when you pull back.
 - **Fix:** **Options → Gamepad → Camera** → set the combat face-movement angle to 180. If a full pull back still turns you, raise the backpedal threshold beside it. PersonalAddon has never controlled movement ([`Architecture/20260926-Phase07.md`](Architecture/20260926-Phase07.md) §4).
 
+### Upkeep Shows No Buffs in a Battleground
+
+- **Mechanism:** During a PvP match the game keeps buff timers from addons even out of combat, the same way it does in any fight.
+- **Symptom:** No buff countdowns; `/pa upkeep` shows the buff read as `Hidden` or `Throttled`. Weapon enchants and ammo and shard counts still show.
+- **Fix:** None needed. Countdowns return outside the match. Details in [`Architecture/20261112-Phase21.md`](Architecture/20261112-Phase21.md) §3.1.
+
+### No Rare Alerts
+
+- **Mechanism:** Rare alerts watch nameplates, so a rare without a plate is never seen. The game also withholds which creature a unit is in dungeons and raids.
+- **Fix:** Turn on **Options → Nameplates → Enemy Nameplates**; one chat line says so at login when they are off. In dungeons and raids nothing fires, by design: `/pa rares` shows `map=Restricted`.
+
 ### A Mob Vanished from the Threat Panel
 
 - **Mechanism:** The threat panel lists mobs that have a nameplate. When the client removes a plate — the mob is behind you, or off the edge of the screen — its row goes with it, even while the mob is still fighting you.
@@ -310,6 +334,9 @@ To eliminate redundant execution overhead, PersonalAddon intentionally omits fea
 - Strafing and backpedaling in combat: **Options → Gamepad → Camera** → the combat face-movement angle. At 0 you always turn to face where the stick points; at 180 you never do, so you strafe and backpedal. The live default, 105, strafes but turns you around when you pull back. The backpedal threshold beside it sets how hard a pull turns you instead. PersonalAddon never changes these; they are yours to set.
 - A rarity icon on enemy nameplates: **Options → Nameplates → Rarity Icon**. Forever turned it on in build 1.60.1.70790, and PersonalAddon's rare/elite ring was retired for it ([`Architecture/20261104-Patch02.md`](Architecture/20261104-Patch02.md) §5).
 - Container cleanup accessible through the bag Manage menu.
+- A buff frame that, collapsed, shows only buffs with 90 seconds or less left and flashes them under 31 seconds; Edit Mode moves it. Upkeep differs in its 30-second window, its place beside the combat panels, ignoring short buffs, and its ammo and shard counts.
+- A swing timer.
+- Item and reagent counts on action buttons, gamepad bars included.
 - Native vendor junk selling and transaction summaries, and the "You gained" chat receipt on leaving a merchant (PersonalAddon shows the same figure as a toast).
 
 ---
@@ -336,6 +363,7 @@ Architectural decisions and experiments evaluated across development phases and 
 | Hidden Action Button Indirection | `/click` fails against addon frames with `ScriptedInput` constraints; macros must name items directly | [Phase 16](Architecture/20261011-Phase16.md) §6.1, build 1.60.1.70338 |
 | Bandage First Aid Verification | Item APIs do not expose First Aid rank prerequisites; invalid usages report native error feedback | [Phase 16](Architecture/20261011-Phase16.md) §4.4, build 1.60.1.70338 |
 | Auto-Placing Macros on Bars | `PlaceAction` triggers synchronous slot mutation events inside addon code, compromising Gamepad action bar security | [Phase 12](Architecture/20261006-Phase12.md) §1.3, build 1.60.1.70291 |
+| Buff Timers in Combat | Buff durations are secret from addons during combat. Blizzard's aura container filters only by full duration, not time left, and refuses addon access while auras are secret. Upkeep hides in combat and shows what ran out when the fight ends | [Phase 21](Architecture/20261112-Phase21.md) §1.3, build 1.60.1.70938 |
 
 ---
 

@@ -388,6 +388,84 @@ local function commandThreat()
     ns.Log.Info("  counters: " .. table.concat(parts, " ", 10))
 end
 
+-- Phase 21 section 11: what Upkeep shows, how each part was read, and its anchor.
+local function commandUpkeep(subcommand)
+    if not ns.Upkeep then
+        ns.Log.Error("Upkeep did not load")
+        return
+    end
+    if string.lower(subcommand or "") == "test" then
+        ns.Log.Info("posted a sample low-supply toast: " .. tostring(ns.Upkeep.PostSample()))
+        return
+    end
+    local view = ns.Upkeep.Inspect()
+    notePreview(view)
+    ns.Log.Info(format("enabled=%s visibility=%s anchor=%s inCombat=%s ticker=%s wakeIn=%s tails=%d",
+        tostring(view.enabled), tostring(view.visibility), tostring(view.anchor),
+        tostring(view.inCombat), tostring(view.ticker),
+        view.wakeIn and format("%.1fs", view.wakeIn) or "none", view.tails))
+    ns.Log.Info(format("  buffs: %s (%s) roster=%d%s", view.buffsKnown and "known" or "not known",
+        tostring(view.buffRead), view.rosterBuffs,
+        view.snapshotBuffs and format(" snapshot=%d", view.snapshotBuffs) or ""))
+    local enchants = {}
+    for _, enchant in ipairs(view.enchants) do
+        enchants[#enchants + 1] = format("slot %d enchant %s %.0fs charges %d", enchant.slot,
+            tostring(enchant.enchantId), enchant.remaining, enchant.charges)
+    end
+    ns.Log.Info(format("  enchants: %s (%s)%s", view.enchantsKnown and "known" or "not known",
+        tostring(view.enchantRead), #enchants > 0 and (": " .. concat(enchants, "; ")) or ""))
+    local supplies = {}
+    for _, supply in ipairs(view.supplies) do
+        if supply.state == "Counted" then
+            supplies[#supplies + 1] = format("%s=%d %s", supply.supply, supply.count, tostring(supply.level))
+        else
+            supplies[#supplies + 1] = format("%s=%s%s", supply.supply, supply.state,
+                supply.reason and (" (" .. supply.reason .. ")") or "")
+        end
+    end
+    ns.Log.Info("  supplies: " .. (#supplies > 0 and concat(supplies, " ") or "not read"))
+    local cells = {}
+    for _, cell in ipairs(view.cells) do
+        if cell.kind == "Expired" then
+            cells[#cells + 1] = format("%s expired", cell.source)
+        else
+            cells[#cells + 1] = format("%s %.0fs%s", cell.source, cell.remaining or 0,
+                cell.charges > 0 and format(" x%d", cell.charges) or "")
+        end
+    end
+    ns.Log.Info("  timers: " .. (#cells > 0 and concat(cells, ", ") or "none"))
+    ns.Log.Info("  counters: " .. ns.Upkeep.CounterLine(view.counters))
+end
+
+-- Phase 21 section 11: the map reading, the remembered rares and the counters.
+local function commandRares(subcommand)
+    if not ns.RareAlerts then
+        ns.Log.Error("rare alerts did not load")
+        return
+    end
+    if string.lower(subcommand or "") == "test" then
+        local shown, sounded = ns.RareAlerts.PostSample()
+        ns.Log.Info(format("posted a sample rare toast: %s; sound %s", tostring(shown),
+            sounded and "played" or "not played"))
+        return
+    end
+    local view = ns.RareAlerts.Inspect()
+    ns.Log.Info(format("enabled=%s map=%s enemyPlates=%s remembered=%d/%d pending=%d sound=%s repeat=%dm",
+        tostring(view.enabled), tostring(view.map or "not read yet"), tostring(view.enemyPlates),
+        view.remembered, view.capacity, view.pending, view.playSound and "on" or "off",
+        view.repeatMinutes))
+    local at = GetTime()
+    for _, entry in ipairs(view.recent) do
+        ns.Log.Info(ns.EscapeGuard.Format("  %s, %s, %d min ago", entry.name,
+            entry.rareClass == "RareElite" and "rare elite" or "rare",
+            math.floor((at - entry.at) / 60)))
+    end
+    if #view.recent == 0 then
+        ns.Log.Info("  no rare announced this session")
+    end
+    ns.Log.Info("  counters: " .. ns.RareAlerts.CounterLine(view.counters))
+end
+
 -- Phase 8 section 5: what the skills window would show now, and how it resolved.
 local function commandSkills()
     if not ns.EquippedSkills then
@@ -974,8 +1052,10 @@ local function commandHelp()
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
     ns.Log.Info("/pa preview [on|off|threat|dps]  show every window with sample contents while you adjust")
     ns.Log.Info("/pa threat              the threat panel's rows, timer and counters")
+    ns.Log.Info("/pa upkeep [test]       what Upkeep shows and how it read it; test posts a low-supply toast")
+    ns.Log.Info("/pa rares [test]        rare alerts: the map, remembered rares, counters; test posts one")
     ns.Log.Info("/pa skills              what the skills window shows, and how each row resolved")
-    ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each toast")
+    ns.Log.Info("/pa toasts [test]       toast and loot counts; test posts one of each of the six toasts")
     ns.Log.Info("/pa bags                tidy bags: sorts, skips, and who listens")
     ns.Log.Info("/pa vend                sell junk: the last sale and any skips")
     ns.Log.Info("/pa consumables         the four macros: what each will use, and why not")
@@ -1079,6 +1159,10 @@ local function handler(input)
         reportPreview(words[2])
     elseif command == "threat" then
         commandThreat()
+    elseif command == "upkeep" then
+        commandUpkeep(words[2])
+    elseif command == "rares" then
+        commandRares(words[2])
     elseif command == "skills" then
         commandSkills()
     elseif command == "toasts" then

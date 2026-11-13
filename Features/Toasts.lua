@@ -50,7 +50,22 @@ local KIND = {
     JUNK_SOLD = "JunkSold",
     -- Phase 20 section 6.6. Posted only by this file.
     MERCHANT_VISIT = "MerchantVisit",
+    -- Phase 21 section 9: posted by RareAlerts and Upkeep, each switched by the
+    -- feature that posts it, so Toasts gains no setting.
+    RARE_SPOTTED = "RareSpotted",
+    SUPPLY_LOW = "SupplyLow",
 }
+
+-- The kinds post accepts, for the whitelist below.
+local KNOWN_KIND = {}
+for _, kind in pairs(KIND) do
+    KNOWN_KIND[kind] = true
+end
+
+-- Phase 21 section 9: a new kind's icon falls back to the question mark, never the coin.
+local QUESTION_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local RARE_LABEL = { Rare = "Rare", RareElite = "Rare elite" }
+local SUPPLY_NAME = { Ammo = "ammo", SoulShards = "soul shards" }
 
 local OUTCOME = {
     SHOWN = "Shown",
@@ -248,14 +263,44 @@ local function resetToast(toast)
     toast.count:SetText("")
 end
 
-local function setIcon(texture, icon)
+-- The fallback is the caller's: the coin for loot, as since Phase 8; the question
+-- mark for Phase 21's kinds (audit finding 9b).
+local function setIcon(texture, icon, fallback)
     if icon == nil or texture:SetTexture(icon) == false then
-        texture:SetTexture(MONEY_ICON)
+        texture:SetTexture(fallback or MONEY_ICON)
     end
+end
+
+-- Every paint starts from a plain icon and border (Phase 21 section 9), and paint is
+-- the one owner of the icon's state: resetToast leaves the coordinates alone. SetAtlas
+-- writes the icon's texture coordinates and SetTexture does not put them back, so a
+-- pooled toast that showed a rare's atlas would otherwise crop the next item icon.
+-- resetToast already whitens the border on release; doing it here too keeps the
+-- repaint path (coalesceMoney) honest.
+local function plainIcon(toast)
+    toast.icon:SetTexCoord(0, 1, 0, 1)
+    toast.icon:SetVertexColor(1, 1, 1)
+    toast.iconBorder:SetVertexColor(1, 1, 1)
+end
+
+-- The atlas only when the client knows it and setting it does not raise. SetAtlas
+-- returns nothing, so its return is never the test (audit finding 9a).
+local function setAtlasOrFallback(texture, atlas)
+    if type(atlas) == "string" and atlas ~= "" then
+        local api = _G.C_Texture
+        local kind = ns.ClientRead.Call(type(api) == "table" and api.GetAtlasInfo or nil, "table", atlas)
+        if kind == ns.ClientRead.PLAIN and pcall(texture.SetAtlas, texture, atlas) then
+            return true
+        end
+    end
+    texture:SetTexCoord(0, 1, 0, 1)
+    texture:SetTexture(QUESTION_ICON)
+    return false
 end
 
 local function paint(toast, request)
     toast.request = request
+    plainIcon(toast)
     if request.kind == KIND.LOOTED_ITEM then
         toast.label:SetText(request.isQuestItem and "Quest item" or "You looted")
         setIcon(toast.icon, request.icon)
@@ -301,6 +346,29 @@ local function paint(toast, request)
         end
         toast.label:SetText(label)
         toast.text:SetText("+" .. coinText(request.net or 0))
+    elseif request.kind == KIND.RARE_SPOTTED then
+        -- Phase 21 section 8.4: the art Blizzard's own plate uses for that class.
+        toast.label:SetText(RARE_LABEL[request.rareClass] or "Rare")
+        setAtlasOrFallback(toast.icon, request.atlas)
+        local name = ns.EscapeGuard.Neutralize(request.name)
+        if type(request.level) == "number" then
+            local level = request.level < 0 and "??" or tostring(request.level)
+            toast.text:SetText(format("%s %s level %s", name, MIDDLE_DOT, level))
+        else
+            toast.text:SetText(name)
+        end
+        toast.text:SetTextColor(1, 1, 1)
+    elseif request.kind == KIND.SUPPLY_LOW then
+        -- Phase 21 section 5.3: crossing into red. Red text and border, the threat
+        -- palette's "on you".
+        local supply = SUPPLY_NAME[request.supply] or "supplies"
+        local count = tonumber(request.count) or 0
+        toast.label:SetText(format("%s %s", count <= 0 and "Out of" or "Low on", supply))
+        setIcon(toast.icon, request.icon, QUESTION_ICON)
+        toast.text:SetText(format("%d left", count))
+        local red = ns.UPKEEP_RED
+        toast.text:SetTextColor(red[1], red[2], red[3])
+        toast.iconBorder:SetVertexColor(red[1], red[2], red[3])
     end
 end
 
@@ -477,9 +545,7 @@ local function postRequest(request, allowHold)
         bump(state.counts, "unavailable")
         return OUTCOME.UNAVAILABLE, UNAVAILABLE.DISABLED
     end
-    if type(request) ~= "table" or not (request.kind == KIND.LOOTED_ITEM
-        or request.kind == KIND.LOOTED_MONEY or request.kind == KIND.JUNK_SOLD
-        or request.kind == KIND.MERCHANT_VISIT) then
+    if type(request) ~= "table" or not KNOWN_KIND[request.kind] then
         bump(state.counts, "unavailable")
         return OUTCOME.UNAVAILABLE, UNAVAILABLE.NOT_READY
     end
@@ -1377,11 +1443,11 @@ ns.Toasts = {
     OUTCOME = OUTCOME,
     Post = post,
 
-    -- One of each kind, for placing the toasts and checking the art. Four kinds since
-    -- Phase 20: at the default maximumVisible of 3 the last one queues and appears
-    -- when the first fades (audit finding 11). The junk sample is posted past the
-    -- merchant visit's hold, so a test run at a merchant leaves the real visit alone
-    -- (audit finding 10).
+    -- One of each kind, for placing the toasts and checking the art. Six kinds since
+    -- Phase 21: at the default maximumVisible of 3 the last three queue and appear as
+    -- the first ones fade (Phase 20 audit finding 11). The junk sample is posted past
+    -- the merchant visit's hold, so a test run at a merchant leaves the real visit
+    -- alone (Phase 20 audit finding 10).
     PostSamples = function()
         local outcomes = {}
         outcomes[#outcomes + 1] = post({
@@ -1396,6 +1462,13 @@ ns.Toasts = {
         outcomes[#outcomes + 1] = postRequest({
             kind = KIND.MERCHANT_VISIT, net = 12345,
             junk = { itemsSold = 3, revenue = 250, itemsUnsold = 0, confirmed = true },
+        }, false)
+        outcomes[#outcomes + 1] = postRequest({
+            kind = KIND.RARE_SPOTTED, name = "A rare", level = 34, rareClass = "Rare",
+            atlas = ns.RARE_ALERT_ATLAS and ns.RARE_ALERT_ATLAS.Rare or nil,
+        }, false)
+        outcomes[#outcomes + 1] = postRequest({
+            kind = KIND.SUPPLY_LOW, supply = "Ammo", count = 45, icon = QUESTION_ICON,
         }, false)
         return outcomes
     end,

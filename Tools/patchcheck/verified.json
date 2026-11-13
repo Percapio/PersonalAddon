@@ -1,13 +1,13 @@
 {
- "acceptedAt": 1794024529.5222814,
+ "acceptedAt": 1794543970.6403282,
  "acceptedBy": "AcceptedAfterReview",
  "client": {
-  "binaryModifiedAt": 1794018331.4774103,
-  "build": "1.60.1.70840"
+  "binaryModifiedAt": 1794540266.4076688,
+  "build": "1.60.1.70938"
  },
- "exportDigest": "c227cbc66a9ce93223620283923314233d7b60a4ed5ed56be69d53975cbe927b",
- "exportedAt": 1794019817.2858708,
- "report": "2026-11-06-1.60.1.70840.md",
+ "exportDigest": "4843be41be3643b95b2164669c0849146927fc3fea66a33852cc3b670662fc5d",
+ "exportedAt": 1794542303.743567,
+ "report": "2026-11-12-1.60.1.70938.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
@@ -113,9 +113,6 @@
   ],
   "C_Spell.GetSpellTexture": [
    "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
-  ],
-  "C_Texture.GetAtlasInfo": [
-   "Blizzard_APIDocumentationGenerated/TextureUtilsDocumentation.lua"
   ],
   "C_Timer.After": [
    "Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua"
@@ -351,6 +348,9 @@
   "SimpleScriptRegionAPI:GetHeight": [
    "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
   ],
+  "SimpleScriptRegionAPI:GetSourceLocation": [
+   "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
+  ],
   "SimpleScriptRegionAPI:GetWidth": [
    "Blizzard_APIDocumentationGenerated/SimpleScriptRegionAPIDocumentation.lua"
   ],
@@ -408,9 +408,6 @@
   "SimpleStatusBarAPI:SetValue": [
    "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
   ],
-  "SimpleTextureBaseAPI:SetAtlas": [
-   "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
-  ],
   "SimpleTextureBaseAPI:SetColorTexture": [
    "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
   ],
@@ -445,9 +442,6 @@
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitHealthMax": [
-   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
-  ],
-  "UnitIsBossMob": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitIsDead": [
@@ -1067,14 +1061,6 @@
    "Returns.originalIconID.Type": "\"fileID\"",
    "SecretArguments": "\"AllowedWhenTainted\""
   },
-  "C_Texture.GetAtlasInfo": {
-   "Arguments.atlas.Nilable": "false",
-   "Arguments.atlas.Type": "\"textureAtlas\"",
-   "MayReturnNothing": "true",
-   "Returns.info.Nilable": "false",
-   "Returns.info.Type": "\"AtlasInfo\"",
-   "SecretArguments": "\"AllowedWhenUntainted\""
-  },
   "C_Timer.After": {
    "Arguments.callback.Nilable": "false",
    "Arguments.callback.Type": "\"TimerCallback\"",
@@ -1664,6 +1650,11 @@
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretWhenAnchoringSecret": "true"
   },
+  "SimpleScriptRegionAPI:GetSourceLocation": {
+   "Returns.location.Nilable": "false",
+   "Returns.location.Type": "\"string\"",
+   "SecretReturnsForAspect": "{ Enum.SecretAspect.ObjectDebug }"
+  },
   "SimpleScriptRegionAPI:GetWidth": {
    "Arguments.ignoreRect.Default": "false",
    "Arguments.ignoreRect.Nilable": "false",
@@ -1811,27 +1802,6 @@
    "SecretArguments": "\"AllowedWhenTainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.BarValue }"
   },
-  "SimpleTextureBaseAPI:SetAtlas": {
-   "Arguments.atlas.Nilable": "false",
-   "Arguments.atlas.Type": "\"textureAtlas\"",
-   "Arguments.filterMode.NeverSecret": "true",
-   "Arguments.filterMode.Nilable": "true",
-   "Arguments.filterMode.Type": "\"FilterMode\"",
-   "Arguments.resetTexCoords.NeverSecret": "true",
-   "Arguments.resetTexCoords.Nilable": "true",
-   "Arguments.resetTexCoords.Type": "\"bool\"",
-   "Arguments.useAtlasSize.Default": "false",
-   "Arguments.useAtlasSize.NeverSecret": "true",
-   "Arguments.useAtlasSize.Nilable": "false",
-   "Arguments.useAtlasSize.Type": "\"bool\"",
-   "Arguments.wrapModeHorizontal.NeverSecret": "true",
-   "Arguments.wrapModeHorizontal.Nilable": "true",
-   "Arguments.wrapModeHorizontal.Type": "\"cstring\"",
-   "Arguments.wrapModeVertical.NeverSecret": "true",
-   "Arguments.wrapModeVertical.Nilable": "true",
-   "Arguments.wrapModeVertical.Type": "\"cstring\"",
-   "SecretArguments": "\"AllowedWhenTainted\""
-  },
   "SimpleTextureBaseAPI:SetColorTexture": {
    "Arguments.a.Nilable": "true",
    "Arguments.a.Type": "\"SingleColorValue\"",
@@ -1958,13 +1928,6 @@
    "Returns.result.Type": "\"number\"",
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretWhenUnitHealthMaxRestricted": "true"
-  },
-  "UnitIsBossMob": {
-   "Arguments.unit.Nilable": "false",
-   "Arguments.unit.Type": "\"UnitToken\"",
-   "Returns.result.Nilable": "false",
-   "Returns.result.Type": "\"bool\"",
-   "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "UnitIsDead": {
    "Arguments.unit.Nilable": "false",
@@ -2403,15 +2366,15 @@
   "Blizzard_Game/Shared/EventImplementation.lua": "9314fccf86511c4dc21f48d4aa9cc37134c7b503eb66946db591593b062bafc7",
   "Blizzard_GamepadActionBars/MainActionBarFrame.lua": "820d278342f822e35afea9dca4ceb1f1523b7905aabc00e4ce765738b61ce69f",
   "Blizzard_GamepadActionBars/PageUnit.lua": "c3e74a9b7bcf1875137e5e5d02b1ec93bfb6041270e5209a98eded183ae4e2b0",
-  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "40c417c75d7598aa0a72929740a77a55ed4e1e2d2c57312c23219e9077e4092e",
+  "Blizzard_GamepadSharedUtility/FrameControlsManager.lua": "5251b95396d3b4aefb7194ee5a33e880b96348d0872c2867bed88d55b82bba4a",
   "Blizzard_GamepadSharedUtility/FrameReformUtility.lua": "f7202f0a5b679f0d35ab04c57e8e26a1a25244e7e0e60fbbfb2c6dee85d03a2b",
   "Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua": "ef5beda0110e7213d86de6aebe3f838f4624bac36e3a6047f78b5954fbf36dbe",
   "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua": "27318d5b42f396b5f246cfde2fe2225d5bbfa39d61e4544eb3cd34ae29c26897",
   "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "7e0d964592b95f1fe637aacde7f54cb4651beb5c9c2851eb1f88537e651f7955",
-  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "0db1370b0518abd6a106a8a8d5d2cb456630823d5764760367cf5fdcb98ef613",
+  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "86709c2b9f8667e70688bbde72c8b1a33ebe67dd261874059cce7bd6a8c693fa",
   "Blizzard_GamepadSmartNavigation/Utility.lua": "d60c46b8246bfa18be905e31b570f7ce5879cb69d0e38fb5ee7232ffe7057150",
   "Blizzard_NamePlates/Blizzard_NamePlateBase.lua": "3221e4b6d770dbfbeb58d2a0707341a205531b13654516cf76b5b271ded65729",
-  "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua": "f8249a9482680c366c2ca0e8f4add9d2473487d5988cd3c7be972c110ce17d72",
+  "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua": "10c76a56d5b5f35ef2cb2cd6de753647cfc4fa07bec374f6bc57f630afabc60b",
   "Blizzard_NamePlates/Blizzard_NamePlates.xml": "f7bc75866a5c24b4ad9cc237836d62608b0bd9c966e4561c8d87adcfea5834fd",
   "Blizzard_Settings_Shared/Blizzard_Settings.lua": "daa9b9b36519ad4dfe28bfde040544ed84cc717faedfa80f1e17e3e73a31b4a0",
   "Blizzard_Settings_Shared/Blizzard_SettingsPanel.lua": "27f6db7d502104ad26d2893519fd810b4769616398a0ebb3fb08632f7745f4a7",

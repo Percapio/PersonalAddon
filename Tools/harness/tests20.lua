@@ -812,11 +812,11 @@ check("M14 and a held confirmed sale still shows as the junk toast",
     toast and labelOf(toast) == "Junk sold" and toast.text:GetText() == "2 for coins:500"
     and #visitToasts() == 0, toast and toast.text:GetText())
 
--- M16: four samples, three visible.
+-- M16: six samples since Phase 21 (section 16.1), three visible.
 clearToasts()
 local outcomes = Toasts.PostSamples()
-check("M16 PostSamples returns Shown, Shown, Shown, Queued at maximumVisible 3",
-    table.concat(outcomes, ", ") == "Shown, Shown, Shown, Queued", table.concat(outcomes, ", "))
+check("M16 PostSamples returns Shown, Shown, Shown, Queued, Queued, Queued at maximumVisible 3",
+    table.concat(outcomes, ", ") == "Shown, Shown, Shown, Queued, Queued, Queued", table.concat(outcomes, ", "))
 clearToasts()
 clearToasts()
 

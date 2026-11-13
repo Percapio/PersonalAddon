@@ -2,7 +2,7 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 1.10.1
+## Version: 1.11.0
 ## IconTexture: Interface\AddOns\PersonalAddon\Images\logo.png
 ## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their
@@ -11,7 +11,7 @@
 # PersonalAddonDiagnostics holds counters and fault notes from the last five
 # sessions (Architecture/20261002-Phase09.md section 3); /pa diag clear empties it.
 ## X-License: Artistic License 2.0
-## X-Phase: 20
+## X-Phase: 21
 
 # Interface number follows Blizzard's major*10000 + minor*100 + patch
 # convention for the stated client version 1.60.1. If the client reports a
@@ -49,6 +49,7 @@ Features\FiveSecondRule.lua
 Features\Nameplates.lua
 Features\DamageBreakdown.lua
 Features\ThreatPanel.lua
+Features\Upkeep.lua
 Features\EquippedSkills.lua
 Features\Toasts.lua
 Features\AutoSortBags.lua
@@ -56,5 +57,6 @@ Features\AutoSellJunk.lua
 Features\ConsumableMacros.lua
 Features\NPCQuests.lua
 Features\QuestMarkers.lua
+Features\RareAlerts.lua
 Features\SettingsPanel.lua
 

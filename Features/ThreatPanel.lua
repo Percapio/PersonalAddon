@@ -1059,6 +1059,11 @@ end
 
 ns.ThreatPanel = {
     COUNTER_NAMES = COUNTER_NAMES,
+    -- Phase 21 section 6.2: Upkeep attaches beside this panel when the breakdown is
+    -- off. Read-only; nil until the first enable builds the panel.
+    Frame = function()
+        return state.panel
+    end,
     Inspect = function()
         local rows = {}
         for index = 1, state.drawnCount do
