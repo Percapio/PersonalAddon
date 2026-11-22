@@ -46,6 +46,22 @@ PROPERTY.BarColour = {
     end,
 }
 
+-- Phase 22 section 4.1: a nameplate name's colour. Blizzard writes it with
+-- SetVertexColor and three components (CompactUnitFrame_UpdateName), so this does
+-- the same: one property with two writers, and the name's alpha is never ours.
+PROPERTY.NameColour = {
+    read = function(widget)
+        local kind, red, green, blue = ClientRead.CallMany(widget.GetVertexColor, 3, "number", widget)
+        if kind ~= PLAIN then
+            return kind, red
+        end
+        return PLAIN, { red = red, green = green, blue = blue }
+    end,
+    write = function(widget, colour)
+        widget:SetVertexColor(colour.red, colour.green, colour.blue)
+    end,
+}
+
 function StyleLedger.Create(ledgerName)
     return {
         ledgerName = ledgerName or "unnamed",

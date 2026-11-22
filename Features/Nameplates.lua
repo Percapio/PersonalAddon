@@ -27,6 +27,11 @@
 -- Everything we change is recorded in the style ledger first, scoped to one
 -- occupancy of one frame, so disable puts it back and a recycled frame never
 -- inherits the previous unit's geometry.
+--
+-- Phase 22 (Architecture/20261122-Phase22.md) adds a fourth restyled property: a
+-- player's name, red when either of you can attack the other and light orange
+-- otherwise. Blizzard rewrites it in CompactUnitFrame_UpdateName on every soft-target
+-- change, so it gets a post-hook of its own (section 4.3).
 
 local ADDON_NAME, ns = ...
 
@@ -101,6 +106,18 @@ local state = {
     -- Whether this client lets us set, and see, the name's alignment. Probed once on
     -- the first eligible plate (section 8.4).
     alignCapability = "NotYetProbed",
+    -- Phase 22 section 3. Off by default (D7): it changes how Blizzard's own plate looks.
+    playerNameColours = false,
+    -- Verdict -> { red, green, blue }, from the two colour settings.
+    namePalette = {},
+    -- Whether this client lets us set, and see, a name's colour (section 4.2).
+    nameColourCapability = "NotYetProbed",
+    nameHookInstalled = false,
+    -- Section 5.2: the plates UNIT_FACTION named this frame. plates holds tracked
+    -- records only, and untrackPlate removes its own, so the set is bounded by the
+    -- plate count. generation is bumped by disable, which turns a pending flush into
+    -- a no-op (C_Timer.After cannot be cancelled).
+    factionWork = { plates = {}, all = false, scheduled = false, generation = 0 },
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
     -- enable binds it, so nothing here ever indexes nil.
     counters = {},
@@ -119,6 +136,29 @@ end
 
 -- Config ----------------------------------------------------------------------
 
+-- Phase 22 section 8.2. A stored value that is not six hex digits falls back to the
+-- declared default rather than to ConfigSchema.HexToRgb's white, which would look like
+-- the feature doing nothing.
+local NAME_COLOUR_DEFAULTS = { CanFight = "ff4040", OtherPlayer = "ffc04d" }
+local NAME_COLOUR_KEYS = { CanFight = "nameColourCanFight", OtherPlayer = "nameColourOtherPlayer" }
+
+local function colourFromHex(value, fallback)
+    local hex = fallback
+    if type(value) == "string" and #value == 6 and tonumber(value, 16) then
+        hex = value
+    end
+    local red, green, blue = ns.ConfigSchema.HexToRgb(hex)
+    return { red = red, green = green, blue = blue }
+end
+
+local function namePaletteFrom(settings)
+    local palette = {}
+    for verdict, key in pairs(NAME_COLOUR_KEYS) do
+        palette[verdict] = colourFromHex(settings and settings[key], NAME_COLOUR_DEFAULTS[verdict])
+    end
+    return palette
+end
+
 local function readSettings(config)
     local settings = config and config.settings
     if not settings then
@@ -130,6 +170,8 @@ local function readSettings(config)
     state.guildFontSize = settings.guildFontSize or state.guildFontSize
     state.npcRoles = (settings.npcRoles == true)
     state.nameAlignLeft = (settings.nameAlignLeft == true)
+    state.playerNameColours = (settings.playerNameColours == true)
+    state.namePalette = namePaletteFrom(settings)
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
     state.palette = Threat.PaletteFrom(settings)
@@ -658,20 +700,52 @@ local ALIGN_SKIP_COUNTER = {
     NoNameRegion = "nameAlignSkippedNoRegion",
 }
 
--- Whether Blizzard is laying names out above the bar, spanning it: true, false, or
--- nil when either option field did not read. Read once per sweep, and once per hook
--- fire for its one plate; both fields change only with the Style.
-local function readNameAnchorStyle()
+-- Where Blizzard lays plate names out for the current Style (Phase 22 section 3.4).
+-- One read serves alignment and player name colours, made only by a caller that
+-- wants it, so with both off nothing here is read (audit finding 5).
+local ANCHOR = {
+    ABOVE_SPANNING = "AboveSpanning",
+    ABOVE_CENTRED = "AboveCentred",
+    INSIDE_BAR = "InsideBar",
+    UNREADABLE = "Unreadable",
+}
+
+-- The style is compared with whichever of the three constants read: one that does not
+-- is skipped, never fatal. Camelot never uses CenteredAboveHealthBar, and no premise
+-- pins it (audit finding 4). Unreadable when the style or the table does not read, or
+-- the style matches nothing readable. Both fields change only with the Style.
+local function readNameAnchor()
     local styleKind, style = ClientRead.Field(_G.NamePlateSetupOptions, "unitNameAnchorStyle", "number")
+    if styleKind ~= PLAIN then
+        return ANCHOR.UNREADABLE
+    end
     local stylesKind, styles = ClientRead.Field(_G.NamePlateConstants, "NAME_ANCHOR_STYLES", "table")
-    if styleKind ~= PLAIN or stylesKind ~= PLAIN then
-        return nil
+    if stylesKind ~= PLAIN then
+        return ANCHOR.UNREADABLE
     end
     local aboveKind, above = ClientRead.Field(styles, "AboveHealthBar", "number")
-    if aboveKind ~= PLAIN then
+    if aboveKind == PLAIN and style == above then
+        return ANCHOR.ABOVE_SPANNING
+    end
+    local insideKind, inside = ClientRead.Field(styles, "InsideHealthBar", "number")
+    if insideKind == PLAIN and style == inside then
+        return ANCHOR.INSIDE_BAR
+    end
+    local centredKind, centred = ClientRead.Field(styles, "CenteredAboveHealthBar", "number")
+    if centredKind == PLAIN and style == centred then
+        return ANCHOR.ABOVE_CENTRED
+    end
+    return ANCHOR.UNREADABLE
+end
+
+-- Phase 20's answer for alignment, from the one read: true above the bar, spanning
+-- it; false for any other style; nil when unreadable. Both skips it can lead to land
+-- on one counter, so alignment's outcomes do not change.
+local function styleAboveFrom(anchor)
+    if anchor == nil or anchor == ANCHOR.UNREADABLE then
         return nil
     end
-    return style == above
+    return anchor == ANCHOR.ABOVE_SPANNING
 end
 
 -- Why a plate is not eligible, or nil when it is (section 8.2). showOnlyName is
@@ -752,7 +826,7 @@ local function reassertNameAlignment(plate)
 end
 
 -- The one alignment entry point (section 8.3), for trackPlate, the hooks, the sweep
--- and the setting turning on. styleAbove is readNameAnchorStyle()'s answer.
+-- and the setting turning on. styleAbove is styleAboveFrom(readNameAnchor()).
 local function alignPlateName(plate, styleAbove)
     if not state.nameAlignLeft then
         return
@@ -777,12 +851,13 @@ local function alignPlateName(plate, styleAbove)
 end
 
 -- Every tracked plate, outside the colour sweep's SCOPE.IN filter: a friendly plate's
--- name is as much the user's as an enemy's (Phase 19's lesson).
-local function alignAllPlateNames()
+-- name is as much the user's as an enemy's (Phase 19's lesson). anchor is the sweep's
+-- one read for the pass; the setting turning on reads its own.
+local function alignAllPlateNames(anchor)
     if not state.nameAlignLeft then
         return
     end
-    local styleAbove = readNameAnchorStyle()
+    local styleAbove = styleAboveFrom(anchor or readNameAnchor())
     for _, plate in pairs(state.plates) do
         alignPlateName(plate, styleAbove)
     end
@@ -1086,6 +1161,393 @@ local function unstylePlate(plate)
     plate.desiredColour = nil
 end
 
+-- Player name colours (Phase 22) -----------------------------------------------
+--
+-- Red when either of you can attack the other; light orange for every other player
+-- (Architecture/20261122-Phase22.md sections 3-5). NPCs, your own plate and names
+-- drawn inside the bar (Large, Block) are left to Blizzard, as is a friendly player
+-- while Blizzard's class-colour option is on (D10).
+--
+-- Two fields per plate, and they are different facts (audit findings 1 and 2):
+-- nameDecision is what the last decision answered, for the counters and the view;
+-- namePainted is the verdict whose colour is on the name now, held only while a
+-- NameColour ledger record is. The hook re-asserts namePainted, never a bare decision,
+-- so a write that did not land can never send it after a record that does not exist.
+
+local NAME_CAPABILITY = {
+    NOT_YET_PROBED = "NotYetProbed",
+    VERIFIED = "Verified",
+    REFUSED = "Refused",
+    UNVERIFIABLE = "Unverifiable",
+}
+
+local IDENTITY = { PLAYER = "Player", YOU = "You", NOT_A_PLAYER = "NotAPlayer", UNREADABLE = "Unreadable" }
+
+local NAME_VERDICT = { CAN_FIGHT = "CanFight", OTHER_PLAYER = "OtherPlayer" }
+
+-- Every decision is one string, a verdict or one of these reasons, so deciding
+-- allocates nothing and its counter is "nameColourDecidedTo" .. decision.
+local NAME_SKIP = {
+    NOT_PLAYER = "NotPlayer",
+    YOURSELF = "Yourself",
+    PLAYER_UNREADABLE = "PlayerUnreadable",
+    NO_NAME_REGION = "NoNameRegion",
+    INSIDE_BAR = "InsideBar",
+    STYLE_UNREADABLE = "StyleUnreadable",
+    ATTACK_UNREADABLE = "AttackUnreadable",
+    CLASS_COLOUR_WINS = "ClassColourWins",
+    CLASS_COLOUR_UNREADABLE = "ClassColourUnreadable",
+}
+
+local NAME_OUTCOME = {
+    PAINTED = "Painted",
+    UNCHANGED = "Unchanged",
+    RELEASED = "Released",
+    LEFT_ALONE = "LeftAlone",
+    REFUSED = "Refused",
+    UNREADABLE = "Unreadable",
+}
+
+-- Every Blizzard write of a plate name's colour is in this function (premises
+-- 100-102), so its post-hook corrects the name in the same call (section 4.3).
+local NAME_HOOK_TARGET = "CompactUnitFrame_UpdateName"
+
+local function isPaint(decision)
+    return decision == NAME_VERDICT.CAN_FIGHT or decision == NAME_VERDICT.OTHER_PLAYER
+end
+
+local function nameColourOf(verdict)
+    return state.namePalette[verdict] or colourFromHex(nil, NAME_COLOUR_DEFAULTS[verdict])
+end
+
+-- On, and not stood down. Every name path checks this before it reads anything
+-- (audit findings 2c, 6 and 7).
+local function nameColoursActive()
+    if not state.playerNameColours then
+        return false
+    end
+    local verdict = state.nameColourCapability
+    return verdict == NAME_CAPABILITY.NOT_YET_PROBED or verdict == NAME_CAPABILITY.VERIFIED
+end
+
+-- Whether a plate shows a player, and whether that player is you (section 3.2).
+-- Asked once per occupancy: a unit does not stop being a player, or you, while its
+-- plate is up. A Plain answer is kept; a Withheld one is asked again next pass. A
+-- Withheld self comparison counts as "not you" for this pass only: the personal
+-- display hides its name, so a wrong paint there is never seen.
+local function resolvePlayerIdentity(plate)
+    if plate.identity then
+        return plate.identity
+    end
+    local playerKind, isPlayer = ClientRead.Call(_G.UnitIsPlayer, "boolean", plate.unitToken)
+    if playerKind == WITHHELD then
+        bump(state.counters, "nameColourPlayerWithheld")
+        return IDENTITY.UNREADABLE
+    end
+    if not (playerKind == PLAIN and isPlayer == true) then
+        plate.identity = IDENTITY.NOT_A_PLAYER
+        return plate.identity
+    end
+    local youKind, isYou = ClientRead.Call(UnitIsUnit, "boolean", plate.unitToken, "player")
+    if youKind == PLAIN and isYou == true then
+        plate.identity = IDENTITY.YOU
+        return plate.identity
+    end
+    if youKind == WITHHELD then
+        return IDENTITY.PLAYER
+    end
+    plate.identity = IDENTITY.PLAYER
+    return plate.identity
+end
+
+-- Why a player's name may not be coloured on this plate, or nil when it may (D9).
+-- Inside the bar a light orange name has no contrast; a name-only plate has no bar
+-- behind its name, so it is eligible on every style. showOnlyName is read only when
+-- the style puts names inside the bar or is unreadable.
+local function nameIneligibility(plate, anchor)
+    if not plate.nameRegion then
+        return NAME_SKIP.NO_NAME_REGION
+    end
+    if anchor == ANCHOR.ABOVE_SPANNING or anchor == ANCHOR.ABOVE_CENTRED then
+        return nil
+    end
+    local onlyKind, onlyName = ClientRead.Field(plate.unitFrame, "showOnlyName", "boolean")
+    if onlyKind == PLAIN and onlyName == true then
+        return nil
+    end
+    if anchor == ANCHOR.INSIDE_BAR then
+        return NAME_SKIP.INSIDE_BAR
+    end
+    return NAME_SKIP.STYLE_UNREADABLE
+end
+
+-- What one plate's name should show now (section 3.5). Red when either of you can
+-- attack the other, by the client's own UnitCanAttack asked both ways (D2): that
+-- covers the flag, duels, arenas, free-for-all areas and mind control. A Withheld
+-- read is never taken as false (rule 10); the name is left to Blizzard, which claims
+-- nothing. The class-colour field is read only for a player who would be light
+-- orange, because red outranks Blizzard's decoration.
+local function decideNameColour(plate, anchor)
+    local identity = resolvePlayerIdentity(plate)
+    if identity == IDENTITY.UNREADABLE then
+        return NAME_SKIP.PLAYER_UNREADABLE
+    end
+    if identity == IDENTITY.NOT_A_PLAYER then
+        return NAME_SKIP.NOT_PLAYER
+    end
+    if identity == IDENTITY.YOU then
+        return NAME_SKIP.YOURSELF
+    end
+    local ineligible = nameIneligibility(plate, anchor)
+    if ineligible then
+        return ineligible
+    end
+    local token = plate.unitToken
+    local youKind, youAttack = ClientRead.Call(UnitCanAttack, "boolean", "player", token)
+    local theyKind, theyAttack = ClientRead.Call(UnitCanAttack, "boolean", token, "player")
+    if (youKind == PLAIN and youAttack == true) or (theyKind == PLAIN and theyAttack == true) then
+        return NAME_VERDICT.CAN_FIGHT
+    end
+    if youKind == WITHHELD or theyKind == WITHHELD then
+        bump(state.counters, "nameColourAttackWithheld")
+        return NAME_SKIP.ATTACK_UNREADABLE
+    end
+    local classKind, byClass = ClientRead.Field(plate.unitFrame, "colorNameWithClassColor", "boolean")
+    if classKind == WITHHELD then
+        return NAME_SKIP.CLASS_COLOUR_UNREADABLE
+    end
+    if classKind == PLAIN and byClass == true then
+        return NAME_SKIP.CLASS_COLOUR_WINS
+    end
+    return NAME_VERDICT.OTHER_PLAYER
+end
+
+-- Hands one plate's name back: its record restored and dropped, namePainted cleared.
+-- Returns whether a record was held.
+local function releaseNameColour(plate)
+    plate.namePainted = nil
+    local region = plate.nameRegion
+    if not (state.ledger and region and ns.StyleLedger.HasRecord(state.ledger, region, "NameColour")) then
+        return false
+    end
+    ns.StyleLedger.RestoreProperty(state.ledger, region, "NameColour")
+    bump(state.counters, "nameColourReleased")
+    return true
+end
+
+-- Every tracked plate's name back to Blizzard (section 4.5): on turning off, on
+-- disable, and on a stand-down. The original is the colour read before our first
+-- write, so Blizzard's next CompactUnitFrame_UpdateName is what makes it exact.
+local function restoreNameColours()
+    local restored = 0
+    for _, plate in pairs(state.plates) do
+        if releaseNameColour(plate) then
+            restored = restored + 1
+        end
+        plate.nameDecision = nil
+    end
+    return restored
+end
+
+local NAME_CAPABILITY_LINE = {
+    Refused = "this client did not keep a nameplate name's colour, so player name colours stay off until /reload",
+    Unverifiable = "this client will not show a nameplate name's colour, so player name colours cannot tell whether they worked and stay off until /reload",
+}
+
+-- Records a capability verdict (section 4.5). Refused and Unverifiable stand the
+-- setting down: one line, said once per verdict, and every painted name restored at
+-- once, so no record outlives the stand-down (audit finding 7). Only disable or
+-- /reload lifts it; turning the setting off and on does not.
+local function noteNameCapability(verdict)
+    state.nameColourCapability = verdict
+    -- A counter NAME, not a string value: Diagnostics rejects a non-number counter
+    -- (Phase 20 section 11).
+    bump(state.counters, "nameColourCapability" .. verdict)
+    local line = NAME_CAPABILITY_LINE[verdict]
+    if line then
+        ns.Log.Once("plates:namecolour" .. verdict, line)
+        restoreNameColours()
+    end
+end
+
+-- Keeps a painted name painted, or moves it to another verdict's colour (section
+-- 4.3). The target comes from verdict, never from nameDecision (audit finding 2a).
+-- An unreadable name is not written: a write we cannot check is a contest we cannot
+-- see. NOT_RECORDED is told apart from a refused write, so a lost record can never
+-- stand the setting down (audit finding 1). O(1).
+local function reassertNameColour(plate, verdict)
+    local region = plate.nameRegion
+    local colour = nameColourOf(verdict)
+    local kind, current = ns.StyleLedger.Reads(state.ledger, region, "NameColour")
+    if kind ~= PLAIN then
+        bump(state.counters, "nameColourReadsWithheld")
+        return NAME_OUTCOME.UNREADABLE
+    end
+    if coloursMatch(current, colour) then
+        plate.namePainted = verdict
+        bump(state.counters, "nameColourUnchanged")
+        return NAME_OUTCOME.UNCHANGED
+    end
+    local ok, reason = ns.StyleLedger.Reapply(state.ledger, region, "NameColour", colour)
+    if ok then
+        plate.namePainted = verdict
+        bump(state.counters, "nameColourWrites")
+        return NAME_OUTCOME.PAINTED
+    end
+    if reason == "NOT_RECORDED" then
+        plate.namePainted = nil
+        return NAME_OUTCOME.LEFT_ALONE
+    end
+    bump(state.counters, "nameColourWriteFailed")
+    return NAME_OUTCOME.REFUSED
+end
+
+-- Whether this client lets us set a plate name's colour, and lets us see it (section
+-- 4.2). Apply's own read of the original is the probe's first read, so at most two
+-- reads and two writes (audit finding 3). Returns the verdict for the caller to note.
+local function probeNameColour(plate, verdict)
+    local region = plate.nameRegion
+    local colour = nameColourOf(verdict)
+    local ok, reason = ns.StyleLedger.Apply(state.ledger, region, "NameColour", colour)
+    if not ok then
+        if reason == "WRITE_REFUSED" then
+            bump(state.counters, "nameColourWriteFailed")
+            return NAME_CAPABILITY.REFUSED
+        end
+        return NAME_CAPABILITY.UNVERIFIABLE
+    end
+    bump(state.counters, "nameColourWrites")
+    local kind, current = ns.StyleLedger.Reads(state.ledger, region, "NameColour")
+    if kind == PLAIN and coloursMatch(current, colour) then
+        plate.namePainted = verdict
+        return NAME_CAPABILITY.VERIFIED
+    end
+    ns.StyleLedger.RestoreProperty(state.ledger, region, "NameColour")
+    if kind == PLAIN then
+        return NAME_CAPABILITY.REFUSED
+    end
+    return NAME_CAPABILITY.UNVERIFIABLE
+end
+
+-- Brings one plate's name to its decision (section 4.4). Does nothing, and reads
+-- nothing, unless colours are active (audit finding 2c). Only an outcome that leaves
+-- a record held sets namePainted: Painted, or Unchanged.
+local function applyNameColour(plate, decision)
+    if not nameColoursActive() then
+        return NAME_OUTCOME.LEFT_ALONE
+    end
+    if plate.nameDecision ~= decision then
+        plate.nameDecision = decision
+        bump(state.counters, "nameColourDecidedTo" .. decision)
+    end
+    if not isPaint(decision) then
+        if releaseNameColour(plate) then
+            return NAME_OUTCOME.RELEASED
+        end
+        return NAME_OUTCOME.LEFT_ALONE
+    end
+
+    if state.nameColourCapability == NAME_CAPABILITY.NOT_YET_PROBED then
+        local verdict = probeNameColour(plate, decision)
+        noteNameCapability(verdict)
+        if verdict == NAME_CAPABILITY.VERIFIED then
+            return NAME_OUTCOME.PAINTED
+        end
+        if verdict == NAME_CAPABILITY.UNVERIFIABLE then
+            return NAME_OUTCOME.UNREADABLE
+        end
+        return NAME_OUTCOME.REFUSED
+    end
+
+    local region = plate.nameRegion
+    if ns.StyleLedger.HasRecord(state.ledger, region, "NameColour") then
+        local outcome = reassertNameColour(plate, decision)
+        if outcome == NAME_OUTCOME.REFUSED then
+            noteNameCapability(NAME_CAPABILITY.REFUSED)
+        end
+        return outcome
+    end
+
+    local ok, reason = ns.StyleLedger.Apply(state.ledger, region, "NameColour", nameColourOf(decision))
+    if ok then
+        plate.namePainted = decision
+        bump(state.counters, "nameColourWrites")
+        return NAME_OUTCOME.PAINTED
+    end
+    if reason == "WRITE_REFUSED" then
+        bump(state.counters, "nameColourWriteFailed")
+        noteNameCapability(NAME_CAPABILITY.REFUSED)
+        return NAME_OUTCOME.REFUSED
+    end
+    -- The original did not read. Not a refusal: nothing written, no record, the
+    -- capability kept, and the next pass tries again (audit finding 1).
+    bump(state.counters, "nameColourReadsWithheld")
+    return NAME_OUTCOME.UNREADABLE
+end
+
+-- One plate's decision and paint, for every caller but the hook.
+local function colourPlateName(plate, anchor)
+    if not nameColoursActive() then
+        return NAME_OUTCOME.LEFT_ALONE
+    end
+    return applyNameColour(plate, decideNameColour(plate, anchor))
+end
+
+-- The same, isolated: one plate's fault never stops the others (Phase 9 section 4.6).
+-- A faulted name is handed back to Blizzard and tried afresh next pass.
+local function colourPlateNameIsolated(plate, anchor)
+    local ok, outcome = ns.Isolation.Call(colourPlateName, plate, anchor)
+    if ok then
+        return outcome
+    end
+    bump(state.counters, "nameColourFaults")
+    pcall(releaseNameColour, plate)
+    plate.nameDecision = nil
+    ns.Diagnostics.NoteFault(FEATURE_ID, outcome)
+    ns.Log.OnceError("plates:namefault",
+        "a nameplate's name colour faulted and was handed back to the game's colour; /pa diag shows the message")
+    return nil
+end
+
+-- Blizzard's name update, followed in the same call (section 4.3). O(1): one table
+-- lookup, then at most one read and one write. Raid and party frames pass through
+-- here on every health tick and return at the lookup with nothing read, written or
+-- flagged. No unit read and no style read: eligibility is the attach's and the
+-- sweep's to judge.
+local function onNameUpdated(updatedFrame)
+    if not state.enabled or not state.playerNameColours
+        or state.nameColourCapability ~= NAME_CAPABILITY.VERIFIED then
+        return
+    end
+    local plate = updatedFrame and state.byUnitFrame[updatedFrame]
+    if not plate or not plate.namePainted then
+        return
+    end
+    if reassertNameColour(plate, plate.namePainted) == NAME_OUTCOME.REFUSED then
+        noteNameCapability(NAME_CAPABILITY.REFUSED)
+    end
+end
+
+-- Every player plate not waiting for a faction flush (section 5.3). A flush covering
+-- every plate skips the whole pass, so a change the sweep finds is one no event
+-- announced.
+local function colourAllPlayerNames(anchor)
+    local work = state.factionWork
+    if work.all then
+        return
+    end
+    for _, plate in pairs(state.plates) do
+        if plate.identity ~= IDENTITY.NOT_A_PLAYER and not work.plates[plate] then
+            local before = plate.nameDecision
+            colourPlateNameIsolated(plate, anchor)
+            local after = plate.nameDecision
+            if before ~= nil and after ~= nil and after ~= before then
+                bump(state.counters, "nameColourChangedBySweep")
+            end
+        end
+    end
+end
+
 -- Lifecycle -------------------------------------------------------------------
 
 local function untrackPlate(frame)
@@ -1100,6 +1562,12 @@ local function untrackPlate(frame)
     -- Phase 20 section 8.5: nothing to write back. The plate's next occupancy runs
     -- Blizzard's UpdateAnchors before anything is drawn.
     plate.nameAligned = false
+    -- Phase 22 section 4.5: the name's record goes back with the bar's, before it
+    -- drops, so a recycled plate never starts with our colour. unstylePlate stays
+    -- bar-only: rescopePlate calls it, and the name colour does not follow that scope.
+    releaseNameColour(plate)
+    plate.nameDecision = nil
+    state.factionWork.plates[plate] = nil
     -- Phase 17 section 4.1. Same moment and same reason as the guild label: a
     -- marker left on a recycled plate would sit over the wrong mob.
     if ns.QuestMarkers then
@@ -1166,7 +1634,17 @@ local function trackPlate(unitToken)
     -- OnUnitSet re-lays the name out after the setup-time hooks have returned, so the
     -- hooks cannot be the attach path; this handler, run after Blizzard's driver, sees
     -- the final layout and showOnlyName decided.
-    alignPlateName(plate, readNameAnchorStyle())
+    -- Phase 22 section 3.4 (audit finding 5): one anchor read, made only when alignment
+    -- or player name colours want it, and shared by both.
+    local coloursOn = nameColoursActive()
+    local anchor = (state.nameAlignLeft or coloursOn) and readNameAnchor() or nil
+    alignPlateName(plate, styleAboveFrom(anchor))
+    -- Phase 22 section 5.1: the attach decides the name, for the reason it judges the
+    -- alignment. Before the UNREACHABLE return: such a plate has no name region, and
+    -- the decision says so (NoNameRegion).
+    if coloursOn then
+        colourPlateNameIsolated(plate, anchor)
+    end
 
     if plate.scope == SCOPE.UNREACHABLE then
         ns.Log.Once("plates:unreachable",
@@ -1290,7 +1768,11 @@ local function reassertPlate(plate)
     reassertBarHeight(plate)
     -- Phase 20 section 8.3: outside it for the same reason. A layout pass on an
     -- attached plate reaches here in the same frame as Blizzard's reset.
-    alignPlateName(plate, readNameAnchorStyle())
+    -- Phase 22 audit finding 5: the anchor is read only while alignment is on. The
+    -- name colour is not re-asserted here; it has its own hook (section 4.3).
+    if state.nameAlignLeft then
+        alignPlateName(plate, styleAboveFrom(readNameAnchor()))
+    end
 
     if plate.scope ~= SCOPE.IN or not plate.styleApplied then
         return
@@ -1338,6 +1820,79 @@ local function cedeFaultedPlate(plate)
     state.contested[plate] = nil
 end
 
+-- UNIT_FACTION, a frame later (Phase 22 section 5.2) ---------------------------
+--
+-- The handler marks and schedules; this settles the marked plates in our own
+-- execution. The rescope and the name step are isolated apart (audit finding 6b): a
+-- rescope fault is the bar's and cedes the bar, a name fault is the name's and
+-- releases the name, and neither costs the other.
+
+local function settleFactionPlate(plate, anchor)
+    local ok, fault = ns.Isolation.Call(rescopePlate, plate)
+    if not ok then
+        bump(state.counters, "plateFaults")
+        cedeFaultedPlate(plate)
+        ns.Diagnostics.NoteFault(FEATURE_ID, fault)
+        ns.Log.OnceError("plates:fault",
+            "a nameplate faulted and was handed back to Blizzard's colour; /pa diag shows the message")
+    end
+    if anchor then
+        colourPlateNameIsolated(plate, anchor)
+    end
+end
+
+-- A no-op once a disable has moved the generation on, so a flush scheduled before it
+-- does nothing (Phase 21 audit finding 8's lesson).
+local function flushFactionChanges(generation)
+    local work = state.factionWork
+    if generation ~= work.generation or not state.enabled then
+        return
+    end
+    local all, named = work.all, work.plates
+    work.all, work.plates, work.scheduled = false, {}, false
+    bump(state.counters, "factionFlushes")
+    if all then
+        bump(state.counters, "factionFlushAll")
+    end
+    -- One anchor read for the whole flush, and none unless colours are active (audit
+    -- finding 6a). A stand-down part-way leaves the rest with nothing to do: each
+    -- plate's name step checks "active" before it reads.
+    local anchor = nameColoursActive() and readNameAnchor() or nil
+    if all then
+        for _, plate in pairs(state.plates) do
+            settleFactionPlate(plate, anchor)
+        end
+        return
+    end
+    for plate in pairs(named) do
+        if state.plates[plate.frame] == plate then
+            settleFactionPlate(plate, anchor)
+        end
+    end
+end
+
+-- Without C_Timer.After the flush runs at once, inside the event, and one line says
+-- so: SettingsPanel's trade (Features/SettingsPanel.lua:360-373), because a faction
+-- change that never takes effect is worse than one handled inline (audit finding 6c).
+-- Deliberately not cached, as there.
+local function scheduleFactionFlush()
+    local work = state.factionWork
+    if work.scheduled then
+        return
+    end
+    work.scheduled = true
+    local generation = work.generation
+    if not (C_Timer and type(C_Timer.After) == "function") then
+        ns.Log.Once("plates:nofactiondefer",
+            "this client has no C_Timer.After, so a faction change is handled inside the event rather than a frame later")
+        flushFactionChanges(generation)
+        return
+    end
+    C_Timer.After(0, function()
+        flushFactionChanges(generation)
+    end)
+end
+
 -- One plate's fault never stops the sweep (Phase 9 section 4.6). Before Phase 9 a
 -- single plate's error ended every sweep, and four re-assert paths kept the stale
 -- colours of the plates it never reached. The message goes to the diagnostics log
@@ -1354,9 +1909,17 @@ local function sweep()
     state.reassertPending = false
 
     local allies, allyCount = Threat.Allies()
+    -- Phase 22 section 5.3: one anchor read for the pass, and none unless alignment or
+    -- player name colours want it.
+    local coloursOn = nameColoursActive()
+    local anchor = (state.nameAlignLeft or coloursOn) and readNameAnchor() or nil
     -- Phase 20 section 8.3: every plate, outside the scope filter below, for the
     -- paths that re-lay a name out after the hooks have run.
-    alignAllPlateNames()
+    alignAllPlateNames(anchor)
+    -- Phase 22 section 5.3: every player plate, outside the scope filter too.
+    if coloursOn then
+        colourAllPlayerNames(anchor)
+    end
     for _, plate in pairs(state.plates) do
         if plate.scope == SCOPE.IN then
             local ok, fault = ns.Isolation.Call(paintPlate, plate, allies, allyCount)
@@ -1454,6 +2017,34 @@ local function installReassertHook()
         "no nameplate update path available to hook; re-assertion falls back to the sweep alone")
 end
 
+-- Phase 22 section 4.3: one more post-hook, on the function that writes the name's
+-- colour, with a body of its own. Running reassertPlate from it would triple a health
+-- tick's work: UpdateHealth -> UpdateName -> UpdateHealthColor passes three hooks.
+-- Installed at most once, like the others.
+local function installNameHook()
+    if state.nameHookInstalled or not hooksecurefunc then
+        return
+    end
+    if type(_G[NAME_HOOK_TARGET]) ~= "function" then
+        return
+    end
+    if pcall(hooksecurefunc, NAME_HOOK_TARGET, onNameUpdated) then
+        state.nameHookInstalled = true
+        state.hookTargets = state.hookTargets and (state.hookTargets .. ", " .. NAME_HOOK_TARGET)
+            or NAME_HOOK_TARGET
+    end
+end
+
+-- Said only while the setting is on, so a user who never turns it on hears nothing.
+-- Without the hook the sweep re-asserts every pass, a quarter second behind.
+local function noteMissingNameHook()
+    if state.playerNameColours and not state.nameHookInstalled then
+        ns.Log.Once("plates:nonamehook", format(
+            "%s is missing on this client, so a player's name can show the game's colour for up to a quarter second after each update",
+            NAME_HOOK_TARGET))
+    end
+end
+
 -- Signals ---------------------------------------------------------------------
 
 local function onGuildUpdate()
@@ -1485,13 +2076,24 @@ local function onPlateRemoved(unitToken)
     end
 end
 
+-- UNIT_FACTION (Phase 22 section 5.2): mark and schedule, nothing more; the rescope
+-- and the name decision run a frame later. "player" names every plate, because your
+-- own PvP state changes who is attackable; Blizzard's plate listens for it too
+-- (premise 105). A token no tracked plate carries changes nothing.
 local function onUnitFaction(unitToken)
-    if not unitToken then
+    if not unitToken or not state.enabled then
+        return
+    end
+    local work = state.factionWork
+    if unitToken == "player" then
+        work.all = true
+        scheduleFactionFlush()
         return
     end
     for _, plate in pairs(state.plates) do
         if plate.unitToken == unitToken then
-            rescopePlate(plate)
+            work.plates[plate] = true
+            scheduleFactionFlush()
             return
         end
     end
@@ -1507,7 +2109,7 @@ local SIGNALS = {
     { event = "NAME_PLATE_UNIT_REMOVED", handler = onPlateRemoved, required = false,
       lost = "plates are released by the stale sweep instead, up to one sweep late" },
     { event = "UNIT_FACTION", handler = onUnitFaction, required = false,
-      lost = "a unit changing attackability is missed until its plate is replaced" },
+      lost = "a unit changing attackability is missed until its plate is replaced, and a player's name colour until the next sweep" },
     { event = "PLAYER_ENTERING_WORLD", handler = onEnteringWorld, required = false,
       lost = "stale plates are released by the interval sweep instead" },
     -- Phase 15. Not required: without it a guild label is correct when the plate
@@ -1573,6 +2175,9 @@ local function enable(config)
     end
 
     installReassertHook()
+    -- Phase 22 section 4.3.
+    installNameHook()
+    noteMissingNameHook()
     startTicker()
 
     return true
@@ -1582,6 +2187,10 @@ end
 -- have created the ledger or tracked anything.
 local function disable()
     state.enabled = false
+    -- Phase 22 section 5.2: a flush scheduled before this does nothing.
+    local work = state.factionWork
+    work.generation = work.generation + 1
+    work.plates, work.all, work.scheduled = {}, false, false
     stopTicker()
     stopContesting()
 
@@ -1594,6 +2203,9 @@ local function disable()
     -- A disable is the cheapest moment to let the probe run again, and the only way
     -- back to an unprobed state inside a UI load.
     state.alignCapability = ALIGN_CAPABILITY.NOT_YET_PROBED
+    -- Phase 22 section 4.5, at the same moment and for the same reasons.
+    restoreNameColours()
+    state.nameColourCapability = NAME_CAPABILITY.NOT_YET_PROBED
 
     releaseAllPlateLabels()
     -- Patch 02 section 4.6: decided again at the next enable.
@@ -1637,6 +2249,41 @@ local function onConfigChanged(config, changedKey)
         end
         for _, plate in pairs(state.plates) do
             applyPlateLabel(plate)
+        end
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    -- Phase 22 section 5.1 (audit finding 7). On: while active, every tracked plate at
+    -- once, against one anchor read; while stood down, nothing at all. Off: handed back,
+    -- with the capability left as it is, so off and on again never re-probes.
+    if changedKey == "playerNameColours" then
+        if state.playerNameColours then
+            noteMissingNameHook()
+            if nameColoursActive() then
+                local anchor = readNameAnchor()
+                for _, plate in pairs(state.plates) do
+                    colourPlateNameIsolated(plate, anchor)
+                end
+            end
+        else
+            restoreNameColours()
+        end
+        return ns.CONFIG_RESULT.APPLIED
+    end
+
+    -- A colour changed: while Verified, every painted name repaints in the new colour.
+    -- NotYetProbed has painted nothing, and a stand-down holds no record. The first
+    -- refusal stops the loop and stands the setting down. Returns before the bar
+    -- palette's reset below, which these keys have nothing to do with.
+    if changedKey == "nameColourCanFight" or changedKey == "nameColourOtherPlayer" then
+        if nameColoursActive() and state.nameColourCapability == NAME_CAPABILITY.VERIFIED then
+            for _, plate in pairs(state.plates) do
+                if plate.namePainted
+                    and reassertNameColour(plate, plate.namePainted) == NAME_OUTCOME.REFUSED then
+                    noteNameCapability(NAME_CAPABILITY.REFUSED)
+                    break
+                end
+            end
         end
         return ns.CONFIG_RESULT.APPLIED
     end
@@ -1716,6 +2363,11 @@ defaultSettings.guildFontSize = ns.GUILD_FONT_DEFAULT
 -- Phase 20: off by default, for Phase 15's reason (section 10.2).
 defaultSettings.npcRoles = false
 defaultSettings.nameAlignLeft = false
+-- Phase 22 section 8.2: off by default (D7), for Phase 20's reason: it changes how
+-- Blizzard's own plate looks.
+defaultSettings.playerNameColours = false
+defaultSettings.nameColourCanFight = NAME_COLOUR_DEFAULTS.CanFight
+defaultSettings.nameColourOtherPlayer = NAME_COLOUR_DEFAULTS.OtherPlayer
 -- Phase 19's rarityRings, rarityRingSize and rarityRingOffsetX/Y are gone with the
 -- ring (Patch 02 section 5). ConfigStore prunes them from a stored config at
 -- hydration, once, because no default claims them any more (section 5.4).
@@ -1769,6 +2421,11 @@ ns.Registry.Register(FEATURE_ID, {
         },
         -- Orders 7 to 10 were Phase 19's ring controls, retired by Patch 02 section 5:
         -- Blizzard's own rarity icon is the setting now (Options > Nameplates).
+        -- Phase 22 section 8.2 takes order 7, beside the other name toggles.
+        playerNameColours = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour player names", order = 7,
+            description = "Red: a player who can fight you, or whom you can fight: an enemy with PvP on, a battleground enemy, a duel. Light orange: every other player. NPC names stay the game's. Not on the Large and Block styles, where the name sits inside the bar.",
+        },
         yieldSelectedTarget = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 11,
             description = "Stops contesting the bar colour on the unit you have selected. Turn this on if that plate flickers.",
@@ -1800,6 +2457,18 @@ ns.Registry.Register(FEATURE_ID, {
             kind = ns.ConfigSchema.KIND.COLOUR, label = "Hostile, and attacking neither", order = 17,
             group = "Colours, highest priority first",
         },
+        -- Phase 22 section 8.2. After the threat colours, under a header of their own: a
+        -- key with no group does not close the header above it, so an earlier order would
+        -- put "Leave your target's colour alone" under this one.
+        nameColourCanFight = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Can fight you, or you them", order = 18,
+            group = "Player names",
+            groupDescription = "Used by \"Colour player names\".",
+        },
+        nameColourOtherPlayer = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Every other player", order = 19,
+            group = "Player names",
+        },
         -- Not curated: a frame-rate decision dressed as a preference.
         sweepInterval = {
             kind = ns.ConfigSchema.KIND.NUMBER, label = "Sweep interval",
@@ -1821,6 +2490,47 @@ ns.Nameplates = {
         local out = {}
         for _, plate in pairs(state.plates) do
             out[#out + 1] = plate
+        end
+        return out
+    end,
+
+    -- Phase 22 section 7.3. The two draw-distance settings as the client reports them,
+    -- for /pa plates only: never a sweep, a hook, an event or Inspect. Reads only;
+    -- nothing here can write a CVar. Each field is its own read, because
+    -- GetCVarInfo's returns differ in type.
+    DistanceSettings = function()
+        local out = {}
+        local reader = C_CVar and C_CVar.GetCVarInfo
+        local entries = ns.PLATE_DISTANCE_CVARS or {}
+        for index = 1, #entries do
+            local entry = entries[index]
+            local setting = { name = entry.name, label = entry.label, readable = false }
+            local valueKind, value = ClientRead.CallNth(reader, 1, "string", entry.name)
+            if valueKind == PLAIN then
+                setting.readable = true
+                setting.yards = tonumber(value)
+                local defaultKind, defaultValue = ClientRead.CallNth(reader, 2, "string", entry.name)
+                if defaultKind == PLAIN then
+                    setting.defaultYards = tonumber(defaultValue)
+                end
+                local accountKind, perAccount = ClientRead.CallNth(reader, 3, "boolean", entry.name)
+                if accountKind == PLAIN then
+                    setting.perAccount = perAccount
+                end
+                local characterKind, perCharacter = ClientRead.CallNth(reader, 4, "boolean", entry.name)
+                if characterKind == PLAIN then
+                    setting.perCharacter = perCharacter
+                end
+                local lockedKind, locked = ClientRead.CallNth(reader, 5, "boolean", entry.name)
+                if lockedKind == PLAIN then
+                    setting.locked = locked
+                end
+                local secureKind, secure = ClientRead.CallNth(reader, 6, "boolean", entry.name)
+                if secureKind == PLAIN then
+                    setting.secure = secure
+                end
+            end
+            out[#out + 1] = setting
         end
         return out
     end,
@@ -1915,6 +2625,45 @@ ns.Nameplates = {
             nameAlignSkippedNameOnly = counters.nameAlignSkippedNameOnly or 0,
             nameAlignSkippedNoRegion = counters.nameAlignSkippedNoRegion or 0,
             nameAlignWriteFailed = counters.nameAlignWriteFailed or 0,
+            -- Phase 22 section 9. red and lightOrange count namePainted: what is on
+            -- screen, not what was meant. left counts each Leave reason by decision.
+            playerNames = (function()
+                local red, lightOrange, recorded, left = 0, 0, 0, {}
+                for _, plate in pairs(state.plates) do
+                    if plate.namePainted == NAME_VERDICT.CAN_FIGHT then
+                        red = red + 1
+                    elseif plate.namePainted == NAME_VERDICT.OTHER_PLAYER then
+                        lightOrange = lightOrange + 1
+                    end
+                    -- Names holding a ledger record: what disable or off would restore.
+                    if state.ledger and plate.nameRegion
+                        and ns.StyleLedger.HasRecord(state.ledger, plate.nameRegion, "NameColour") then
+                        recorded = recorded + 1
+                    end
+                    local decision = plate.nameDecision
+                    if decision and not isPaint(decision) then
+                        left[decision] = (left[decision] or 0) + 1
+                    end
+                end
+                local nameCounters = {}
+                for key, value in pairs(counters) do
+                    if type(key) == "string" and type(value) == "number"
+                        and (key:find("^nameColour") or key:find("^factionFlush")) then
+                        nameCounters[key] = value
+                    end
+                end
+                return {
+                    on = state.playerNameColours,
+                    capability = state.nameColourCapability,
+                    hookInstalled = state.nameHookInstalled,
+                    red = red,
+                    lightOrange = lightOrange,
+                    recorded = recorded,
+                    left = left,
+                    flushPending = state.factionWork.scheduled,
+                    counters = nameCounters,
+                }
+            end)(),
             guildReadsPlain = counters.guildReadsPlain or 0,
             guildReadsNoGuild = counters.guildReadsNoGuild or 0,
             guildReadsWithheld = counters.guildReadsWithheld or 0,

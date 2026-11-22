@@ -129,9 +129,10 @@ if HARNESS_SESSION == "phase12" then
         end
     end
     -- Phase 21 section 16.1: with rare alerts on the page, each feature gets a header and
-    -- the colour group sits inside the first.
+    -- the colour group sits inside the first. Phase 22 section 14.1: the player-name
+    -- pickers bring a second group, after the threat colours.
     check("A3 nameplates: one header per feature, the colour group inside the first",
-        headerNames(plates) == "Nameplates,Colours, highest priority first,Rare alerts",
+        headerNames(plates) == "Nameplates,Colours, highest priority first,Player names,Rare alerts",
         headerNames(plates))
     -- Phase 21 audit finding 12: select the colour group's header by name. The loop used
     -- to keep the LAST header on the page, which is now the "Rare alerts" feature header.
@@ -151,10 +152,15 @@ if HARNESS_SESSION == "phase12" then
         and intro.name:find("PersonalAddon " .. ns.VERSION, 1, true) ~= nil and intro.tooltip == "/pa help lists every command.",
         intro and intro.name)
 
-    -- A4: the colours in verdict priority (Phase 11 section 2.3).
+    -- A4: the colours in verdict priority (Phase 11 section 2.3). Phase 22 section 14.1:
+    -- only the swatches between the colour group's header and the next header, so the
+    -- player-name pickers after it do not move this check; tests22 G3 checks those.
     local swatches = {}
+    local inThreatGroup = false
     for _, initializer in ipairs(plates.layout.initializers) do
-        if initializer.kind == "swatch" then
+        if initializer.kind == "header" then
+            inThreatGroup = (initializer.name == "Colours, highest priority first")
+        elseif initializer.kind == "swatch" and inThreatGroup then
             swatches[#swatches + 1] = initializer.name
         end
     end

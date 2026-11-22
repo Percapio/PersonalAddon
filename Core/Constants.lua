@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.11.0-phase21"
+ns.VERSION = "1.12.0-phase22"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -537,3 +537,13 @@ ns.RARE_ALERT_ATLAS = {
 }
 -- How many alerts /pa rares lists.
 ns.RARE_ALERT_RECENT = 5
+
+-- Phase 22 (Architecture/20261122-Phase22.md) --------------------------------------------
+
+-- The two draw-distance settings /pa plates reports, in the order printed (section 7.3).
+-- Both are secure on Forever, so they are read and never written; the readout is the
+-- only place an unlock would show, because the secure flag is not in the UI export.
+ns.PLATE_DISTANCE_CVARS = {
+    { name = "nameplateMaxDistance", label = "all plates" },
+    { name = "nameplatePlayerMaxDistance", label = "players" },
+}

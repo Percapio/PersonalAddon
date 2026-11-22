@@ -1,15 +1,18 @@
 {
- "acceptedAt": 1794543970.6403282,
+ "acceptedAt": 1795378608.5238354,
  "acceptedBy": "AcceptedAfterReview",
  "client": {
-  "binaryModifiedAt": 1794540266.4076688,
-  "build": "1.60.1.70938"
+  "binaryModifiedAt": 1795216917.889636,
+  "build": "1.60.1.71037"
  },
- "exportDigest": "4843be41be3643b95b2164669c0849146927fc3fea66a33852cc3b670662fc5d",
- "exportedAt": 1794542303.743567,
- "report": "2026-11-12-1.60.1.70938.md",
+ "exportDigest": "663eaeaad23d99a4ec9cec2220802fd8b25936c3d67fce25302aa9467dccaee8",
+ "exportedAt": 1795371967.7784457,
+ "report": "2026-11-22-1.60.1.71037.md",
  "surfaceDefinitions": {
   "C_CVar.GetCVar": [
+   "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
+  ],
+  "C_CVar.GetCVarInfo": [
    "Blizzard_APIDocumentationGenerated/CVarDocumentation.lua"
   ],
   "C_CVar.SetCVar": [
@@ -42,6 +45,12 @@
   "C_DamageMeter.IsDamageMeterAvailable": [
    "Blizzard_APIDocumentationGenerated/DamageMeterDocumentation.lua"
   ],
+  "C_Item.GetItemCount": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
+  "C_Item.GetItemIconByID": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
   "C_Item.GetItemInfo": [
    "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
   ],
@@ -55,6 +64,9 @@
    "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
   ],
   "C_Item.GetItemSpell": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
+  ],
+  "C_Item.GetWeaponEnchantInfo": [
    "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
   ],
   "C_MerchantFrame.GetNumJunkItems": [
@@ -102,6 +114,9 @@
   "C_SkillInfo.GetSkillLineInfoByID": [
    "Blizzard_APIDocumentationGenerated/SkillInfoDocumentation.lua"
   ],
+  "C_Sound.PlaySound": [
+   "Blizzard_APIDocumentationGenerated/SoundDocumentation.lua"
+  ],
   "C_Spell.GetSpellInfo": [
    "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
   ],
@@ -114,6 +129,9 @@
   "C_Spell.GetSpellTexture": [
    "Blizzard_APIDocumentationGenerated/SpellDocumentation.lua"
   ],
+  "C_Texture.GetAtlasInfo": [
+   "Blizzard_APIDocumentationGenerated/TextureUtilsDocumentation.lua"
+  ],
   "C_Timer.After": [
    "Blizzard_APIDocumentationGenerated/UITimerDocumentation.lua"
   ],
@@ -125,6 +143,9 @@
   ],
   "C_TooltipInfo.GetItemByID": [
    "Blizzard_APIDocumentationGenerated/TooltipInfoDocumentation.lua"
+  ],
+  "C_UnitAuras.GetUnitAuras": [
+   "Blizzard_APIDocumentationGenerated/UnitAuraDocumentation.lua"
   ],
   "CursorHasItem": [
    "Blizzard_APIDocumentationGenerated/GameCursorDocumentation.lua"
@@ -333,6 +354,9 @@
   "SimpleObjectAPI:GetDebugName": [
    "Blizzard_APIDocumentationGenerated/SimpleObjectAPIDocumentation.lua"
   ],
+  "SimpleRegionAPI:GetVertexColor": [
+   "Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua"
+  ],
   "SimpleRegionAPI:SetAlpha": [
    "Blizzard_APIDocumentationGenerated/SimpleRegionAPIDocumentation.lua"
   ],
@@ -408,7 +432,13 @@
   "SimpleStatusBarAPI:SetValue": [
    "Blizzard_APIDocumentationGenerated/SimpleStatusBarAPIDocumentation.lua"
   ],
+  "SimpleTextureBaseAPI:SetAtlas": [
+   "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
+  ],
   "SimpleTextureBaseAPI:SetColorTexture": [
+   "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
+  ],
+  "SimpleTextureBaseAPI:SetDesaturated": [
    "Blizzard_APIDocumentationGenerated/SimpleTextureBaseAPIDocumentation.lua"
   ],
   "SimpleTextureBaseAPI:SetTexCoord": [
@@ -478,6 +508,9 @@
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "UnitThreatSituation": [
+   "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
+  ],
+  "UnitUsesAmmo": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
   "canaccesstable": [
@@ -552,6 +585,9 @@
   "event PLAYER_ENTERING_WORLD": [
    "Blizzard_APIDocumentationGenerated/SystemDocumentation.lua"
   ],
+  "event PLAYER_EQUIPMENT_CHANGED": [
+   "Blizzard_APIDocumentationGenerated/PaperDollInfoDocumentation.lua"
+  ],
   "event PLAYER_GUILD_UPDATE": [
    "Blizzard_APIDocumentationGenerated/GuildInfoDocumentation.lua"
   ],
@@ -573,6 +609,9 @@
   "event QUEST_LOG_UPDATE": [
    "Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua"
   ],
+  "event UNIT_AURA": [
+   "Blizzard_APIDocumentationGenerated/UnitAuraDocumentation.lua"
+  ],
   "event UNIT_DISPLAYPOWER": [
    "Blizzard_APIDocumentationGenerated/UnitDocumentation.lua"
   ],
@@ -587,6 +626,9 @@
   ],
   "event UPDATE_MACROS": [
    "Blizzard_APIDocumentationGenerated/UIMacrosDocumentation.lua"
+  ],
+  "event WEAPON_ENCHANT_CHANGED": [
+   "Blizzard_APIDocumentationGenerated/ItemDocumentation.lua"
   ],
   "issecrettable": [
    "Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
@@ -616,6 +658,9 @@
    "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"
   ],
   "lua CompactUnitFrame_UpdateHealthColor": [
+   "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"
+  ],
+  "lua CompactUnitFrame_UpdateName": [
    "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua"
   ],
   "lua ContainerFrameCombinedBags": [
@@ -705,6 +750,9 @@
   "lua SELECTED_CHAT_FRAME": [
    "Blizzard_ChatFrameBase/Mainline/FloatingChatFrame.lua"
   ],
+  "lua SOUNDKIT": [
+   "Blizzard_SharedXML/Mainline/SoundKitConstants.lua"
+  ],
   "lua SetCVar": [
    "Blizzard_SharedXMLBase/CvarUtil.lua"
   ],
@@ -739,6 +787,25 @@
    "Arguments.name.Type": "\"cstring\"",
    "Returns.value.Nilable": "true",
    "Returns.value.Type": "\"string\"",
+   "SecretArguments": "\"NotAllowed\""
+  },
+  "C_CVar.GetCVarInfo": {
+   "Arguments.name.Nilable": "false",
+   "Arguments.name.Type": "\"cstring\"",
+   "Returns.defaultValue.Nilable": "false",
+   "Returns.defaultValue.Type": "\"cstring\"",
+   "Returns.isLockedFromUser.Nilable": "false",
+   "Returns.isLockedFromUser.Type": "\"bool\"",
+   "Returns.isReadOnly.Nilable": "false",
+   "Returns.isReadOnly.Type": "\"bool\"",
+   "Returns.isSecure.Nilable": "false",
+   "Returns.isSecure.Type": "\"bool\"",
+   "Returns.isStoredServerAccount.Nilable": "false",
+   "Returns.isStoredServerAccount.Type": "\"bool\"",
+   "Returns.isStoredServerCharacter.Nilable": "false",
+   "Returns.isStoredServerCharacter.Type": "\"bool\"",
+   "Returns.value.Nilable": "false",
+   "Returns.value.Type": "\"cstring\"",
    "SecretArguments": "\"NotAllowed\""
   },
   "C_CVar.SetCVar": {
@@ -830,6 +897,32 @@
    "Returns.isAvailable.Nilable": "false",
    "Returns.isAvailable.Type": "\"bool\""
   },
+  "C_Item.GetItemCount": {
+   "Arguments.includeAccountBank.Default": "false",
+   "Arguments.includeAccountBank.Nilable": "false",
+   "Arguments.includeAccountBank.Type": "\"bool\"",
+   "Arguments.includeBank.Default": "false",
+   "Arguments.includeBank.Nilable": "false",
+   "Arguments.includeBank.Type": "\"bool\"",
+   "Arguments.includeReagentBank.Default": "false",
+   "Arguments.includeReagentBank.Nilable": "false",
+   "Arguments.includeReagentBank.Type": "\"bool\"",
+   "Arguments.includeUses.Default": "false",
+   "Arguments.includeUses.Nilable": "false",
+   "Arguments.includeUses.Type": "\"bool\"",
+   "Arguments.itemInfo.Nilable": "false",
+   "Arguments.itemInfo.Type": "\"ItemInfo\"",
+   "Returns.count.Nilable": "false",
+   "Returns.count.Type": "\"number\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Item.GetItemIconByID": {
+   "Arguments.itemInfo.Nilable": "false",
+   "Arguments.itemInfo.Type": "\"ItemInfo\"",
+   "Returns.icon.Nilable": "true",
+   "Returns.icon.Type": "\"fileID\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "C_Item.GetItemInfo": {
    "Arguments.itemInfo.Nilable": "false",
    "Arguments.itemInfo.Type": "\"ItemInfo\"",
@@ -920,6 +1013,14 @@
    "Returns.spellID.Type": "\"number\"",
    "Returns.spellName.Nilable": "false",
    "Returns.spellName.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_Item.GetWeaponEnchantInfo": {
+   "Arguments.weaponSlot.Nilable": "false",
+   "Arguments.weaponSlot.Type": "\"WeaponSlot\"",
+   "Returns.enchants.InnerType": "\"WeaponEnchantInfo\"",
+   "Returns.enchants.Nilable": "false",
+   "Returns.enchants.Type": "\"table\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "C_MerchantFrame.GetNumJunkItems": {
@@ -1024,6 +1125,29 @@
    "Returns.skillLineAttributes.Type": "\"SkillLineAttributes\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "C_Sound.PlaySound": {
+   "Arguments.forceNoDuplicates.Default": "false",
+   "Arguments.forceNoDuplicates.Nilable": "false",
+   "Arguments.forceNoDuplicates.Type": "\"bool\"",
+   "Arguments.overridePriority.Nilable": "true",
+   "Arguments.overridePriority.Type": "\"number\"",
+   "Arguments.runFinishCallback.Default": "false",
+   "Arguments.runFinishCallback.Nilable": "false",
+   "Arguments.runFinishCallback.Type": "\"bool\"",
+   "Arguments.soundKitID.Nilable": "false",
+   "Arguments.soundKitID.Type": "\"number\"",
+   "Arguments.uiSoundSubType.Default": "\"g_defaultSI3UISoundSubTypeForLua\"",
+   "Arguments.uiSoundSubType.Nilable": "false",
+   "Arguments.uiSoundSubType.Type": "\"UISoundSubType\"",
+   "Arguments.volumeOverride.Nilable": "true",
+   "Arguments.volumeOverride.Type": "\"number\"",
+   "MayReturnNothing": "true",
+   "Returns.soundHandle.Nilable": "false",
+   "Returns.soundHandle.Type": "\"SoundHandle\"",
+   "Returns.success.Nilable": "false",
+   "Returns.success.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "C_Spell.GetSpellInfo": {
    "Arguments.spellIdentifier.Nilable": "false",
    "Arguments.spellIdentifier.Type": "\"SpellIdentifier\"",
@@ -1060,6 +1184,14 @@
    "Returns.originalIconID.Nilable": "false",
    "Returns.originalIconID.Type": "\"fileID\"",
    "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "C_Texture.GetAtlasInfo": {
+   "Arguments.atlas.Nilable": "false",
+   "Arguments.atlas.Type": "\"textureAtlas\"",
+   "MayReturnNothing": "true",
+   "Returns.info.Nilable": "false",
+   "Returns.info.Type": "\"AtlasInfo\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "C_Timer.After": {
    "Arguments.callback.Nilable": "false",
@@ -1100,6 +1232,27 @@
    "MayReturnNothing": "true",
    "Returns.data.Nilable": "false",
    "Returns.data.Type": "\"TooltipData\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
+  "C_UnitAuras.GetUnitAuras": {
+   "Arguments.filter.Nilable": "false",
+   "Arguments.filter.Type": "\"AuraFilters\"",
+   "Arguments.maxCount.Nilable": "true",
+   "Arguments.maxCount.Type": "\"number\"",
+   "Arguments.sortDirection.Default": "\"Normal\"",
+   "Arguments.sortDirection.Nilable": "false",
+   "Arguments.sortDirection.Type": "\"UnitAuraSortDirection\"",
+   "Arguments.sortRule.Default": "\"Unsorted\"",
+   "Arguments.sortRule.Nilable": "false",
+   "Arguments.sortRule.Type": "\"UnitAuraSortRule\"",
+   "Arguments.unit.NeverSecret": "true",
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitTokenRestrictedForAddOns\"",
+   "RequiresUnitAuraAccess": "true",
+   "Returns.auras.ConditionalSecretContents": "true",
+   "Returns.auras.InnerType": "\"AuraData\"",
+   "Returns.auras.Nilable": "false",
+   "Returns.auras.Type": "\"table\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
   "CursorHasItem": {
@@ -1608,6 +1761,18 @@
    "Returns.debugName.Type": "\"string\"",
    "SecretArguments": "\"AllowedWhenUntainted\""
   },
+  "SimpleRegionAPI:GetVertexColor": {
+   "MayReturnNothing": "true",
+   "Returns.colorA.Nilable": "false",
+   "Returns.colorA.Type": "\"number\"",
+   "Returns.colorB.Nilable": "false",
+   "Returns.colorB.Type": "\"number\"",
+   "Returns.colorG.Nilable": "false",
+   "Returns.colorG.Type": "\"number\"",
+   "Returns.colorR.Nilable": "false",
+   "Returns.colorR.Type": "\"number\"",
+   "SecretReturnsForAspect": "{ Enum.SecretAspect.VertexColor, Enum.SecretAspect.Alpha }"
+  },
   "SimpleRegionAPI:SetAlpha": {
    "Arguments.alpha.Nilable": "false",
    "Arguments.alpha.Type": "\"SingleColorValue\"",
@@ -1802,6 +1967,27 @@
    "SecretArguments": "\"AllowedWhenTainted\"",
    "SecretArgumentsAddAspect": "{ Enum.SecretAspect.BarValue }"
   },
+  "SimpleTextureBaseAPI:SetAtlas": {
+   "Arguments.atlas.Nilable": "false",
+   "Arguments.atlas.Type": "\"textureAtlas\"",
+   "Arguments.filterMode.NeverSecret": "true",
+   "Arguments.filterMode.Nilable": "true",
+   "Arguments.filterMode.Type": "\"FilterMode\"",
+   "Arguments.resetTexCoords.NeverSecret": "true",
+   "Arguments.resetTexCoords.Nilable": "true",
+   "Arguments.resetTexCoords.Type": "\"bool\"",
+   "Arguments.useAtlasSize.Default": "false",
+   "Arguments.useAtlasSize.NeverSecret": "true",
+   "Arguments.useAtlasSize.Nilable": "false",
+   "Arguments.useAtlasSize.Type": "\"bool\"",
+   "Arguments.wrapModeHorizontal.NeverSecret": "true",
+   "Arguments.wrapModeHorizontal.Nilable": "true",
+   "Arguments.wrapModeHorizontal.Type": "\"cstring\"",
+   "Arguments.wrapModeVertical.NeverSecret": "true",
+   "Arguments.wrapModeVertical.Nilable": "true",
+   "Arguments.wrapModeVertical.Type": "\"cstring\"",
+   "SecretArguments": "\"AllowedWhenTainted\""
+  },
   "SimpleTextureBaseAPI:SetColorTexture": {
    "Arguments.a.Nilable": "true",
    "Arguments.a.Type": "\"SingleColorValue\"",
@@ -1813,6 +1999,13 @@
    "Arguments.colorR.Type": "\"number\"",
    "ChecksForbiddenAspects": "{ { Argument = \"self\", Aspect = Enum.ForbiddenAspect.SetTexture } }",
    "SecretArguments": "\"AllowedWhenTainted\""
+  },
+  "SimpleTextureBaseAPI:SetDesaturated": {
+   "Arguments.desaturated.Default": "false",
+   "Arguments.desaturated.Nilable": "false",
+   "Arguments.desaturated.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenTainted\"",
+   "SecretArgumentsAddAspect": "{ Enum.SecretAspect.Desaturation }"
   },
   "SimpleTextureBaseAPI:SetTexCoord": {
    "Arguments.bottom.Nilable": "false",
@@ -2047,6 +2240,13 @@
    "SecretArguments": "\"AllowedWhenUntainted\"",
    "SecretWhenUnitThreatStateRestricted": "true"
   },
+  "UnitUsesAmmo": {
+   "Arguments.unit.Nilable": "false",
+   "Arguments.unit.Type": "\"UnitToken\"",
+   "Returns.result.Nilable": "false",
+   "Returns.result.Type": "\"bool\"",
+   "SecretArguments": "\"AllowedWhenUntainted\""
+  },
   "canaccesstable": {
    "Arguments.table.Nilable": "false",
    "Arguments.table.Type": "\"LuaValueReference\"",
@@ -2269,6 +2469,13 @@
    "Payload.isReloadingUi.Type": "\"bool\"",
    "SynchronousEvent": "true"
   },
+  "event PLAYER_EQUIPMENT_CHANGED": {
+   "Payload.equipmentSlot.Nilable": "false",
+   "Payload.equipmentSlot.Type": "\"number\"",
+   "Payload.hasCurrent.Nilable": "false",
+   "Payload.hasCurrent.Type": "\"bool\"",
+   "SynchronousEvent": "true"
+  },
   "event PLAYER_GUILD_UPDATE": {
    "Payload.unitTarget.Nilable": "false",
    "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
@@ -2312,6 +2519,14 @@
   "event QUEST_LOG_UPDATE": {
    "UniqueEvent": "true"
   },
+  "event UNIT_AURA": {
+   "Payload.unitTarget.Nilable": "false",
+   "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
+   "Payload.updateInfo.Nilable": "false",
+   "Payload.updateInfo.Type": "\"UnitAuraUpdateInfo\"",
+   "SecretWhenAurasRestricted": "true",
+   "SynchronousEvent": "true"
+  },
   "event UNIT_DISPLAYPOWER": {
    "Payload.unitTarget.Nilable": "false",
    "Payload.unitTarget.Type": "\"UnitTokenVariant\"",
@@ -2343,6 +2558,9 @@
   "event UPDATE_MACROS": {
    "SynchronousEvent": "true"
   },
+  "event WEAPON_ENCHANT_CHANGED": {
+   "UniqueEvent": "true"
+  },
   "issecrettable": {
    "Arguments.table.Nilable": "false",
    "Arguments.table.Type": "\"LuaValueReference\"",
@@ -2371,7 +2589,7 @@
   "Blizzard_GamepadSharedUtility/InputBindingStack/BindingSetFactory.lua": "ef5beda0110e7213d86de6aebe3f838f4624bac36e3a6047f78b5954fbf36dbe",
   "Blizzard_GamepadSharedUtility/InputBindingStack/InputBindingManager.lua": "27318d5b42f396b5f246cfde2fe2225d5bbfa39d61e4544eb3cd34ae29c26897",
   "Blizzard_GamepadSharedUtility/PromptedBindings/PromptedBindingFooter.lua": "7e0d964592b95f1fe637aacde7f54cb4651beb5c9c2851eb1f88537e651f7955",
-  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "86709c2b9f8667e70688bbde72c8b1a33ebe67dd261874059cce7bd6a8c693fa",
+  "Blizzard_GamepadSmartNavigation/SmartNavigation.lua": "d9b12344d0d85a479239a1595d675ed337baf9c033d9601556775c282a675d58",
   "Blizzard_GamepadSmartNavigation/Utility.lua": "d60c46b8246bfa18be905e31b570f7ce5879cb69d0e38fb5ee7232ffe7057150",
   "Blizzard_NamePlates/Blizzard_NamePlateBase.lua": "3221e4b6d770dbfbeb58d2a0707341a205531b13654516cf76b5b271ded65729",
   "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua": "10c76a56d5b5f35ef2cb2cd6de753647cfc4fa07bec374f6bc57f630afabc60b",

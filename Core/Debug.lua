@@ -225,6 +225,85 @@ local function commandFsr()
     end
 end
 
+-- Phase 22 section 9: player name colours. left covers all nine reasons; the four
+-- unreadable ones are summed, and broken down only when the sum is above zero.
+local function reportPlayerNames(names)
+    if not (names and names.on) then
+        ns.Log.Info("  player names: off")
+        return
+    end
+    ns.Log.Info(format("  player names: on, capability=%s hook=%s; red=%d lightOrange=%d",
+        tostring(names.capability), names.hookInstalled and "yes" or "no",
+        names.red or 0, names.lightOrange or 0))
+    local left = names.left or {}
+    local unreadable = (left.PlayerUnreadable or 0) + (left.StyleUnreadable or 0)
+        + (left.AttackUnreadable or 0) + (left.ClassColourUnreadable or 0)
+    ns.Log.Info(format("    left: notPlayer=%d you=%d insideBar=%d classColour=%d noRegion=%d unreadable=%d",
+        left.NotPlayer or 0, left.Yourself or 0, left.InsideBar or 0, left.ClassColourWins or 0,
+        left.NoNameRegion or 0, unreadable))
+    if unreadable > 0 then
+        ns.Log.Info(format("    unreadable: player=%d style=%d attack=%d classColour=%d",
+            left.PlayerUnreadable or 0, left.StyleUnreadable or 0, left.AttackUnreadable or 0,
+            left.ClassColourUnreadable or 0))
+    end
+    local counts = names.counters or {}
+    ns.Log.Info(format("    writes=%d unchanged=%d released=%d bySweep=%d flushes=%d (all %d) faults=%d writeFailed=%d",
+        counts.nameColourWrites or 0, counts.nameColourUnchanged or 0, counts.nameColourReleased or 0,
+        counts.nameColourChangedBySweep or 0, counts.factionFlushes or 0, counts.factionFlushAll or 0,
+        counts.nameColourFaults or 0, counts.nameColourWriteFailed or 0))
+end
+
+-- A distance as a number, or "?" when the client's string did not parse. Never the raw
+-- string: nothing the client returns is echoed into chat unparsed.
+local function yardsText(value)
+    if type(value) ~= "number" then
+        return "?"
+    end
+    return format("%g", value)
+end
+
+local function storageText(setting)
+    if setting.perCharacter == true then
+        return "per character"
+    end
+    if setting.perAccount == true then
+        return "per account"
+    end
+    if setting.perCharacter == nil and setting.perAccount == nil then
+        return "unknown storage"
+    end
+    return "this computer"
+end
+
+-- Phase 22 section 7.3: one line per draw-distance setting, so one that will not read
+-- never hides the other. Both are secure on Forever; a line that says otherwise is the
+-- only place an unlock would show.
+local function reportDrawDistance()
+    if not (ns.Nameplates and ns.Nameplates.DistanceSettings) then
+        return
+    end
+    for _, setting in ipairs(ns.Nameplates.DistanceSettings()) do
+        if not setting.readable then
+            ns.Log.Info(format("  draw distance, %s: %s is not registered on this client",
+                setting.label, setting.name))
+        else
+            local secureText = "secure?"
+            if setting.secure == true then
+                secureText = "secure"
+            elseif setting.secure == false then
+                secureText = "not secure"
+            end
+            ns.Log.Info(format("  draw distance, %s: %s yd (default %s); %s, %s%s",
+                setting.label, yardsText(setting.yards), yardsText(setting.defaultYards),
+                secureText, storageText(setting), setting.locked == true and ", locked" or ""))
+            if setting.secure ~= true then
+                ns.Log.Info(format("    not secure on this client: /console %s <yards> changes it%s",
+                    setting.name, setting.perCharacter == true and " for this character" or ""))
+            end
+        end
+    end
+end
+
 local function commandPlates()
     if not ns.Nameplates then
         ns.Log.Error("the nameplate feature did not load")
@@ -307,6 +386,9 @@ local function commandPlates()
     else
         ns.Log.Info("  alignment: off")
     end
+    -- Phase 22 section 9.
+    reportPlayerNames(view.playerNames)
+    reportDrawDistance()
     ns.Log.Info(format("  ledger: widgets=%d restored=%d widgetGone=%d writeRefused=%d",
         view.ledgerWidgets, view.ledgerRestored, view.ledgerWidgetGone,
         view.ledgerWriteRefused))
@@ -1048,7 +1130,7 @@ local function commandHelp()
     ns.Log.Info("/pa fault               arm the fault probe, then cast anything")
     ns.Log.Info("/pa failenable          enable the probe whose enable always fails")
     ns.Log.Info("/pa pool                exercise both frame pool drop policies")
-    ns.Log.Info("/pa plates              nameplate tracking, ledger and capability state")
+    ns.Log.Info("/pa plates              nameplate tracking, ledger, capability state, player name colours and the draw distance")
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
     ns.Log.Info("/pa preview [on|off|threat|dps]  show every window with sample contents while you adjust")
     ns.Log.Info("/pa threat              the threat panel's rows, timer and counters")

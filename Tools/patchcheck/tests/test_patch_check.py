@@ -441,8 +441,9 @@ class RealExportTests(unittest.TestCase):
         # 15 took the register from 29 to 36 without touching this line, so T18 was
         # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2). Patch 02
         # retired five ring premises and added one: 86 - 5 + 1 (Patch 02 section 2.3).
-        # Phase 21 added thirteen, premises 87-99 (Phase 21 section 12).
-        self.assertEqual(len(register), 95)
+        # Phase 21 added thirteen, premises 87-99 (Phase 21 section 12). Phase 22 added
+        # thirteen more, premises 100-112 (Phase 22 section 10).
+        self.assertEqual(len(register), 108)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -591,6 +592,27 @@ class RealExportTests(unittest.TestCase):
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
         self.assertIn(by_id["NO-SHARD-POWER-IN-CAMELOT"].check["file"], current.load_set.files)
+
+    def test_t30_the_phase22_premises_hold_on_the_current_export(self):
+        # Architecture/20261122-Phase22.md section 10. Every Pattern premise names a file in
+        # the load set, so none can read Unknown (Phase 21 audit finding 11), and the
+        # FlagAbsent and FlagEquals checks pin their entry names, so a misspelt one reads
+        # Broken here rather than passing silently.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        phase22 = ("PLATE-NAME-COLOUR-UNTOUCHED-BY-PLATE", "CUF-NAME-COLOUR-NEVER-READ",
+                   "CUF-UPDATENAME-WRITES-COLOUR", "PLATE-NAME-COLOURED-LEGACY-ONLY",
+                   "PLATE-CLASS-COLOUR-NAME-FIELD", "PLATE-FACTION-LISTENS-FOR-PLAYER",
+                   "UNIT-CAN-ATTACK-PVP-READABLE", "UNIT-IS-PLAYER-PVP-READABLE",
+                   "NAME-COLOUR-WRITE-UNRESTRICTED", "CAMELOT-NO-DISTANCE-SETTING",
+                   "CONSOLE-FORCES-INSECURE", "DEV-CONSOLE-FORCES-INSECURE",
+                   "SETCVAR-REFUSES-SECURE")
+        for premise_id in phase22:
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+            if by_id[premise_id].check["kind"] == "Pattern":
+                self.assertIn(by_id[premise_id].check["file"], current.load_set.files)
 
     def test_t15_every_file_in_running_stacks_is_in_the_load_set(self):
         loaded = {name.lower() for name in load_set.resolve_load_set(paths.EXPORT).files}

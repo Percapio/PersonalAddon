@@ -972,14 +972,17 @@ check("R12 guildFontSize resizes role labels", sized and sized.text.textHeight =
     sized and tostring(sized.text.textHeight))
 setSetting("nameplates", "guildFontSize", ns.GUILD_FONT_DEFAULT)
 
--- R14: turning hostile while the plate is up.
+-- R14: turning hostile while the plate is up. Phase 22 section 5.2: the rescope runs a
+-- frame after UNIT_FACTION, so each check waits one frame.
 HARNESS.units.nameplate1.canAttack = true
 HARNESS.units.nameplate1.friend = false
 HARNESS.fire("UNIT_FACTION", "nameplate1")
+HARNESS.frame()
 check("R14 a scope change to attackable releases the role", record("nameplate1").label == nil)
 HARNESS.units.nameplate1.canAttack = false
 HARNESS.units.nameplate1.friend = true
 HARNESS.fire("UNIT_FACTION", "nameplate1")
+HARNESS.frame()
 check("R14 and turning friendly brings it back", labelText("nameplate1") == "Innkeeper")
 
 -- R16: a withheld UnitIsPlayer, counted per toggle.

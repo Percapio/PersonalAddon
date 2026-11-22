@@ -4,8 +4,9 @@ APIs, then runs one test file per session, each in a fresh runtime.
 Sessions: Phase 7's nameplate checks (tests.lua, "main" and "withheld"), Phase 8's
 checks (tests8.lua, four variants), Phase 9's (tests9.lua, four variants),
 Phase 10's (tests10.lua), Phase 11's (tests11.lua, three variants), Phase 12's
-(tests12.lua, two variants) Phase 13's (tests13.lua, two variants) Phase 14's (tests14.lua), Phase 15's (tests15.lua), Phase 16's (tests16.lua), Phase 17's (tests17.lua), Phase 18's (tests18.lua), Phase 19's (tests19.lua) and Phase 20's (tests20.lua, two
-variants). The static secret-read lint (Tools/lint) runs first;
+(tests12.lua, two variants) Phase 13's (tests13.lua, two variants) Phase 14's (tests14.lua), Phase 15's (tests15.lua), Phase 16's (tests16.lua), Phase 17's (tests17.lua), Phase 18's (tests18.lua), Phase 19's (tests19.lua), Phase 20's (tests20.lua, two
+variants), Patch 02's (testsPatch02.lua, three variants), Phase 21's (tests21.lua,
+three variants) and Phase 22's (tests22.lua, two variants). The static secret-read lint (Tools/lint) runs first;
 --no-lint skips it. Moved from c:\\tmp\\PersonalAddonHarness by
 Architecture/20261002-Phase10.md section 2.
 
@@ -61,6 +62,9 @@ SESSIONS = [
     ("phase21", "tests21.lua"),
     ("phase21-hidden", "tests21.lua"),
     ("phase21-noapi", "tests21.lua"),
+    # Architecture/20261122-Phase22.md section 14.1.
+    ("phase22", "tests22.lua"),
+    ("phase22-nohook", "tests22.lua"),
 ]
 
 # A chat line naming one of these alongside "raised" or "faulted" is an error.
@@ -91,6 +95,7 @@ def run_session(session, tests):
     lua.execute((HERE / "stubs20.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubsPatch02.lua").read_text(encoding="utf-8"))
     lua.execute((HERE / "stubs21.lua").read_text(encoding="utf-8"))
+    lua.execute((HERE / "stubs22.lua").read_text(encoding="utf-8"))
     lua.globals().HARNESS_SESSION = session
     load = lua.eval(
         "function(src, name) local f, err = loadstring(src, '@' .. name) "

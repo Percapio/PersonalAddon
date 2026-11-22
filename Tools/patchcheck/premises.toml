@@ -743,3 +743,100 @@ statement = "C_Sound.PlaySound is not a restricted call"
 source = "Phase 21 section 8.4"
 consequence = "Rule 7: the rare alert's sound would be a refusal. Switch playSound's default off and re-read section 8.4 before the next build (Features/RareAlerts.lua)"
 check = { kind = "FlagAbsent", entry = "C_Sound.PlaySound", flag = "HasRestrictions" }
+
+# Phase 22 (Architecture/20261122-Phase22.md section 10). Premises 100-112, numbered on
+# from Phase 21's 87-99. 100-108 hold the player name colours up; 109-112 are why the
+# draw distance cannot change in game, which only README's "Tried and Not Possible" row
+# rests on. The secure flag itself lives in the client, not the export: /pa plates is
+# where an unlock would show.
+
+[[premise]]
+id = "PLATE-NAME-COLOUR-UNTOUCHED-BY-PLATE"
+statement = "The plate's own code neither writes nor reads its name's colour"
+source = "Phase 22 sections 4.3 and 6"
+consequence = "A second writer (the name flashes until the next sweep) or a reader (our colour reaching Blizzard's execution). Re-read sections 4.3 and 6 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua", regex = 'name:(Set|Get)(Vertex|Text)Color', expect = "Absent" }
+
+[[premise]]
+id = "CUF-NAME-COLOUR-NEVER-READ"
+statement = "No compact-frame code reads a name's colour"
+source = "Phase 22 section 6"
+consequence = "Our name colour may reach Blizzard's execution. Re-read section 6 before the next build (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua", regex = 'name:Get(Vertex|Text)Color', expect = "Absent" }
+
+[[premise]]
+id = "CUF-UPDATENAME-WRITES-COLOUR"
+statement = "CompactUnitFrame_UpdateName is where a name's colour is written"
+source = "Phase 22 section 4.3"
+consequence = "The name hook follows a function that no longer colours the name, so names flash on every soft-target change. Re-read section 4.3 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_UnitFrame/Shared/CompactUnitFrame.lua", regex = 'function CompactUnitFrame_UpdateName\(frame\)[\s\S]{0,2500}?frame\.name:SetVertexColor\(', expect = "Present" }
+
+[[premise]]
+id = "PLATE-NAME-COLOURED-LEGACY-ONLY"
+statement = "Blizzard colours plate names by reaction on the Legacy style only"
+source = "Phase 22 section 3.1"
+consequence = "Player name colours would override a meaningful Blizzard colour, and README's 'white today' is wrong. Re-read section 3.1 (Features/Nameplates.lua, README.md)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlates.lua", regex = 'local function IsUnitNameColored\(namePlateStyle\)\s*if namePlateStyle == Enum\.NamePlateStyle\.Legacy then\s*return true;\s*end\s*return false;', expect = "Present" }
+
+[[premise]]
+id = "PLATE-CLASS-COLOUR-NAME-FIELD"
+statement = "A plate records Blizzard's class-colour choice for its name in colorNameWithClassColor"
+source = "Phase 22 section 3.2, decision D10"
+consequence = "D10 reads a field nothing sets, so friendly players lose their class-coloured names to light orange. Re-read section 3.2 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua", regex = 'self\.colorNameWithClassColor = colorNameWithClassColor;', expect = "Present" }
+
+[[premise]]
+id = "PLATE-FACTION-LISTENS-FOR-PLAYER"
+statement = "Blizzard's plate re-evaluates on UNIT_FACTION for its own unit and for the player"
+source = "Phase 22 section 5.2"
+consequence = "Our choice of event may be stale; the sweep still finds a change within one pass. Re-read section 5.2 (Features/Nameplates.lua)"
+check = { kind = "Pattern", file = "Blizzard_NamePlates/Blizzard_NamePlateUnitFrame.lua", regex = 'self:RegisterUnitEvent\("UNIT_FACTION", self\.unit, "player"\);', expect = "Present" }
+
+[[premise]]
+id = "UNIT-CAN-ATTACK-PVP-READABLE"
+statement = "Attackability is not secret in a PvP match"
+source = "Phase 22 section 3.3, decision D2"
+consequence = "In battlegrounds every attack read is Withheld: player names go to Blizzard's white, and nameColourAttackWithheld climbs (Features/Nameplates.lua)"
+check = { kind = "FlagAbsent", entry = "UnitCanAttack", flag = "SecretInActivePvPMatch" }
+
+[[premise]]
+id = "UNIT-IS-PLAYER-PVP-READABLE"
+statement = "Whether a unit is a player is not secret in a PvP match"
+source = "Phase 22 section 3.3"
+consequence = "Every battleground name is PlayerUnreadable, so none is coloured (Features/Nameplates.lua)"
+check = { kind = "FlagAbsent", entry = "UnitIsPlayer", flag = "SecretInActivePvPMatch" }
+
+[[premise]]
+id = "NAME-COLOUR-WRITE-UNRESTRICTED"
+statement = "Setting a region's vertex colour is not a restricted call"
+source = "Phase 22 section 4.1"
+consequence = "Rule 7: every player name paint would be a refusal. Default playerNameColours off and re-read section 4 before the next build (Features/Nameplates.lua)"
+check = { kind = "FlagAbsent", entry = "SimpleRegionAPI:SetVertexColor", flag = "HasRestrictions" }
+
+[[premise]]
+id = "CAMELOT-NO-DISTANCE-SETTING"
+statement = "Camelot's Options leave out Classic's Nameplate Distance"
+source = "Phase 22 section 7.2"
+consequence = "Camelot may now offer the slider: README's 'Nameplate Draw Distance' row and section 7 are wrong; point users to Options (README.md)"
+check = { kind = "Pattern", file = "Blizzard_SettingsDefinitions_Frame/Camelot/NameplatesOverrides.lua", regex = 'function NameplatesOverrides\.AdjustNameplateSettings\(category\)\s*-- Used by Classic for some Classic-only settings, such as Nameplate Distance\.\s*end', expect = "Present" }
+
+[[premise]]
+id = "CONSOLE-FORCES-INSECURE"
+statement = "A typed /console runs ConsoleExec insecurely"
+source = "Phase 22 section 7.2"
+consequence = "A typed /console may now set the secure distance settings. Repeat in-game check 1 and re-read README's row (README.md)"
+check = { kind = "Pattern", file = "Blizzard_ChatFrameBase/Shared/SlashCommands.lua", regex = 'SLASH_COMMAND\.CONSOLE[^\n]*\n\s*forceinsecure\(\);\s*ConsoleExec\(msg\);', expect = "Present" }
+
+[[premise]]
+id = "DEV-CONSOLE-FORCES-INSECURE"
+statement = "The developer console runs ConsoleExec insecurely"
+source = "Phase 22 section 7.2"
+consequence = "The developer console may now set the secure distance settings. Repeat in-game check 1 and re-read README's row (README.md)"
+check = { kind = "Pattern", file = "Blizzard_Console/Blizzard_Console.lua", regex = 'function DeveloperConsoleMixin:ExecuteCommand\(text\)\s*forceinsecure\(\);', expect = "Present" }
+
+[[premise]]
+id = "SETCVAR-REFUSES-SECURE"
+statement = "C_CVar.SetCVar refuses a secure CVar"
+source = "Phase 22 section 7.2, decision D3"
+consequence = "An addon could now write the draw distance. D3 stands (the user owns the setting), but section 7.2's first row and README's row change (README.md)"
+check = { kind = "FlagEquals", entry = "C_CVar.SetCVar", flag = "RequiresNonSecureCVar", value = "true" }

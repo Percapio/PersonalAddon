@@ -83,6 +83,7 @@ Custom nameplate restyling prioritizes threat accountability, target hierarchy, 
 - **Guild Names:** Displayed under player health bars in secondary weight with outline filtering and full escape-code neutralization ([`Core/EscapeGuard.lua`](Core/EscapeGuard.lua)).
 - **NPC Roles:** Friendly NPCs show their role (Innkeeper, Weapon Merchant, Flight Master) in the guild name's place, read from QuestieDB.
 - **Name Alignment:** On the Thin and Cast Focus styles, an option moves each nameplate's name from the middle of the bar to its left end.
+- **Player Name Colours:** Red for a player who can fight you, light orange for every other player.
 - **Threat-Priority Color Palette:** Six prioritized color states reflecting aggro status, pull proximity, outside taps, and neutral disposition.
 - **Implementation:** [`Features/Nameplates.lua`](Features/Nameplates.lua).
 
@@ -198,6 +199,13 @@ All configuration options are accessible in-game via **Options > AddOns > Person
   Under the health bar of a friendly NPC, in the guild name's place and at its size: the role its tooltip shows — Innkeeper, Weapon Merchant, Flight Master — read from QuestieDB rather than scraped from the tooltip. "Friendly" is the client's own answer for the character you are playing, so it works the same for Alliance and Horde. Hostile and attackable units never get one, and a unit that turns hostile loses it. Its own switch, off by default; the text passes through [`Core/EscapeGuard.lua`](Core/EscapeGuard.lua) like a guild name. Requires QuestieDB and friendly NPC nameplates enabled. **Nothing is shown in dungeons and raids**, where the client withholds which NPC a unit is.
 - **Names at the Left End of the Bar ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   On the Thin and Cast Focus styles the game centres each nameplate's name above the bar; this option moves it to the bar's left end. Only the name's alignment changes and no anchor is moved, which is why a free x-offset is not offered (see [Tried and Not Possible](#tried-and-not-possible)). The Large and Block styles already put the name inside the bar on the left and are left alone, as are name-only plates. The first plate is tested once per session: `/pa plates` shows `capability=Verified` when the client keeps the alignment, and `Refused` or `Unverifiable`, with the setting standing down, when it does not.
+- **Player Name Colours ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
+  A player's name on their nameplate, recoloured:
+  - **Red** when they can fight you, or you them: an enemy with PvP on, a battleground enemy, a duel, an arena, a free-for-all area. "Can fight" is the game's own answer, asked both ways, so an unflagged enemy turns red the moment you flag yourself.
+  - **Light orange** for every other player. Both colours are pickers on the Nameplates page.
+  - NPC names stay the game's, as do the pets and totems of players. Off by default.
+  - Not on the Large and Block styles, where the name sits inside the bar and a coloured name would be lost against the bar; a name-only plate is still coloured. With the game's class colour for friendly names on (Options → Nameplates), friendly players keep it.
+  - Only the nameplate's name changes: the names the game draws above characters' heads are its own.
 - **Nameplate Health Bar Height ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Scales nameplate bar height from 30% to 100% of Blizzard's base layout, automatically adapting to the player's selected UI Style and Global Scale.
 - **Rare Alerts ([`Features/RareAlerts.lua`](Features/RareAlerts.lua)):**
@@ -266,7 +274,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 | `/pa bags`, `/pa vend` | Reports last container sort or vendor event, including skip reasons and what holds a sort back |
 | `/pa consumables` | Summarizes active consumable bindings and assignment diagnostics |
 | `/pa quests` | Displays QuestieDB bridge status, offered NPC quests, and marker targets, and which features are waiting for QuestieDB |
-| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles and whether they can be read, name alignment and its capability), and FSR tracker (casts that spent mana, cost nothing, or could not be priced) |
+| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles and whether they can be read, name alignment and its capability, player name colours and why each name was left alone, and the draw distance), and FSR tracker (casts that spent mana, cost nothing, or could not be priced) |
 | `/pa preview [on\|off\|threat\|dps]` | Manages visual adjustment preview mode and toggles active HUD anchor |
 | `/pa panel` | Inspects settings registration tree and category building diagnostics |
 | `/pa blocked` | Outputs protected function refusals attributed to PersonalAddon |
@@ -316,6 +324,11 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Mechanism:** Rare alerts watch nameplates, so a rare without a plate is never seen. The game also withholds which creature a unit is in dungeons and raids.
 - **Fix:** Turn on **Options → Nameplates → Enemy Nameplates**; one chat line says so at login when they are off. In dungeons and raids nothing fires, by design: `/pa rares` shows `map=Restricted`.
 
+### Player Names Stay White
+
+- **Mechanism:** Player name colours are off by default. On the Large and Block styles the name sits inside the bar and is left alone. With the game's class colour for friendly names on, friendly players keep it.
+- **Fix:** Turn on **Options → AddOns → PersonalAddon → Nameplates → Colour player names**, on the Thin or Cast Focus style. `/pa plates` says why each name was left alone (`left:`). Details in [`Architecture/20261122-Phase22.md`](Architecture/20261122-Phase22.md) §3.
+
 ### A Mob Vanished from the Threat Panel
 
 - **Mechanism:** The threat panel lists mobs that have a nameplate. When the client removes a plate — the mob is behind you, or off the edge of the screen — its row goes with it, even while the mob is still fighting you.
@@ -364,6 +377,7 @@ Architectural decisions and experiments evaluated across development phases and 
 | Bandage First Aid Verification | Item APIs do not expose First Aid rank prerequisites; invalid usages report native error feedback | [Phase 16](Architecture/20261011-Phase16.md) §4.4, build 1.60.1.70338 |
 | Auto-Placing Macros on Bars | `PlaceAction` triggers synchronous slot mutation events inside addon code, compromising Gamepad action bar security | [Phase 12](Architecture/20261006-Phase12.md) §1.3, build 1.60.1.70291 |
 | Buff Timers in Combat | Buff durations are secret from addons during combat. Blizzard's aura container filters only by full duration, not time left, and refuses addon access while auras are secret. Upkeep hides in combat and shows what ran out when the fight ends | [Phase 21](Architecture/20261112-Phase21.md) §1.3, build 1.60.1.70938 |
+| Nameplate Draw Distance | Both distance settings are secure on Forever: all plates 45 yards, players 40. Addons are refused, Blizzard runs typed `/console` and the developer console insecurely, and Camelot leaves out the slider Classic offers. `/pa plates` shows both | [Phase 22](Architecture/20261122-Phase22.md) §7, build 1.60.1.71037 |
 
 ---
 
@@ -418,7 +432,7 @@ The World of Warcraft client evaluates code trust per execution thread. When Bli
 - Chat output routes through `AddMessage`, which enters Blizzard's message history and `FADEFRAMES` list.
 - Settings registration stores control definitions inside Blizzard's Settings tables.
 - The NPC quest tooltip block executes inside Blizzard's tooltip construction callback to ensure correct frame measurement before display ([`Features/NPCQuests.lua`](Features/NPCQuests.lua)).
-- Nameplate restyling post-hooks execute inside Blizzard's draw call to prevent single-frame color flickers; the bar height and the name's left alignment are re-asserted on the same hooks ([`Features/Nameplates.lua`](Features/Nameplates.lua)).
+- Nameplate restyling post-hooks execute inside Blizzard's draw call to prevent single-frame color flickers; the bar height, the name's left alignment and the player name colour are re-asserted on the same hooks, and the name colour also on `CompactUnitFrame_UpdateName` ([`Features/Nameplates.lua`](Features/Nameplates.lua)).
 
 ### To Trace How Taint Reached a Refusal
 
