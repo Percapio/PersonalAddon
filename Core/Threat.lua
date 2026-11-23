@@ -12,6 +12,11 @@
 -- Threat from GAPBugs01 section 3.6; standing from Phase 7 section 5.3; the colour
 -- priority from Phase 7 section 5.4, with R7's AboutToPull second (Phase 11
 -- section 2.3). Every client value goes through ClientRead (README rule 10).
+--
+-- Patch 03 (Architecture/20261122-Patch03.md sections 5-6): the role the colours are
+-- for. Tank, chosen by hand or by Auto through the game's own tank test, turns a mob
+-- you hold green and one on your group red. The choice is the nameplates feature's
+-- threatRole setting, written here for the role box and /pa role alike.
 
 local ADDON_NAME, ns = ...
 
@@ -21,15 +26,18 @@ ns.Threat = Threat
 local ClientRead = ns.ClientRead
 local PLAIN, ABSENT, WITHHELD = ClientRead.PLAIN, ClientRead.ABSENT, ClientRead.WITHHELD
 
-local tonumber, sub = tonumber, string.sub
+local tonumber, sub, format, pairs, type, tostring = tonumber, string.sub, string.format, pairs, type, tostring
 
 -- Diagnostics loads after this file; the counters are only bumped at run time.
 local function bump(counters, name)
     ns.Diagnostics.Bump(counters, name)
 end
 
+-- Patch 03 section 5.2: status 3 (you hold it, and the most threat) and status 2 (you
+-- hold it, out-threatened) are told apart. For DPS both are still OnPlayer.
 local AGGRO = {
-    ON_PLAYER = "OnPlayer",
+    ON_PLAYER_SECURE = "OnPlayerSecure",
+    ON_PLAYER_INSECURE = "OnPlayerInsecure",
     ABOUT_TO_PULL = "AboutToPull",
     ON_GROUP_OR_PET = "OnGroupOrPet",
     ELSEWHERE = "Elsewhere",
@@ -64,8 +72,31 @@ local VERDICT = {
     NEUTRAL = "Neutral",
     ELSEWHERE = "Elsewhere",
     CEDED = "Ceded",
+    -- Patch 03 section 5.3: the tank's three. Held securely, out-threatened, and on
+    -- your group. They borrow the six colours below (TANK_COLOUR_SOURCE).
+    TANK_HOLDING = "TankHolding",
+    TANK_SLIPPING = "TankSlipping",
+    TANK_LOOSE = "TankLoose",
 }
 Threat.VERDICT = VERDICT
+
+-- What the colours are for now, and what the user chose (Patch 03 sections 5.4, 5.7).
+local ROLE = { DPS = "Dps", TANK = "Tank" }
+Threat.ROLE = ROLE
+local ROLE_CHOICE = { DPS = "Dps", TANK = "Tank", AUTO = "Auto" }
+Threat.ROLE_CHOICE = ROLE_CHOICE
+
+-- What the game's tank test answered under Auto. Unread covers Absent, Withheld, a
+-- failed call and a missing function: never "not a tank" (section 5.7.2).
+local AUTO_READING = { NOT_ASKED = "NotAsked", TANK = "Tank", NOT_TANK = "NotTank", UNREAD = "Unread" }
+Threat.AUTO_READING = AUTO_READING
+
+local ROLE_WRITE = { WRITTEN = "Written", UNCHANGED = "Unchanged", REFUSED = "Refused" }
+Threat.ROLE_WRITE = ROLE_WRITE
+
+-- The setting that holds the choice, and its owner (section 6.6).
+local ROLE_FEATURE_ID, ROLE_KEY = "nameplates", "threatRole"
+Threat.ROLE_FEATURE_ID, Threat.ROLE_KEY = ROLE_FEATURE_ID, ROLE_KEY
 
 local STANDING = {
     NOT_YET_READ = "NotYetRead",
@@ -88,6 +119,16 @@ Threat.PALETTE_KEYS = {
     { verdict = VERDICT.NEUTRAL, key = "colourNeutral", default = "ffff00" },
     { verdict = VERDICT.ELSEWHERE, key = "colourElsewhere", default = "ffffff" },
 }
+
+-- Patch 03 section 5.4 (decision D12): no picker of their own. A tank's held mob takes
+-- the "attacking your group" colour, its slipping one the "about to pull" colour, and
+-- its loose one the "attacking you" colour. PALETTE_KEYS stays six.
+local TANK_COLOUR_SOURCE = {
+    [VERDICT.TANK_HOLDING] = VERDICT.ON_GROUP_OR_PET,
+    [VERDICT.TANK_SLIPPING] = VERDICT.ABOUT_TO_PULL,
+    [VERDICT.TANK_LOOSE] = VERDICT.ON_PLAYER,
+}
+Threat.TANK_COLOUR_SOURCE = TANK_COLOUR_SOURCE
 
 -- The allies whose threat makes a monster green: your pet first, then the party
 -- or the raid. Built once, so a sweep concatenates no strings (Phase 9 section 4).
@@ -154,8 +195,11 @@ function Threat.ClassifyAggro(unitToken, allies, allyCount, counters)
     local kind, status = readStatus("player", unitToken, counters)
     if kind == PLAIN then
         engaged = true
+        if status >= ns.SECURELY_TANKING_STATUS then
+            return AGGRO.ON_PLAYER_SECURE, 0, ENGAGEMENT.ENGAGED
+        end
         if status >= ns.TANKING_STATUS then
-            return AGGRO.ON_PLAYER, 0, ENGAGEMENT.ENGAGED
+            return AGGRO.ON_PLAYER_INSECURE, 0, ENGAGEMENT.ENGAGED
         end
         if status == ns.ABOUT_TO_PULL_STATUS then
             return AGGRO.ABOUT_TO_PULL, 0, ENGAGEMENT.ENGAGED
@@ -281,8 +325,23 @@ end
 -- ahead of its own threat red, so grey is exactly what ceding would show. Neutral
 -- is not: there Blizzard's colour carries threat-list membership we could not
 -- read, and yellow would claim "not on you". Unreadable behaves as Hostile.
-function Threat.ResolveVerdict(aggro, disposition)
-    if aggro == AGGRO.ON_PLAYER then
+--
+-- Patch 03 section 5.3: for a tank, a mob held securely is TankHolding, one held but
+-- out-threatened TankSlipping, and one on the group TankLoose, which outranks tapped
+-- grey (D13) as OnPlayer does for DPS. A role of nil is DPS.
+function Threat.ResolveVerdict(aggro, disposition, role)
+    if role == ROLE.TANK then
+        if aggro == AGGRO.ON_PLAYER_SECURE then
+            return VERDICT.TANK_HOLDING
+        end
+        if aggro == AGGRO.ON_PLAYER_INSECURE then
+            return VERDICT.TANK_SLIPPING
+        end
+        if aggro == AGGRO.ON_GROUP_OR_PET then
+            return VERDICT.TANK_LOOSE
+        end
+    end
+    if aggro == AGGRO.ON_PLAYER_SECURE or aggro == AGGRO.ON_PLAYER_INSECURE then
         return VERDICT.ON_PLAYER
     end
     if aggro == AGGRO.ABOUT_TO_PULL then
@@ -319,13 +378,17 @@ local function hexToColour(hex)
     return { red = red / 255, green = green / 255, blue = blue / 255, alpha = 1 }
 end
 
--- Every verdict but Ceded, from a settings table holding PALETTE_KEYS' keys.
+-- Every verdict but Ceded, from a settings table holding PALETTE_KEYS' keys. The
+-- tank verdicts take their source verdict's colour (Patch 03 section 5.4).
 function Threat.PaletteFrom(settings)
     local palette = {}
     local keys = Threat.PALETTE_KEYS
     for index = 1, #keys do
         local entry = keys[index]
         palette[entry.verdict] = hexToColour(settings and settings[entry.key]) or hexToColour(entry.default)
+    end
+    for verdict, source in pairs(TANK_COLOUR_SOURCE) do
+        palette[verdict] = palette[source]
     end
     return palette
 end
@@ -338,4 +401,69 @@ function Threat.PaletteDefaults()
         defaults[keys[index].key] = keys[index].default
     end
     return defaults
+end
+
+-- Role (Patch 03 sections 5.4, 5.7, 6.4) --------------------------------------------
+
+-- The choice the user made: the stored threatRole when it is exactly Tank or Auto, and
+-- DPS otherwise, nil, missing and malformed included (D23).
+function Threat.RoleChoiceFrom(settings)
+    local value = settings and settings[ROLE_KEY]
+    if value == ROLE_CHOICE.TANK or value == ROLE_CHOICE.AUTO then
+        return value
+    end
+    return ROLE_CHOICE.DPS
+end
+
+-- The role the colours are for now, and what the game's test answered (section 5.7.2).
+-- Dps and Tank read nothing. Auto reads UnitHasEffectivelyTankAura("player") once:
+-- only a Plain boolean decides, and anything else is DPS, counted as unread. The
+-- function's return is non-nilable, so Absent means it said nothing: round one's trap,
+-- never "not a tank". Counted in the caller's own table, as every read here is.
+function Threat.ResolveRole(choice, counters)
+    if choice == ROLE_CHOICE.TANK then
+        return ROLE.TANK, AUTO_READING.NOT_ASKED
+    end
+    if choice ~= ROLE_CHOICE.AUTO then
+        return ROLE.DPS, AUTO_READING.NOT_ASKED
+    end
+    local test = _G.UnitHasEffectivelyTankAura
+    if type(test) ~= "function" then
+        bump(counters, "autoRoleReadsUnread")
+        ns.Log.Once("threat:notanktest",
+            "this client has no UnitHasEffectivelyTankAura, so the Auto choice shows DPS colours")
+        return ROLE.DPS, AUTO_READING.UNREAD
+    end
+    local kind, isTank = ClientRead.Call(test, "boolean", "player")
+    if kind ~= PLAIN then
+        bump(counters, "autoRoleReadsUnread")
+        return ROLE.DPS, AUTO_READING.UNREAD
+    end
+    bump(counters, "autoRoleReadsPlain")
+    if isTank then
+        return ROLE.TANK, AUTO_READING.TANK
+    end
+    return ROLE.DPS, AUTO_READING.NOT_TANK
+end
+
+-- Stores the user's choice, for the role box and /pa role alike (section 6.4). The
+-- /pa set path: ConfigStore.Set, which validates the Choice, then NotifyConfigChanged,
+-- which runs the nameplates sweep at once when that feature is enabled. Counted in the
+-- nameplates table, the setting's owner, looked up here: CountersFor answers whether or
+-- not any feature is enabled. Reads no client value before NotifyConfigChanged.
+function Threat.WriteRoleChoice(choice)
+    if ns.ConfigStore.Get(ROLE_FEATURE_ID, ROLE_KEY) == choice then
+        return ROLE_WRITE.UNCHANGED
+    end
+    local counters = ns.Diagnostics.CountersFor(ROLE_FEATURE_ID)
+    local ok, reason = ns.ConfigStore.Set(ROLE_FEATURE_ID, ROLE_KEY, choice)
+    if not ok then
+        bump(counters, "roleWritesRefused")
+        ns.Log.Once("threat:rolerefused", format(
+            "the threat colour choice could not be stored (%s)", tostring(reason)))
+        return ROLE_WRITE.REFUSED, reason
+    end
+    bump(counters, "roleWrites")
+    ns.Registry.NotifyConfigChanged(ROLE_FEATURE_ID, ROLE_KEY)
+    return ROLE_WRITE.WRITTEN
 end

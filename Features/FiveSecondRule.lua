@@ -18,15 +18,38 @@
 -- no resource cost -- its documented answer, and the one every Blizzard caller treats
 -- as "no cost" -- and this file used to read that as "the client will not say", which
 -- restarted the window on every wand shot, Auto Shot, potion and Hearthstone.
+--
+-- Patch 03 (Architecture/20261122-Patch03.md section 4): after a window that ends in
+-- combat, the same line keeps moving in the tick colour, crossing the bar every
+-- FSR_TICK_PERIOD seconds, until the next mana-costing cast or the end of the fight.
+-- The rhythm is WoW Classic's 2 seconds, by the user's decision: a cue, not a reading
+-- of Forever's ticks, which stay unreadable for the reason above. It reads GetTime
+-- and, once at the window's end and once per tick, UnitAffectingCombat("player").
 
 local ADDON_NAME, ns = ...
 
 local FEATURE_ID = "fiveSecondRule"
 
-local format, max = string.format, math.max
+local format, max, floor = string.format, math.max, math.floor
 local STATE = ns.TRACKER_STATE
 local MANA = ns.POWER_TYPE_MANA
 local FSR_WINDOW = ns.FSR_WINDOW
+local TICK_PERIOD = ns.FSR_TICK_PERIOD
+local TICK_COLOUR_DEFAULT = "ffd100"
+
+-- Why a run of ticks ended (Patch 03 section 4.3). Disable resets them uncounted, as
+-- it resets the window (audit finding 6).
+local TICK_STOP = {
+    CAST = "Cast",
+    FIGHT_ENDED = "FightEnded",
+    BACKSTOP = "Backstop",
+    SWITCHED_OFF = "SwitchedOff",
+    LOADING_SCREEN = "LoadingScreen",
+}
+
+-- What UnitAffectingCombat("player") answered. Unread is never "in combat", in either
+-- direction: it starts no ticks and ends running ones (section 4.3).
+local COMBAT = { IN = "In", OUT = "Out", UNREAD = "Unread" }
 
 -- The spellcast payload and the mana bar's geometry are client values that can be
 -- secret (Phase 9 section 5.2), so they are read through ClientRead.
@@ -38,6 +61,14 @@ local tracker = {
     state = STATE.REGENERATING,
     windowStartedAt = 0,
     windowEndsAt = 0,
+    -- Patch 03 section 4.3: the tick clock. tickAnchor is the window's end, and
+    -- tickLastCycle the last tick boundary the backstop checked; both 0 outside Ticking.
+    tickAnchor = 0,
+    tickLastCycle = 0,
+    showTicks = true,
+    tickColour = { red = 1, green = 0.82, blue = 0 },
+    -- Whether the line is on screen, kept here rather than asked of the texture.
+    lineShown = false,
     tokens = {},
     marker = nil,
     markerBar = nil,
@@ -73,6 +104,28 @@ local function windowElapsedFraction(now)
     return elapsed
 end
 
+-- Where the line sits during ticks, from our own clock only (Patch 03 section 4.3):
+-- the share of the current 2-second cycle since the window's end. 0 whenever the
+-- state is not Ticking, so Inspect never reports a phase that is not running
+-- (audit finding 8).
+local function tickFraction(now)
+    if tracker.state ~= STATE.TICKING or tracker.tickAnchor <= 0 then
+        return 0
+    end
+    local elapsed = now - tracker.tickAnchor
+    if elapsed < 0 then
+        return 0
+    end
+    return (elapsed % TICK_PERIOD) / TICK_PERIOD
+end
+
+local function lineFraction(now)
+    if tracker.state == STATE.TICKING then
+        return tickFraction(now)
+    end
+    return windowElapsedFraction(now)
+end
+
 -- Render ---------------------------------------------------------------------
 
 local function resolveManaBar()
@@ -95,6 +148,29 @@ local function applyAppearance()
         end
     end
     marker:SetAlpha(tracker.lineAlpha)
+end
+
+local function setLineColour(marker, red, green, blue)
+    if marker.SetColorTexture then
+        marker:SetColorTexture(red, green, blue, 1)
+    else
+        marker:SetTexture(red, green, blue, 1)
+    end
+end
+
+-- White for the window, the tick colour for ticks (Patch 03 section 4.4). Written on
+-- each state change, never per frame.
+local function applyLineColour()
+    local marker = tracker.marker
+    if not marker then
+        return
+    end
+    if tracker.state == STATE.TICKING then
+        local colour = tracker.tickColour
+        setLineColour(marker, colour.red, colour.green, colour.blue)
+    else
+        setLineColour(marker, 1, 1, 1)
+    end
 end
 
 local function ensureMarker()
@@ -137,7 +213,8 @@ local function refreshManaUser()
 end
 
 local function shouldRender()
-    return tracker.state == STATE.IN_FSR and tracker.manaUser == true
+    return (tracker.state == STATE.IN_FSR or tracker.state == STATE.TICKING)
+        and tracker.manaUser == true
 end
 
 -- One SetPoint against the same anchor point, which replaces it rather than
@@ -158,33 +235,101 @@ local function positionMarker()
     if width <= 0 then
         return
     end
-    marker:SetPoint("LEFT", bar, "LEFT", width * windowElapsedFraction(GetTime()), 0)
+    marker:SetPoint("LEFT", bar, "LEFT", width * lineFraction(GetTime()), 0)
 end
 
+-- Patch 03 section 4.3. Plain false and Absent are out of combat; Withheld and a
+-- failed call are Unread.
+local function readCombat()
+    local kind, inCombat = ClientRead.Call(UnitAffectingCombat, "boolean", "player")
+    if kind == PLAIN then
+        return inCombat == true and COMBAT.IN or COMBAT.OUT
+    end
+    if kind == ABSENT then
+        return COMBAT.OUT
+    end
+    return COMBAT.UNREAD
+end
+
+local refreshVisibility
+
+-- Ends a run of ticks (Patch 03 section 4.3): Regenerating, the line white again and
+-- hidden, the clock cleared, the driver stopped by the visibility refresh, counted by
+-- reason. A no-op outside Ticking. A cast's stop is the window's own start, not this.
+local function stopTicks(reason)
+    if tracker.state ~= STATE.TICKING then
+        return
+    end
+    tracker.state = STATE.REGENERATING
+    tracker.tickAnchor = 0
+    tracker.tickLastCycle = 0
+    bump(tracker.counters, "tickStops" .. reason)
+    applyLineColour()
+    refreshVisibility()
+end
+
+-- The backstop: once per tick, the fight is checked (section 4.3). Between boundaries
+-- nothing is read, so the read is one per tick, never one per frame.
+local function checkFightAtTick(now)
+    local cycle = floor((now - tracker.tickAnchor) / TICK_PERIOD)
+    if cycle <= tracker.tickLastCycle then
+        return
+    end
+    tracker.tickLastCycle = cycle
+    if readCombat() ~= COMBAT.IN then
+        stopTicks(TICK_STOP.BACKSTOP)
+    end
+end
+
+-- Runs while the window line is shown, and for as long as ticks run, shown or not
+-- (audit finding 7): a non-mana form hides the line but never stops the backstop.
 local function onUpdate()
-    positionMarker()
+    if tracker.state == STATE.TICKING then
+        checkFightAtTick(GetTime())
+        if tracker.state ~= STATE.TICKING then
+            return
+        end
+    end
+    if tracker.lineShown then
+        positionMarker()
+    end
 end
 
-local function refreshVisibility()
+function refreshVisibility()
     local marker = tracker.marker
     if not marker then
         return
     end
 
-    if shouldRender() then
+    -- About to show the line while ticking (a shift back into a mana form): the fight
+    -- is checked first, so one that ended unannounced never flashes the gold line
+    -- (audit finding 7). stopTicks refreshes again with the state no longer Ticking.
+    if tracker.state == STATE.TICKING and shouldRender() and not tracker.lineShown
+        and readCombat() ~= COMBAT.IN then
+        stopTicks(TICK_STOP.BACKSTOP)
+        return
+    end
+
+    local driverWanted = (tracker.state == STATE.TICKING) or shouldRender()
+    if driverWanted then
         if not tracker.updating and tracker.driver then
             tracker.driver:SetScript("OnUpdate", onUpdate)
             tracker.updating = true
         end
+    else
+        if tracker.updating and tracker.driver then
+            tracker.driver:SetScript("OnUpdate", nil)
+        end
+        tracker.updating = false
+    end
+
+    if shouldRender() then
+        tracker.lineShown = true
         positionMarker()
         marker:Show()
         return
     end
-
-    if tracker.updating and tracker.driver then
-        tracker.driver:SetScript("OnUpdate", nil)
-    end
-    tracker.updating = false
+    tracker.lineShown = false
     marker:Hide()
 end
 
@@ -227,6 +372,36 @@ local function clearWindow()
     tracker.state = STATE.REGENERATING
     tracker.windowStartedAt = 0
     tracker.windowEndsAt = 0
+    tracker.tickAnchor = 0
+    tracker.tickLastCycle = 0
+end
+
+-- What follows the window (Patch 03 section 4.3): Ticking, anchored at the window's
+-- end, when ticks are on, the player uses mana and the fight is on; otherwise the
+-- state stays Regenerating and the outcome is counted. One combat read at most.
+local function onWindowEnd(anchor)
+    if not tracker.showTicks then
+        bump(tracker.counters, "ticksSkippedOff")
+        return
+    end
+    if tracker.manaUser ~= true then
+        bump(tracker.counters, "ticksSkippedNotManaUser")
+        return
+    end
+    local combat = readCombat()
+    if combat == COMBAT.UNREAD then
+        bump(tracker.counters, "ticksSkippedCombatUnread")
+        return
+    end
+    if combat ~= COMBAT.IN then
+        bump(tracker.counters, "ticksSkippedOutOfCombat")
+        return
+    end
+    tracker.state = STATE.TICKING
+    tracker.tickAnchor = anchor
+    tracker.tickLastCycle = 0
+    bump(tracker.counters, "ticksStarted")
+    applyLineColour()
 end
 
 function onWindowTimer()
@@ -240,7 +415,9 @@ function onWindowTimer()
         return
     end
 
+    local endedAt = tracker.windowEndsAt
     clearWindow()
+    onWindowEnd(endedAt)
     refreshVisibility()
 end
 
@@ -348,10 +525,18 @@ local function classifyCastCost(spellId)
 end
 
 local function startWindow(now)
+    -- Patch 03 section 4.2: a cast during ticks restarts the window, and the line turns
+    -- white again. The tick clock goes with it; the window's end re-anchors it.
+    if tracker.state == STATE.TICKING then
+        bump(tracker.counters, "tickStops" .. TICK_STOP.CAST)
+        tracker.tickAnchor = 0
+        tracker.tickLastCycle = 0
+    end
     tracker.state = STATE.IN_FSR
     tracker.windowStartedAt = now
     tracker.windowEndsAt = now + FSR_WINDOW
     scheduleWindowEnd(FSR_WINDOW + 0.02)
+    applyLineColour()
     refreshVisibility()
 end
 
@@ -407,9 +592,19 @@ local function onEnteringWorld()
     -- Conservative: do not carry a window across a loading screen. A stale
     -- window shows the line after regen has already resumed, which is a
     -- confidently wrong reading; dropping it merely under-reports once.
+    if tracker.state == STATE.TICKING then
+        bump(tracker.counters, "tickStops" .. TICK_STOP.LOADING_SCREEN)
+    end
     clearWindow()
+    applyLineColour()
     refreshManaUser()
     refreshVisibility()
+end
+
+-- Patch 03 section 4.5: the fight ended. SynchronousEvent, so this changes only our
+-- own state and hides only our own texture, as onEnteringWorld does.
+local function onRegenEnabled()
+    stopTicks(TICK_STOP.FIGHT_ENDED)
 end
 
 -- What each signal costs us if this client will not deliver it. The one
@@ -421,9 +616,21 @@ local SIGNALS = {
       lost = "the indicator will not follow a form or power-type change" },
     { event = "PLAYER_ENTERING_WORLD", handler = onEnteringWorld, required = false,
       lost = "a running window will not be cleared after a loading screen" },
+    { event = "PLAYER_REGEN_ENABLED", handler = onRegenEnabled, required = false,
+      lost = "regen ticks will end at the next tick's check rather than when the fight ends" },
 }
 
 -- Lifecycle ------------------------------------------------------------------
+
+-- A malformed or missing colour takes the default rather than ConfigSchema.HexToRgb's
+-- white, which would look like the window line.
+local function tickColourFrom(hex)
+    if type(hex) ~= "string" or #hex ~= 6 or not tonumber(hex, 16) then
+        hex = TICK_COLOUR_DEFAULT
+    end
+    local red, green, blue = ns.ConfigSchema.HexToRgb(hex)
+    return { red = red, green = green, blue = blue }
+end
 
 local function readSettings(config)
     local settings = config and config.settings
@@ -432,6 +639,8 @@ local function readSettings(config)
     end
     tracker.lineWidth = settings.lineWidth or tracker.lineWidth
     tracker.lineAlpha = settings.lineAlpha or tracker.lineAlpha
+    tracker.showTicks = (settings.showTicks ~= false)
+    tracker.tickColour = tickColourFrom(settings.tickColour)
 end
 
 local function enable(config)
@@ -479,15 +688,20 @@ local function disable()
     if tracker.marker then
         tracker.marker:Hide()
     end
+    tracker.lineShown = false
 
     for index = #tracker.tokens, 1, -1 do
         ns.Dispatch.Unsubscribe(tracker.tokens[index])
         tracker.tokens[index] = nil
     end
 
+    -- Patch 03 section 4.3: the ticks are reset with the window, uncounted (audit
+    -- finding 6).
     tracker.state = STATE.REGENERATING
     tracker.windowStartedAt = 0
     tracker.windowEndsAt = 0
+    tracker.tickAnchor = 0
+    tracker.tickLastCycle = 0
 end
 
 local function onConfigChanged(config, changedKey)
@@ -495,6 +709,13 @@ local function onConfigChanged(config, changedKey)
     if changedKey == "lineWidth" or changedKey == "lineAlpha" then
         applyAppearance()
         refreshVisibility()
+    elseif changedKey == "showTicks" then
+        -- Patch 03 section 4.6: off ends a running set at once; on waits for a window.
+        if not tracker.showTicks then
+            stopTicks(TICK_STOP.SWITCHED_OFF)
+        end
+    elseif changedKey == "tickColour" then
+        applyLineColour()
     end
     return ns.CONFIG_RESULT.APPLIED
 end
@@ -502,12 +723,15 @@ end
 ns.Registry.Register(FEATURE_ID, {
     enabledByDefault = true,
     label = "Five-second rule indicator",
-    description = "A line that sweeps across your mana bar while the five-second rule is running.",
+    description = "A line that sweeps across your mana bar while the five-second rule is running, then keeps a two-second regen rhythm while you fight.",
     settingsPage = ns.SETTINGS_PAGE.COMBAT,
     settingsOrder = 10,
     settings = {
         lineWidth = 2,
         lineAlpha = 0.9,
+        -- Patch 03 section 8.2 (D6).
+        showTicks = true,
+        tickColour = TICK_COLOUR_DEFAULT,
     },
     schema = {
         lineWidth = {
@@ -521,6 +745,15 @@ ns.Registry.Register(FEATURE_ID, {
             unit = ns.ConfigSchema.UNIT.FRACTION,
             description = "How solid the line is.",
             minimum = 0.1, maximum = 1.0, step = 0.05,
+        },
+        -- Patch 03 section 8.2: no group, so both follow "Line opacity" under the
+        -- feature's own switch.
+        showTicks = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show regen ticks", order = 3,
+            description = "After the five-second window, a gold line keeps WoW Classic's two-second regen rhythm until your next mana-costing cast or the end of the fight. A rhythm for the Classic habit, not the game's own ticks.",
+        },
+        tickColour = {
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "Tick line colour", order = 4,
         },
     },
 }, {
@@ -547,6 +780,13 @@ ns.FiveSecondRule = {
             castsFree = tracker.counters.castsFree or 0,
             castsCostUnknown = tracker.counters.castsCostUnknown or 0,
             windowStartedAt = tracker.windowStartedAt,
+            -- Patch 03 section 9. tickFraction is 0 unless the state is Ticking.
+            tickFraction = tickFraction(now),
+            tickAnchor = tracker.tickAnchor,
+            showTicks = tracker.showTicks,
+            lineShown = tracker.lineShown,
+            driverRunning = (tracker.driver ~= nil and tracker.driver:GetScript("OnUpdate") ~= nil),
+            counters = tracker.counters,
         }
     end,
 }

@@ -442,8 +442,9 @@ class RealExportTests(unittest.TestCase):
         # failing before Phase 16 added premises 37-47 (Phase 16 section 12.2). Patch 02
         # retired five ring premises and added one: 86 - 5 + 1 (Patch 02 section 2.3).
         # Phase 21 added thirteen, premises 87-99 (Phase 21 section 12). Phase 22 added
-        # thirteen more, premises 100-112 (Phase 22 section 10).
-        self.assertEqual(len(register), 108)
+        # thirteen more, premises 100-112 (Phase 22 section 10). Patch 03 added eight,
+        # premises 113-120 (Patch 03 section 10).
+        self.assertEqual(len(register), 116)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
@@ -609,6 +610,24 @@ class RealExportTests(unittest.TestCase):
                    "CONSOLE-FORCES-INSECURE", "DEV-CONSOLE-FORCES-INSECURE",
                    "SETCVAR-REFUSES-SECURE")
         for premise_id in phase22:
+            outcome = premises.evaluate_premise(by_id[premise_id], current, None)
+            self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
+            if by_id[premise_id].check["kind"] == "Pattern":
+                self.assertIn(by_id[premise_id].check["file"], current.load_set.files)
+
+    def test_t31_the_patch03_premises_hold_on_the_current_export(self):
+        # Architecture/20261122-Patch03.md section 10. As T30: both Pattern premises name
+        # a file in the load set, and the FlagAbsent checks pin their entry names, so a
+        # misspelt one reads Broken here. 116 and 117 pin the two Blizzard facts that keep
+        # the role box off the pad; 118-120 pin Auto's tank test as readable in a fight.
+        register = premises.load_register(patch_check.default_paths().register)
+        current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
+        by_id = {premise.id: premise for premise in register}
+        patch03 = ("UNIT-FACTION-GROUP-PVP-READABLE", "UNIT-FACTION-GROUP-IDENTITY-READABLE",
+                   "UNIT-AFFECTING-COMBAT-READABLE", "PAD-NAV-PANEL-DESCENDANTS-ONLY",
+                   "PAD-MOUSE-FOCUS-MANAGED-ONLY", "TANK-AURA-TEST-READS-IN-COMBAT",
+                   "TANK-AURA-TEST-ANSWERS-IN-COMBAT", "TANK-AURA-TEST-UNRESTRICTED")
+        for premise_id in patch03:
             outcome = premises.evaluate_premise(by_id[premise_id], current, None)
             self.assertEqual(outcome.status, premises.HOLDS, f"{premise_id}: {outcome.evidence}")
             if by_id[premise_id].check["kind"] == "Pattern":

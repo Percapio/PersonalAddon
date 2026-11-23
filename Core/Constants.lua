@@ -5,7 +5,7 @@
 local ADDON_NAME, ns = ...
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION = "1.12.0-phase22"
+ns.VERSION = "1.12.1-patch03"
 
 ns.SAVED_VARIABLE = "PersonalAddonDB"
 ns.QUARANTINE_KEY = "quarantinedStore"
@@ -20,6 +20,11 @@ ns.CURRENT_SCHEMA_VERSION = 1
 -- with the tick-phase design: this client protects power values, so there is no
 -- observable tick. See Architecture section 11.1a.
 ns.FSR_WINDOW = 5.0
+-- Patch 03 section 4 (decisions D4, D24): the regen tick line's rhythm. WoW Classic's
+-- 2-second interval, by the user's decision: a cue for a Classic habit, not a fact
+-- about Forever. The game's own ticks cannot be read (power values are secret), so
+-- nothing here claims to match them. Do not "correct" this to game data.
+ns.FSR_TICK_PERIOD = 2.0
 
 -- UNAVAILABLE (Architecture/20261104-Patch02.md section 4.5): enable found an optional
 -- provider missing. Not a fault: no error line, and the provider says so once itself.
@@ -48,11 +53,14 @@ ns.CONFIG_RESULT = {
     RELOAD_REQUIRED = "RELOAD_REQUIRED",
 }
 
--- Two states, not three. UNKNOWN existed to model "the phase estimate is
--- unrecoverable"; with no phase to estimate, not-in-window IS regenerating.
+-- Three states. UNKNOWN existed to model "the phase estimate is unrecoverable";
+-- with no phase to estimate, not-in-window is regenerating. Patch 03 section 4.2
+-- adds TICKING: after a window that ends in combat, the line keeps the 2-second
+-- rhythm until the next mana-costing cast or the end of the fight.
 ns.TRACKER_STATE = {
     REGENERATING = "REGENERATING",
     IN_FSR = "IN_FSR",
+    TICKING = "TICKING",
 }
 
 -- Enum.PowerType exists on the modern client codebase; 0 is the correct
@@ -92,6 +100,10 @@ ns.DIAGNOSTICS_FAULT_NOTE_LENGTH = 300
 -- The client's threat scale: 2 and 3 mean the unit is the mob's current target.
 -- A client fact, not a preference (GAPBugs01 section 3.6).
 ns.TANKING_STATUS = 2
+-- Status 3: the unit is the mob's target and holds the most threat; 2 is its target
+-- while someone else out-threatens it. Tank colours tell them apart (Patch 03
+-- section 5.2).
+ns.SECURELY_TANKING_STATUS = 3
 -- Status 1: your threat is above the tank's and the mob is not on you yet. A
 -- client fact (Phase 11 section 3).
 ns.ABOUT_TO_PULL_STATUS = 1

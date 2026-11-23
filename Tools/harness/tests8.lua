@@ -56,7 +56,15 @@ end
 -- above it. Pool order says nothing about screen order.
 local function rowsText()
     local panel = _G.PersonalAddonEquippedSkills
-    local rows = shownChildren(panel)
+    -- Patch 03 section 14.1 (audit finding 2): skill rows only. The role box is a shown
+    -- child of the panel anchored to it too, as breakdownRows filters on share
+    -- (tests20.lua:290). shownChildren itself also serves the toasts, so it stays as is.
+    local rows = {}
+    for _, frame in ipairs(shownChildren(panel)) do
+        if rawget(frame, "level") then
+            rows[#rows + 1] = frame
+        end
+    end
     local texts, anchor = {}, panel
     for _ = 1, #rows do
         local nextRow

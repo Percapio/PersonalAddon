@@ -840,3 +840,65 @@ statement = "C_CVar.SetCVar refuses a secure CVar"
 source = "Phase 22 section 7.2, decision D3"
 consequence = "An addon could now write the draw distance. D3 stands (the user owns the setting), but section 7.2's first row and README's row change (README.md)"
 check = { kind = "FlagEquals", entry = "C_CVar.SetCVar", flag = "RequiresNonSecureCVar", value = "true" }
+
+# Patch 03 (Architecture/20261122-Patch03.md section 10). Premises 113-120, numbered on
+# from Phase 22's 100-112. 113-114 hold the faction split up, 115 the tick line, 116-117
+# keep the role box off the pad (sharper than G1-PATH: they fail only when the facts
+# section 6.3 relies on fail), and 118-120 are Auto's: the game's own tank test stays
+# readable, answering and unrestricted in a fight.
+
+[[premise]]
+id = "UNIT-FACTION-GROUP-PVP-READABLE"
+statement = "A unit's faction is not secret in a PvP match"
+source = "Patch 03 section 3.2"
+consequence = "In battlegrounds every player name reads FactionUnreadable and stays the game's white; nameColourFactionUnread climbs (Features/Nameplates.lua)"
+check = { kind = "FlagAbsent", entry = "UnitFactionGroup", flag = "SecretInActivePvPMatch" }
+
+[[premise]]
+id = "UNIT-FACTION-GROUP-IDENTITY-READABLE"
+statement = "A unit's faction is not secret for units outside your group"
+source = "Patch 03 section 3.2"
+consequence = "Every stranger's name reads FactionUnreadable, so no name turns light orange anywhere; nameColourFactionUnread climbs (Features/Nameplates.lua)"
+check = { kind = "FlagAbsent", entry = "UnitFactionGroup", flag = "SecretWhenUnitIdentityRestricted" }
+
+[[premise]]
+id = "UNIT-AFFECTING-COMBAT-READABLE"
+statement = "Whether the player is in combat is never secret"
+source = "Patch 03 section 4.3"
+consequence = "Every window ends with ticksSkippedCombatUnread and no tick line is ever drawn; the five-second window is unaffected (Features/FiveSecondRule.lua)"
+check = { kind = "FlagAbsent", entry = "UnitAffectingCombat", flag = "SecretReturns" }
+
+[[premise]]
+id = "PAD-NAV-PANEL-DESCENDANTS-ONLY"
+statement = "The pad cursor collects buttons only from the tracked panel's descendants and its extra panels"
+source = "Patch 03 section 6.3, GAPBugs01 section 2.9"
+consequence = "The Tank/DPS box's buttons may become pad targets, which would run our OnClick inside SmartNavigation's click: G1's carrier. Default roleChoice off and re-read Patch 03 section 6.3 before the next build (Features/EquippedSkills.lua)"
+check = { kind = "Pattern", file = "Blizzard_GamepadSmartNavigation/Utility.lua", regex = 'function Utility\.FindButtons\(inFrame, extraPanels, includeInFrame\)[\s\S]{0,1600}?local children = \{ frame:GetChildren\(\) \};[\s\S]{0,700}?FindButtons\(inFrame, buttonsFound\);\s*if extraPanels then\s*for _, panel in pairs\(extraPanels\) do\s*FindButtons\(panel, buttonsFound\);', expect = "Present" }
+
+[[premise]]
+id = "PAD-MOUSE-FOCUS-MANAGED-ONLY"
+statement = "A mouse click moves pad focus only to a frame the Gamepad UI is managing"
+source = "Patch 03 section 6.3"
+consequence = "A mouse click on the Tank/DPS box may select its button as the pad cursor's current button. Re-read Patch 03 section 6.3 before the next build (Features/EquippedSkills.lua)"
+check = { kind = "Pattern", file = "Blizzard_GamepadSharedUtility/FrameControlsManager.lua", regex = 'function GamepadFrameControlsManagerMixin:FocusFrame\(frame\)\s*local index = ArrayIndexOf\(self\.shownFrames, frame\);\s*if \(index == 0\) then\s*return false;', expect = "Present" }
+
+[[premise]]
+id = "TANK-AURA-TEST-READS-IN-COMBAT"
+statement = "The game's tank test is not made secret by combat or encounter restrictions"
+source = "Patch 03 section 5.7"
+consequence = "Auto reads Withheld in every fight and shows DPS colours there; autoRoleReadsUnread climbs (Core/Threat.lua)"
+check = { kind = "FlagAbsent", entry = "UnitHasEffectivelyTankAura", flag = "SecretWhenUnitAuraRestricted" }
+
+[[premise]]
+id = "TANK-AURA-TEST-ANSWERS-IN-COMBAT"
+statement = "The game's tank test does not go silent while auras are secret"
+source = "Patch 03 section 5.7"
+consequence = "In combat the test would return nothing, which reads Absent: Auto would show DPS colours in every fight, the trap round one found in GetPlayerAuraBySpellID (Core/Threat.lua)"
+check = { kind = "FlagAbsent", entry = "UnitHasEffectivelyTankAura", flag = "RequiresNonSecretAura" }
+
+[[premise]]
+id = "TANK-AURA-TEST-UNRESTRICTED"
+statement = "The game's tank test is not a restricted call"
+source = "Patch 03 section 5.7"
+consequence = "Rule 7: every Auto read would be a refusal. Remove Auto from the box and re-read section 5.7 before the next build (Core/Threat.lua)"
+check = { kind = "FlagAbsent", entry = "UnitHasEffectivelyTankAura", flag = "HasRestrictions" }

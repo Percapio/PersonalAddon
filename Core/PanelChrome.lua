@@ -4,7 +4,8 @@
 -- window has to look like the breakdown panel, and two copies of the border chain
 -- would drift apart the first time either changed.
 --
--- Every panel built here is parented to UIParent, never to a Blizzard frame.
+-- Every panel built here is parented to UIParent, or to another frame of ours (Patch
+-- 03 section 6.2: the role box under the skills panel), never to a Blizzard frame.
 -- SmartNavigation post-hooks CreateFrame and rebuilds a panel's navigation state,
 -- in the caller's execution, when a new frame's parent chain reaches a panel it
 -- tracks (Patch 01 section 0.2). A child of ours under a Blizzard panel would put
@@ -55,15 +56,15 @@ local BORDER_TEMPLATES = {
     "InsetFrameTemplate3",
 }
 
-local function createPanelFrame(frameName)
+local function createPanelFrame(frameName, parent)
     for index = 1, #FRAME_TEMPLATES do
         local ok, frame = pcall(CreateFrame, "Frame", frameName,
-            _G.UIParent, FRAME_TEMPLATES[index])
+            parent, FRAME_TEMPLATES[index])
         if ok and frame then
             return frame, FRAME_TEMPLATES[index]
         end
     end
-    return CreateFrame("Frame", frameName, _G.UIParent), nil
+    return CreateFrame("Frame", frameName, parent), nil
 end
 
 local function applyBorder(panel, ownerKey, ownerLabel)
@@ -114,10 +115,12 @@ end
 -- spec.strata      frame strata, or nil to inherit UIParent's
 -- spec.ownerKey    prefix for this panel's once-only notices
 -- spec.ownerLabel  how a notice names the panel, e.g. "the breakdown panel"
+-- spec.parent      one of OUR frames, or nil for UIParent (Patch 03 section 6.2).
+--                  Never a Blizzard frame: README rule 6
 --
 -- Returns { frame, background, borderStyle }.
 function PanelChrome.Build(spec)
-    local panel, frameTemplate = createPanelFrame(spec.frameName)
+    local panel, frameTemplate = createPanelFrame(spec.frameName, spec.parent or _G.UIParent)
     panel:SetWidth(spec.width)
     panel:SetHeight(spec.height)
 

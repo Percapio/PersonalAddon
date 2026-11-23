@@ -2,7 +2,7 @@
 ## Title: PersonalAddon
 ## Notes: Cherry-picked quality-of-life features, controller-first.
 ## Author: perceptum
-## Version: 1.12.0
+## Version: 1.12.1
 ## IconTexture: Interface\AddOns\PersonalAddon\Images\logo.png
 ## SavedVariables: PersonalAddonDB, PersonalAddonBlockLog, PersonalAddonDiagnostics
 # PersonalAddonBlockLog holds the refusals BlockWatch records, with their

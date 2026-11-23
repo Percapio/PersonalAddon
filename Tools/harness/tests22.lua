@@ -635,8 +635,9 @@ if not NOHOOK then
         header ~= nil and initializers[headerIndex + 1] ~= nil
         and initializers[headerIndex + 1].name == "Can fight you, or you them"
         and header.tooltip == "Used by \"Colour player names\".", header and header.tooltip)
+    -- Patch 03 (D3): the second picker is relabelled "The other faction"; key unchanged.
     check("G3 the pickers come after the threat colours",
-        table.concat(swatches, "|"):find("Hostile, and attacking neither|Can fight you, or you them|Every other player", 1, true) ~= nil,
+        table.concat(swatches, "|"):find("Hostile, and attacking neither|Can fight you, or you them|The other faction", 1, true) ~= nil,
         table.concat(swatches, "|"))
     local accepted = ns.ConfigStore.Set("nameplates", "nameColourCanFight", "zzzzzz")
     check("G4 a colour that is not six hex digits is refused", accepted == false

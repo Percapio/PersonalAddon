@@ -32,6 +32,10 @@
 -- player's name, red when either of you can attack the other and light orange
 -- otherwise. Blizzard rewrites it in CompactUnitFrame_UpdateName on every soft-target
 -- change, so it gets a post-hook of its own (section 4.3).
+--
+-- Patch 03 (Architecture/20261122-Patch03.md): light orange is for a player of the
+-- other faction only, and your own faction keeps the game's white (section 3); the
+-- bar colours follow the role, DPS, Tank or Auto (section 5).
 
 local ADDON_NAME, ns = ...
 
@@ -118,6 +122,11 @@ local state = {
     -- plate count. generation is bumped by disable, which turns a pending flush into
     -- a no-op (C_Timer.After cannot be cancelled).
     factionWork = { plates = {}, all = false, scheduled = false, generation = 0 },
+    -- Patch 03 section 5.5: the stored choice, and the role and Auto reading the last
+    -- sweep resolved. The attach and the hooks use these, so they make no test read.
+    roleChoice = Threat.ROLE_CHOICE.DPS,
+    role = Threat.ROLE.DPS,
+    auto = Threat.AUTO_READING.NOT_ASKED,
     -- This UI load's diagnostics table (Phase 9 section 4.3). A detached table until
     -- enable binds it, so nothing here ever indexes nil.
     counters = {},
@@ -175,6 +184,7 @@ local function readSettings(config)
     state.colouringWanted = (settings.aggroColouring ~= false)
     state.yieldSelectedTarget = (settings.yieldSelectedTarget == true)
     state.palette = Threat.PaletteFrom(settings)
+    state.roleChoice = Threat.RoleChoiceFrom(settings)
 end
 
 -- Frame shape -----------------------------------------------------------------
@@ -278,7 +288,7 @@ local function verdictFor(plate, allies, allyCount)
     if withheld > 0 then
         noteWithheldThreat()
     end
-    return Threat.ResolveVerdict(aggro, Threat.Disposition(unitToken, counters))
+    return Threat.ResolveVerdict(aggro, Threat.Disposition(unitToken, counters), state.role)
 end
 
 -- Guild names (Phase 15) ------------------------------------------------------
@@ -1166,7 +1176,8 @@ end
 -- Red when either of you can attack the other; light orange for every other player
 -- (Architecture/20261122-Phase22.md sections 3-5). NPCs, your own plate and names
 -- drawn inside the bar (Large, Block) are left to Blizzard, as is a friendly player
--- while Blizzard's class-colour option is on (D10).
+-- while Blizzard's class-colour option is on (D10). Patch 03 section 3: light orange
+-- only for the other faction; your own faction's players are left to the game's white.
 --
 -- Two fields per plate, and they are different facts (audit findings 1 and 2):
 -- nameDecision is what the last decision answered, for the counters and the view;
@@ -1197,6 +1208,9 @@ local NAME_SKIP = {
     ATTACK_UNREADABLE = "AttackUnreadable",
     CLASS_COLOUR_WINS = "ClassColourWins",
     CLASS_COLOUR_UNREADABLE = "ClassColourUnreadable",
+    -- Patch 03 section 3.3.
+    SAME_FACTION = "SameFaction",
+    FACTION_UNREADABLE = "FactionUnreadable",
 }
 
 local NAME_OUTCOME = {
@@ -1281,13 +1295,45 @@ local function nameIneligibility(plate, anchor)
     return NAME_SKIP.STYLE_UNREADABLE
 end
 
+-- A plate's faction, read once per occupancy (Patch 03 section 3.2): a unit cannot
+-- change faction while its plate is up. A Plain, non-empty tag is kept on the record,
+-- which is rebuilt on every attach; anything else is counted and asked again.
+local function resolvePlateFaction(plate)
+    if plate.faction then
+        return plate.faction
+    end
+    local kind, tag = ClientRead.Call(_G.UnitFactionGroup, "string", plate.unitToken)
+    if kind == PLAIN and tag ~= "" then
+        plate.faction = tag
+        return tag
+    end
+    bump(state.counters, "nameColourFactionUnread")
+    return nil
+end
+
+-- Your own faction, once per batch: an attach, a pass, a faction flush or a settings
+-- change, beside that batch's one anchor read (Patch 03 section 3.4). Not cached
+-- across batches, so it needs no invalidation rule. false when it does not read.
+local function readYourFaction()
+    local kind, tag = ClientRead.Call(_G.UnitFactionGroup, "string", "player")
+    if kind == PLAIN and tag ~= "" then
+        return tag
+    end
+    bump(state.counters, "nameColourFactionUnread")
+    return false
+end
+
 -- What one plate's name should show now (section 3.5). Red when either of you can
 -- attack the other, by the client's own UnitCanAttack asked both ways (D2): that
 -- covers the flag, duels, arenas, free-for-all areas and mind control. A Withheld
 -- read is never taken as false (rule 10); the name is left to Blizzard, which claims
 -- nothing. The class-colour field is read only for a player who would be light
 -- orange, because red outranks Blizzard's decoration.
-local function decideNameColour(plate, anchor)
+--
+-- Patch 03 section 3.3: after the attack reads, the faction. Red comes first (D2), so a
+-- duel with your own faction is still red. Your own faction is left to the game's
+-- white (D1); a faction that does not read is left too, never taken as either.
+local function decideNameColour(plate, anchor, yourFaction)
     local identity = resolvePlayerIdentity(plate)
     if identity == IDENTITY.UNREADABLE then
         return NAME_SKIP.PLAYER_UNREADABLE
@@ -1311,6 +1357,13 @@ local function decideNameColour(plate, anchor)
     if youKind == WITHHELD or theyKind == WITHHELD then
         bump(state.counters, "nameColourAttackWithheld")
         return NAME_SKIP.ATTACK_UNREADABLE
+    end
+    local theirFaction = resolvePlateFaction(plate)
+    if not yourFaction or not theirFaction then
+        return NAME_SKIP.FACTION_UNREADABLE
+    end
+    if theirFaction == yourFaction then
+        return NAME_SKIP.SAME_FACTION
     end
     local classKind, byClass = ClientRead.Field(plate.unitFrame, "colorNameWithClassColor", "boolean")
     if classKind == WITHHELD then
@@ -1485,18 +1538,19 @@ local function applyNameColour(plate, decision)
     return NAME_OUTCOME.UNREADABLE
 end
 
--- One plate's decision and paint, for every caller but the hook.
-local function colourPlateName(plate, anchor)
+-- One plate's decision and paint, for every caller but the hook. yourFaction is the
+-- batch's readYourFaction() (Patch 03 section 3.4).
+local function colourPlateName(plate, anchor, yourFaction)
     if not nameColoursActive() then
         return NAME_OUTCOME.LEFT_ALONE
     end
-    return applyNameColour(plate, decideNameColour(plate, anchor))
+    return applyNameColour(plate, decideNameColour(plate, anchor, yourFaction))
 end
 
 -- The same, isolated: one plate's fault never stops the others (Phase 9 section 4.6).
 -- A faulted name is handed back to Blizzard and tried afresh next pass.
-local function colourPlateNameIsolated(plate, anchor)
-    local ok, outcome = ns.Isolation.Call(colourPlateName, plate, anchor)
+local function colourPlateNameIsolated(plate, anchor, yourFaction)
+    local ok, outcome = ns.Isolation.Call(colourPlateName, plate, anchor, yourFaction)
     if ok then
         return outcome
     end
@@ -1531,7 +1585,7 @@ end
 -- Every player plate not waiting for a faction flush (section 5.3). A flush covering
 -- every plate skips the whole pass, so a change the sweep finds is one no event
 -- announced.
-local function colourAllPlayerNames(anchor)
+local function colourAllPlayerNames(anchor, yourFaction)
     local work = state.factionWork
     if work.all then
         return
@@ -1539,7 +1593,7 @@ local function colourAllPlayerNames(anchor)
     for _, plate in pairs(state.plates) do
         if plate.identity ~= IDENTITY.NOT_A_PLAYER and not work.plates[plate] then
             local before = plate.nameDecision
-            colourPlateNameIsolated(plate, anchor)
+            colourPlateNameIsolated(plate, anchor, yourFaction)
             local after = plate.nameDecision
             if before ~= nil and after ~= nil and after ~= before then
                 bump(state.counters, "nameColourChangedBySweep")
@@ -1643,7 +1697,7 @@ local function trackPlate(unitToken)
     -- alignment. Before the UNREACHABLE return: such a plate has no name region, and
     -- the decision says so (NoNameRegion).
     if coloursOn then
-        colourPlateNameIsolated(plate, anchor)
+        colourPlateNameIsolated(plate, anchor, readYourFaction())
     end
 
     if plate.scope == SCOPE.UNREACHABLE then
@@ -1827,7 +1881,7 @@ end
 -- rescope fault is the bar's and cedes the bar, a name fault is the name's and
 -- releases the name, and neither costs the other.
 
-local function settleFactionPlate(plate, anchor)
+local function settleFactionPlate(plate, anchor, yourFaction)
     local ok, fault = ns.Isolation.Call(rescopePlate, plate)
     if not ok then
         bump(state.counters, "plateFaults")
@@ -1837,7 +1891,7 @@ local function settleFactionPlate(plate, anchor)
             "a nameplate faulted and was handed back to Blizzard's colour; /pa diag shows the message")
     end
     if anchor then
-        colourPlateNameIsolated(plate, anchor)
+        colourPlateNameIsolated(plate, anchor, yourFaction)
     end
 end
 
@@ -1858,15 +1912,17 @@ local function flushFactionChanges(generation)
     -- finding 6a). A stand-down part-way leaves the rest with nothing to do: each
     -- plate's name step checks "active" before it reads.
     local anchor = nameColoursActive() and readNameAnchor() or nil
+    -- Patch 03 section 3.4: your faction once per flush, beside the anchor.
+    local yourFaction = anchor and readYourFaction() or nil
     if all then
         for _, plate in pairs(state.plates) do
-            settleFactionPlate(plate, anchor)
+            settleFactionPlate(plate, anchor, yourFaction)
         end
         return
     end
     for plate in pairs(named) do
         if state.plates[plate.frame] == plate then
-            settleFactionPlate(plate, anchor)
+            settleFactionPlate(plate, anchor, yourFaction)
         end
     end
 end
@@ -1909,6 +1965,11 @@ local function sweep()
     state.reassertPending = false
 
     local allies, allyCount = Threat.Allies()
+    -- Patch 03 section 5.5: the role once per pass, before any plate's verdict, and
+    -- only while the bars are coloured. Under Auto this is the pass's one test read.
+    if colouringActive() then
+        state.role, state.auto = Threat.ResolveRole(state.roleChoice, state.counters)
+    end
     -- Phase 22 section 5.3: one anchor read for the pass, and none unless alignment or
     -- player name colours want it.
     local coloursOn = nameColoursActive()
@@ -1916,9 +1977,10 @@ local function sweep()
     -- Phase 20 section 8.3: every plate, outside the scope filter below, for the
     -- paths that re-lay a name out after the hooks have run.
     alignAllPlateNames(anchor)
-    -- Phase 22 section 5.3: every player plate, outside the scope filter too.
+    -- Phase 22 section 5.3: every player plate, outside the scope filter too. Patch 03
+    -- section 3.4: your faction once per pass, beside the anchor.
     if coloursOn then
-        colourAllPlayerNames(anchor)
+        colourAllPlayerNames(anchor, readYourFaction())
     end
     for _, plate in pairs(state.plates) do
         if plate.scope == SCOPE.IN then
@@ -2261,8 +2323,9 @@ local function onConfigChanged(config, changedKey)
             noteMissingNameHook()
             if nameColoursActive() then
                 local anchor = readNameAnchor()
+                local yourFaction = readYourFaction()
                 for _, plate in pairs(state.plates) do
-                    colourPlateNameIsolated(plate, anchor)
+                    colourPlateNameIsolated(plate, anchor, yourFaction)
                 end
             end
         else
@@ -2368,6 +2431,9 @@ defaultSettings.nameAlignLeft = false
 defaultSettings.playerNameColours = false
 defaultSettings.nameColourCanFight = NAME_COLOUR_DEFAULTS.CanFight
 defaultSettings.nameColourOtherPlayer = NAME_COLOUR_DEFAULTS.OtherPlayer
+-- Patch 03 section 6.6 (D30): what the bar colours are for, written by the role box
+-- under the skills window and by /pa role. DPS by default (D16).
+defaultSettings.threatRole = Threat.ROLE_CHOICE.DPS
 -- Phase 19's rarityRings, rarityRingSize and rarityRingOffsetX/Y are gone with the
 -- ring (Patch 02 section 5). ConfigStore prunes them from a stored config at
 -- hydration, once, because no default claims them any more (section 5.4).
@@ -2384,7 +2450,7 @@ ns.Registry.Register(FEATURE_ID, {
     schema = {
         aggroColouring = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour nameplates", order = 1,
-            description = "Red: it is attacking you. Orange: you are about to pull it. Grey: tagged by a player outside your group. Green: attacking your group or pet. Yellow: neutral. White: hostile, attacking neither.",
+            description = "Red: it is attacking you. Orange: you are about to pull it. Grey: tagged by a player outside your group. Green: attacking your group or pet. Yellow: neutral. White: hostile, attacking neither. Tank (the switch beside your bags, or Auto while the game counts you as tanking): green when you hold it, orange when it is about to change hands, red when it is on your group.",
         },
         -- Phase 14. A percentage of the game's own height, not a pixel count: the
         -- game's base depends on the Style and Global Scale the user chose, so a
@@ -2424,7 +2490,7 @@ ns.Registry.Register(FEATURE_ID, {
         -- Phase 22 section 8.2 takes order 7, beside the other name toggles.
         playerNameColours = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Colour player names", order = 7,
-            description = "Red: a player who can fight you, or whom you can fight: an enemy with PvP on, a battleground enemy, a duel. Light orange: every other player. NPC names stay the game's. Not on the Large and Block styles, where the name sits inside the bar.",
+            description = "Red: a player who can fight you, or whom you can fight, of either faction. Light orange: a player of the other faction who can't. Your own faction and NPC names stay the game's. Not on the Large and Block styles, where the name sits inside the bar.",
         },
         yieldSelectedTarget = {
             kind = ns.ConfigSchema.KIND.TOGGLE, label = "Leave your target's colour alone", order = 11,
@@ -2466,8 +2532,18 @@ ns.Registry.Register(FEATURE_ID, {
             groupDescription = "Used by \"Colour player names\".",
         },
         nameColourOtherPlayer = {
-            kind = ns.ConfigSchema.KIND.COLOUR, label = "Every other player", order = 19,
+            kind = ns.ConfigSchema.KIND.COLOUR, label = "The other faction", order = 19,
             group = "Player names",
+        },
+        -- Patch 03 section 6.6: not curated (D17). The settings page draws a Choice only
+        -- when it has two values, and this one has three; the role box and /pa role set it.
+        threatRole = {
+            kind = ns.ConfigSchema.KIND.CHOICE, label = "Threat colours for", curated = false,
+            choices = {
+                { value = "Dps", label = "DPS" },
+                { value = "Tank", label = "Tank" },
+                { value = "Auto", label = "Auto" },
+            },
         },
         -- Not curated: a frame-rate decision dressed as a preference.
         sweepInterval = {
@@ -2685,6 +2761,13 @@ ns.Nameplates = {
             unreachable = unreachable,
             coloured = coloured,
             verdicts = verdicts,
+            -- Patch 03 section 9: the stored choice, and the role and Auto reading the
+            -- last sweep resolved.
+            roleChoice = state.roleChoice,
+            role = state.role,
+            auto = state.auto,
+            autoRoleReadsPlain = counters.autoRoleReadsPlain or 0,
+            autoRoleReadsUnread = counters.autoRoleReadsUnread or 0,
             standingCapability = Threat.StandingCapability(),
             sweeps = state.sweepCount,
             hookInstalled = state.hookInstalled,

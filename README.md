@@ -64,7 +64,7 @@ Combat modules provide low-overhead combat telemetry while respecting Blizzard's
 
 - **Damage Breakdown:** Renders the last fight's damage by spell directly above the player frame: a header with the fight's length and DPS, then each spell's icon, DPS, and share, with shares that always add up to 100%. Reads Blizzard's internal meter rather than processing combat log text strings.
 - **Threat Panel:** Displays attacking mobs, current threat margins, target markers, and health bars in the same HUD anchor during encounters.
-- **Five-Second Rule (FSR):** Smooth status sweep texture mapped across the mana bar tracking spirit regeneration windows for casters. Only a cast that spends mana starts it; wand shots, Auto Shot, and potions leave it alone.
+- **Five-Second Rule (FSR):** Smooth status sweep texture mapped across the mana bar tracking spirit regeneration windows for casters. Only a cast that spends mana starts it; wand shots, Auto Shot, and potions leave it alone. After the window, a gold line keeps WoW Classic's two-second regen rhythm.
 - **Upkeep:** Out of combat, the buffs and weapon enchants about to run out, and your ammo or soul shards, beside the damage and threat panels.
 - **Implementations:** [`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua), [`Features/ThreatPanel.lua`](Features/ThreatPanel.lua), [`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua), and [`Features/Upkeep.lua`](Features/Upkeep.lua).
 
@@ -83,7 +83,7 @@ Custom nameplate restyling prioritizes threat accountability, target hierarchy, 
 - **Guild Names:** Displayed under player health bars in secondary weight with outline filtering and full escape-code neutralization ([`Core/EscapeGuard.lua`](Core/EscapeGuard.lua)).
 - **NPC Roles:** Friendly NPCs show their role (Innkeeper, Weapon Merchant, Flight Master) in the guild name's place, read from QuestieDB.
 - **Name Alignment:** On the Thin and Cast Focus styles, an option moves each nameplate's name from the middle of the bar to its left end.
-- **Player Name Colours:** Red for a player who can fight you, light orange for every other player.
+- **Player Name Colours:** Red for a player who can fight you, light orange for the other faction; your own faction keeps the game's white.
 - **Threat-Priority Color Palette:** Six prioritized color states reflecting aggro status, pull proximity, outside taps, and neutral disposition.
 - **Implementation:** [`Features/Nameplates.lua`](Features/Nameplates.lua).
 
@@ -98,7 +98,7 @@ Streamlined inventory management focused on non-disruptive automation and clear 
 | ![Bags and Loot Settings Page 1](Images/bags_n_loot1.png) | ![Bags and Loot Settings Page 2](Images/bags_n_loot2.png) |
 | *Geometry and opacity controls for Equipped Skills dock and toast notification triggers.* | *Throttle controls for post-close bag sorting and merchant auto-vend.* |
 
-- **Equipped Skills Panel:** Docks adjacent to open bags displaying weapon skill ranks, defense, and primary professions.
+- **Equipped Skills Panel:** Docks adjacent to open bags displaying weapon skill ranks, defense, and primary professions. Under it, a Tank / DPS / Auto switch for the threat colours. Mouse only: the controller's cursor never reaches addon buttons, on purpose.
 - **Custom Loot Toasts:** Independent pop-ups for looted currency, uncommon-or-better items, quest objects, and the gold a merchant visit earns you, without hooking Blizzard's alert frames.
 - **Safe Container Sorting:** Automatically executes Clean Up Bags on bag close with a 60-second cooldown lock, verifying no item locks are held.
 - **Auto-Junk Liquidation:** Executes automated grey-item sales upon opening merchant frames, with the proceeds folded into the merchant visit toast.
@@ -157,7 +157,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 ### Combat
 
 - **Five-Second Rule ([`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua)):**
-  For mana users, a calibrated indicator sweeps across the player mana bar displaying the elapsed time until spirit-based mana regeneration resumes. A cast that spends mana restarts the sweep; a cast that costs no mana — a wand shot, Auto Shot, a potion — leaves the sweep alone. Mana values remain masked by the client, so discrete regeneration ticks cannot be surfaced.
+  For mana users, a calibrated indicator sweeps across the player mana bar displaying the elapsed time until spirit-based mana regeneration resumes. A cast that spends mana restarts the sweep; a cast that costs no mana — a wand shot, Auto Shot, a potion — leaves the sweep alone. After the window, a gold line keeps WoW Classic's two-second regen rhythm until your next mana-costing cast or the end of the fight. It is a rhythm for the Classic habit, not the game's own ticks: mana stays masked from addons. Its own switch turns it off.
 - **Threat Panel HUD ([`Features/ThreatPanel.lua`](Features/ThreatPanel.lua)):**
   During combat, dynamically summarizes all units engaged with the player or party:
   - Unit health bar rendered in threat-priority color palette.
@@ -183,16 +183,18 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Nameplate Threat Colors ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Recolors hostile and neutral nameplates based on tank/damage-dealer threat hierarchy:
 
-  | Priority | Color | Condition |
-  |---|---|---|
-  | 1 | Red | Attacking you directly (overrides external tap tags) |
-  | 2 | Orange | Imminent pull: your threat exceeds the active tank |
-  | 3 | Grey | Tagged by an external player outside your party/raid |
-  | 4 | Green | Attacking a party member or your active pet |
-  | 5 | Yellow | Neutral unit |
-  | 6 | White | Hostile unit attacking neither party nor player |
+  | Priority | Color | Condition | Tank |
+  |---|---|---|---|
+  | 1 | Red | Attacking you directly (overrides external tap tags) | Green while you hold it securely; orange while someone out-threatens you short of pulling it |
+  | 2 | Orange | Imminent pull: your threat exceeds the active tank | Orange: you are about to win it back |
+  | 3 | Grey | Tagged by an external player outside your party/raid | Grey while it attacks nobody in your group |
+  | 4 | Green | Attacking a party member or your active pet | Red, ranked above grey: a mob loose on your group |
+  | 5 | Yellow | Neutral unit | Yellow |
+  | 6 | White | Hostile unit attacking neither party nor player | White |
 
   Red and orange are prioritized for survival; tapped grey never masks an enemy targeting the player. Colors derive from server threat tables, functioning reliably in dungeons and raid instances.
+
+  Tank, DPS or Auto is chosen with the mouse in a small box under the skills window while your bags are open. Auto follows the game's own test for whether you are tanking. DPS is the default, and the threat panel follows. Orange means "about to change hands" in both roles.
 - **Guild Names on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Draws player guild tags underneath health bars in secondary muted white with black outline shaders. Strings pass through [`Core/EscapeGuard.lua`](Core/EscapeGuard.lua) to strip formatting exploits before drawing.
 - **NPC Roles on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
@@ -202,7 +204,8 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Player Name Colours ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   A player's name on their nameplate, recoloured:
   - **Red** when they can fight you, or you them: an enemy with PvP on, a battleground enemy, a duel, an arena, a free-for-all area. "Can fight" is the game's own answer, asked both ways, so an unflagged enemy turns red the moment you flag yourself.
-  - **Light orange** for every other player. Both colours are pickers on the Nameplates page.
+  - **Light orange** for a player of the other faction who can't. Both colours are pickers on the Nameplates page.
+  - **Your own faction** keeps the game's white, or its class colour with the game's friendly class-colour option on.
   - NPC names stay the game's, as do the pets and totems of players. Off by default.
   - Not on the Large and Block styles, where the name sits inside the bar and a coloured name would be lost against the bar; a name-only plate is still coloured. With the game's class colour for friendly names on (Options → Nameplates), friendly players keep it.
   - Only the nameplate's name changes: the names the game draws above characters' heads are its own.
@@ -216,7 +219,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 ### Bags & Loot
 
 - **Equipped Skills Panel ([`Features/EquippedSkills.lua`](Features/EquippedSkills.lua)):**
-  When bags are open, docks a compact skill summary against the left container frame showing primary profession ranks, equipped weapon skills, and defense as `rank / maximum`.
+  When bags are open, docks a compact skill summary against the left container frame showing primary profession ranks, equipped weapon skills, and defense as `rank / maximum`. Under it, a Tank / DPS / Auto switch for the threat colours. Mouse only: the controller's cursor never reaches addon buttons, on purpose. Its own checkbox hides it, and `/pa role` sets the same choice from chat.
 - **Custom Toast Alerts ([`Features/Toasts.lua`](Features/Toasts.lua)):**
   Surfaces popups for looted currency, green-or-better items, and quest objects. When you leave a merchant richer than you arrived, one toast shows the gold gained over the visit — items sold by hand and junk sold automatically alike. The game's own "You gained" chat line still prints. A visit that only bought things shows nothing, and quest rewards and crafted items never trigger a toast. Screen duration, offset, and categories are configurable; "Gold gained at a merchant" switches the visit toast off and brings back a junk sale's own toast.
 - **Automated Bag Consolidation ([`Features/AutoSortBags.lua`](Features/AutoSortBags.lua)):**
@@ -268,13 +271,14 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 | `/pa on <feature>`, `/pa off <feature>` | Toggles specific feature modules on or off |
 | `/pa get <feature>`, `/pa set <feature> <k> <v>` | Reads or updates a specific configuration key |
 | `/pa skills` | Dumps current skills panel layout and tracked values to chat |
+| `/pa role`, `/pa role tank\|dps\|auto` | Shows or sets whose threat colours the nameplates and threat panel use, stored per account, and whether the Tank / DPS / Auto box is showing; under Auto, also what the game's tank test answers |
 | `/pa toasts`, `/pa toasts test` | Summarizes toast metrics and the merchant visit in progress; emits one synthetic toast of each of the six kinds, merchant visit, rare and low supply included |
 | `/pa upkeep`, `/pa upkeep test` | Reports what Upkeep shows and why: whether buffs and enchants could be read, the ammo and shard counts, the anchor, and its counters; `test` posts a sample low-supply toast |
 | `/pa rares`, `/pa rares test` | Reports the map reading, whether enemy nameplates are on, the rares announced this session, and the counters; `test` posts a sample rare toast and plays the sound |
 | `/pa bags`, `/pa vend` | Reports last container sort or vendor event, including skip reasons and what holds a sort back |
 | `/pa consumables` | Summarizes active consumable bindings and assignment diagnostics |
 | `/pa quests` | Displays QuestieDB bridge status, offered NPC quests, and marker targets, and which features are waiting for QuestieDB |
-| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles and whether they can be read, name alignment and its capability, player name colours and why each name was left alone, and the draw distance), and FSR tracker (casts that spent mana, cost nothing, or could not be priced) |
+| `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles and whether they can be read, name alignment and its capability, player name colours and why each name was left alone, and the draw distance), and FSR tracker (casts that spent mana, cost nothing, or could not be priced, and the regen ticks: started, skipped and stopped, by reason) |
 | `/pa preview [on\|off\|threat\|dps]` | Manages visual adjustment preview mode and toggles active HUD anchor |
 | `/pa panel` | Inspects settings registration tree and category building diagnostics |
 | `/pa blocked` | Outputs protected function refusals attributed to PersonalAddon |
@@ -326,8 +330,23 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
 ### Player Names Stay White
 
-- **Mechanism:** Player name colours are off by default. On the Large and Block styles the name sits inside the bar and is left alone. With the game's class colour for friendly names on, friendly players keep it.
+- **Mechanism:** Player name colours are off by default. On the Large and Block styles the name sits inside the bar and is left alone. With the game's class colour for friendly names on, friendly players keep it. Players of your own faction stay white by design, unless they can fight you.
 - **Fix:** Turn on **Options → AddOns → PersonalAddon → Nameplates → Colour player names**, on the Thin or Cast Focus style. `/pa plates` says why each name was left alone (`left:`). Details in [`Architecture/20261122-Phase22.md`](Architecture/20261122-Phase22.md) §3.
+
+### The Role Switch Won't Take the Controller
+
+- **Mechanism:** By design. A button the controller's cursor can select runs its scripts inside the Gamepad UI's own execution and stays its current button, which is how the upstream defect above taints it. The Tank / DPS / Auto box is kept out of the cursor's reach ([`Architecture/20261122-Patch03.md`](Architecture/20261122-Patch03.md) §6.3).
+- **Fix:** Use the mouse, or type `/pa role tank` (or `dps`, `auto`) in chat. Do not put `/pa role` in a macro on a controller bar: the command would then run inside a controller press.
+
+### Auto Shows DPS While I Tank
+
+- **Mechanism:** Auto follows only the game's own test for whether you are tanking. On Forever that test does not count every form, stance or buff a player tanks in.
+- **Fix:** Choose Tank instead. `/pa role` shows what the test answers right now. Details in [`Architecture/20261122-Patch03.md`](Architecture/20261122-Patch03.md) §5.7.
+
+### Tank Colours on Every Character
+
+- **Mechanism:** The Tank / DPS / Auto choice is stored per account, not per character.
+- **Fix:** Switch it back in the box under the skills window, or with `/pa role dps`. Auto suits an account whose characters tank only some of the time.
 
 ### A Mob Vanished from the Threat Panel
 
@@ -378,6 +397,8 @@ Architectural decisions and experiments evaluated across development phases and 
 | Auto-Placing Macros on Bars | `PlaceAction` triggers synchronous slot mutation events inside addon code, compromising Gamepad action bar security | [Phase 12](Architecture/20261006-Phase12.md) §1.3, build 1.60.1.70291 |
 | Buff Timers in Combat | Buff durations are secret from addons during combat. Blizzard's aura container filters only by full duration, not time left, and refuses addon access while auras are secret. Upkeep hides in combat and shows what ran out when the fight ends | [Phase 21](Architecture/20261112-Phase21.md) §1.3, build 1.60.1.70938 |
 | Nameplate Draw Distance | Both distance settings are secure on Forever: all plates 45 yards, players 40. Addons are refused, Blizzard runs typed `/console` and the developer console insecurely, and Camelot leaves out the slider Classic offers. `/pa plates` shows both | [Phase 22](Architecture/20261122-Phase22.md) §7, build 1.60.1.71037 |
+| Regen Ticks from the Game | Mana is secret to addons in and out of combat; the tick line is a fixed two-second rhythm instead | [Patch 03](Architecture/20261122-Patch03.md) §1.3, §4, build 1.60.1.71037 |
+| Controller-Selectable Addon Buttons | The pad cursor runs an addon button's scripts inside its own execution and keeps the button as its current one: G1's carrier | [Patch 03](Architecture/20261122-Patch03.md) §6.3, [GAPBugs01](Architecture/20261002-GAPBugs01.md) §2.9 |
 
 ---
 
@@ -432,6 +453,7 @@ The World of Warcraft client evaluates code trust per execution thread. When Bli
 - Chat output routes through `AddMessage`, which enters Blizzard's message history and `FADEFRAMES` list.
 - Settings registration stores control definitions inside Blizzard's Settings tables.
 - The NPC quest tooltip block executes inside Blizzard's tooltip construction callback to ensure correct frame measurement before display ([`Features/NPCQuests.lua`](Features/NPCQuests.lua)).
+- The role switch's three buttons are PersonalAddon's only clickable frames. They stay out of the pad's navigation and carry no enter or leave scripts ([`Architecture/20261122-Patch03.md`](Architecture/20261122-Patch03.md) §6.3).
 - Nameplate restyling post-hooks execute inside Blizzard's draw call to prevent single-frame color flickers; the bar height, the name's left alignment and the player name colour are re-asserted on the same hooks, and the name colour also on `CompactUnitFrame_UpdateName` ([`Features/Nameplates.lua`](Features/Nameplates.lua)).
 
 ### To Trace How Taint Reached a Refusal

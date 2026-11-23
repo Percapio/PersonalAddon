@@ -202,15 +202,103 @@ local function commandSet(featureId, key, rawValue)
     reportConfigResult(featureId, key, outcome, detail)
 end
 
+-- Role (Patch 03 section 9) ----------------------------------------------------------
+
+local ROLE_WORDS = { Dps = "DPS", Tank = "Tank", Auto = "Auto" }
+local AUTO_TEST_WORDS = { Tank = "true", NotTank = "false", Unread = "unread", NotAsked = "not asked" }
+-- The three consumers whose tables count Auto's reads (section 5.7.2).
+local AUTO_ROLE_READERS = { "nameplates", "threatPanel", "equippedSkills" }
+
+-- "Tank", or "Tank (Auto)" when Auto chose it.
+local function roleText(choice, role)
+    local text = ROLE_WORDS[role] or ROLE_WORDS[choice] or tostring(role)
+    if choice == ns.Threat.ROLE_CHOICE.AUTO then
+        text = text .. " (Auto)"
+    end
+    return text
+end
+
+-- The choice, and the role resolved live (audit findings 3 and 4). Counted in a scratch
+-- table that is then dropped, so a readout never moves a counter, and needing neither
+-- nameplates nor the skills panel to be enabled.
+local function liveRole()
+    local Threat = ns.Threat
+    local stored = ns.ConfigStore.Feature(Threat.ROLE_FEATURE_ID)
+    local choice = Threat.RoleChoiceFrom(stored and stored.settings)
+    local role, auto = Threat.ResolveRole(choice, {})
+    return choice, role, auto
+end
+
+local function commandRole(word)
+    local Threat = ns.Threat
+    if word and word ~= "" then
+        local wanted = ({
+            tank = Threat.ROLE_CHOICE.TANK,
+            dps = Threat.ROLE_CHOICE.DPS,
+            auto = Threat.ROLE_CHOICE.AUTO,
+        })[string.lower(word)]
+        if not wanted then
+            ns.Log.Warn("/pa role [tank | dps | auto]")
+            return
+        end
+        -- The one write path, shared with the role box; it touches no box (section 6.4).
+        local outcome, reason = Threat.WriteRoleChoice(wanted)
+        if outcome == Threat.ROLE_WRITE.REFUSED then
+            ns.Log.Error(format("the choice was not stored (%s)", tostring(reason)))
+            return
+        end
+    end
+
+    local choice, role, auto = liveRole()
+    local text = ROLE_WORDS[choice]
+    if choice == Threat.ROLE_CHOICE.AUTO then
+        if auto == Threat.AUTO_READING.UNREAD then
+            text = "Auto, unread"
+        else
+            text = "Auto, now " .. tostring(ROLE_WORDS[role])
+        end
+    end
+    local boxText = "unavailable (skills window off)"
+    local box = ns.EquippedSkills and ns.EquippedSkills.RoleBoxState and ns.EquippedSkills.RoleBoxState()
+    if box and box.enabled and box.created then
+        if not box.wanted then
+            boxText = "off (roleChoice)"
+        elseif box.shown then
+            boxText = "shown"
+        else
+            boxText = "hidden (bags closed)"
+        end
+    end
+    ns.Log.Info(format("role: %s (per account); box: %s", tostring(text), boxText))
+    if choice == Threat.ROLE_CHOICE.AUTO then
+        local plain, unread = 0, 0
+        for index = 1, #AUTO_ROLE_READERS do
+            local counters = ns.Diagnostics.CountersFor(AUTO_ROLE_READERS[index])
+            plain = plain + (counters.autoRoleReadsPlain or 0)
+            unread = unread + (counters.autoRoleReadsUnread or 0)
+        end
+        ns.Log.Info(format("  the game's tank test: %s; reads plain=%d unread=%d",
+            tostring(AUTO_TEST_WORDS[auto]), plain, unread))
+    end
+end
+
 local function commandFsr()
     if not ns.FiveSecondRule then
         ns.Log.Error("the FSR tracker did not load")
         return
     end
     local view = ns.FiveSecondRule.Inspect()
-    ns.Log.Info(format("state=%s visible=%s remaining=%.2fs elapsed=%d%% manaUser=%s",
+    ns.Log.Info(format("state=%s visible=%s remaining=%.2fs elapsed=%d%% manaUser=%s tick=%d%%",
         tostring(view.state), tostring(view.visible), view.windowRemaining,
-        view.elapsedFraction * 100, tostring(view.manaUser)))
+        view.elapsedFraction * 100, tostring(view.manaUser), (view.tickFraction or 0) * 100))
+    -- Patch 03 section 9: the regen ticks, what started and skipped them, and what ended them.
+    local ticks = view.counters or {}
+    ns.Log.Info(format("  ticks: %s, every %.1fs; started=%d; skipped: off=%d notMana=%d outOfCombat=%d unread=%d; stops: cast=%d fightEnded=%d backstop=%d off=%d loading=%d",
+        view.showTicks and "on" or "off", ns.FSR_TICK_PERIOD or 0, ticks.ticksStarted or 0,
+        ticks.ticksSkippedOff or 0, ticks.ticksSkippedNotManaUser or 0,
+        ticks.ticksSkippedOutOfCombat or 0, ticks.ticksSkippedCombatUnread or 0,
+        ticks.tickStopsCast or 0, ticks.tickStopsFightEnded or 0, ticks.tickStopsBackstop or 0,
+        ticks.tickStopsSwitchedOff or 0, ticks.tickStopsLoadingScreen or 0))
     -- Phase 20 section 2.5: a free cast (a wand shot, a potion) leaves the window
     -- alone; these say which way each cast went.
     ns.Log.Info(format("  casts: mana=%d free=%d unknown=%d%s",
@@ -235,16 +323,19 @@ local function reportPlayerNames(names)
     ns.Log.Info(format("  player names: on, capability=%s hook=%s; red=%d lightOrange=%d",
         tostring(names.capability), names.hookInstalled and "yes" or "no",
         names.red or 0, names.lightOrange or 0))
+    -- Patch 03 section 9 (audit finding 11): the faction's reason joins the unreadable
+    -- sum, and both new fields go last, so Phase 22's part of each line reads as before.
     local left = names.left or {}
     local unreadable = (left.PlayerUnreadable or 0) + (left.StyleUnreadable or 0)
         + (left.AttackUnreadable or 0) + (left.ClassColourUnreadable or 0)
-    ns.Log.Info(format("    left: notPlayer=%d you=%d insideBar=%d classColour=%d noRegion=%d unreadable=%d",
+        + (left.FactionUnreadable or 0)
+    ns.Log.Info(format("    left: notPlayer=%d you=%d insideBar=%d classColour=%d noRegion=%d unreadable=%d sameFaction=%d",
         left.NotPlayer or 0, left.Yourself or 0, left.InsideBar or 0, left.ClassColourWins or 0,
-        left.NoNameRegion or 0, unreadable))
+        left.NoNameRegion or 0, unreadable, left.SameFaction or 0))
     if unreadable > 0 then
-        ns.Log.Info(format("    unreadable: player=%d style=%d attack=%d classColour=%d",
+        ns.Log.Info(format("    unreadable: player=%d style=%d attack=%d classColour=%d faction=%d",
             left.PlayerUnreadable or 0, left.StyleUnreadable or 0, left.AttackUnreadable or 0,
-            left.ClassColourUnreadable or 0))
+            left.ClassColourUnreadable or 0, left.FactionUnreadable or 0))
     end
     local counts = names.counters or {}
     ns.Log.Info(format("    writes=%d unchanged=%d released=%d bySweep=%d flushes=%d (all %d) faults=%d writeFailed=%d",
@@ -316,10 +407,13 @@ local function commandPlates()
     -- Phase 7 exit criteria 5 and 7 read these two lines.
     local verdicts = view.verdicts or {}
     -- aboutToPull (Phase 11, R7) goes last, so the Phase 7 part of the line reads as before.
-    ns.Log.Info(format("  verdicts: onPlayer=%d tapDenied=%d onGroupOrPet=%d neutral=%d elsewhere=%d ceded=%d aboutToPull=%d",
+    -- Patch 03 section 9: the tank verdicts go after aboutToPull, for the same reason.
+    ns.Log.Info(format("  verdicts: onPlayer=%d tapDenied=%d onGroupOrPet=%d neutral=%d elsewhere=%d ceded=%d aboutToPull=%d holding=%d slipping=%d loose=%d",
         verdicts.OnPlayer or 0, verdicts.TapDenied or 0, verdicts.OnGroupOrPet or 0,
         verdicts.Neutral or 0, verdicts.Elsewhere or 0, verdicts.Ceded or 0,
-        verdicts.AboutToPull or 0))
+        verdicts.AboutToPull or 0, verdicts.TankHolding or 0, verdicts.TankSlipping or 0,
+        verdicts.TankLoose or 0))
+    ns.Log.Info("  colours for: " .. roleText(view.roleChoice, view.role))
     ns.Log.Info(format("  contested=%d driver=%s yieldSelectedTarget=%s",
         view.contested or 0, tostring(view.contestedRunning),
         tostring(view.yieldSelectedTarget)))
@@ -452,11 +546,14 @@ local function commandThreat()
     end
     local view = ns.ThreatPanel.Inspect()
     notePreview(view)
-    ns.Log.Info(format("enabled=%s inCombat=%s rows=%d/%d truncated=%d timer=%s (%ss) sweeps=%d panel=%s anchor=%s",
+    -- Patch 03 section 9 (audit finding 4): the role resolved live, as /pa role does; the
+    -- panel's own is a fight old out of combat.
+    local choice, role = liveRole()
+    ns.Log.Info(format("enabled=%s inCombat=%s rows=%d/%d truncated=%d timer=%s (%ss) sweeps=%d panel=%s anchor=%s role=%s",
         tostring(view.enabled), tostring(view.inCombat), view.rowsDrawn, view.maximumRows,
         view.rowsTruncated, view.sweeping and "running" or "stopped", tostring(view.updateInterval),
         view.sweeps, view.panelShown and "shown" or "hidden",
-        view.anchorIsPlayerFrame and "PlayerFrame" or "screen"))
+        view.anchorIsPlayerFrame and "PlayerFrame" or "screen", roleText(choice, role)))
     for index = 1, #view.rows do
         local row = view.rows[index]
         ns.Log.Info(format("  %d. %s %s %s%s", index, tostring(row.token), tostring(row.verdict),
@@ -1134,6 +1231,7 @@ local function commandHelp()
     ns.Log.Info("/pa dps                 refresh the damage breakdown panel and report it")
     ns.Log.Info("/pa preview [on|off|threat|dps]  show every window with sample contents while you adjust")
     ns.Log.Info("/pa threat              the threat panel's rows, timer and counters")
+    ns.Log.Info("/pa role [tank|dps|auto] the role the threat colours are for; with a word, set it")
     ns.Log.Info("/pa upkeep [test]       what Upkeep shows and how it read it; test posts a low-supply toast")
     ns.Log.Info("/pa rares [test]        rare alerts: the map, remembered rares, counters; test posts one")
     ns.Log.Info("/pa skills              what the skills window shows, and how each row resolved")
@@ -1241,6 +1339,8 @@ local function handler(input)
         reportPreview(words[2])
     elseif command == "threat" then
         commandThreat()
+    elseif command == "role" then
+        commandRole(words[2])
     elseif command == "upkeep" then
         commandUpkeep(words[2])
     elseif command == "rares" then

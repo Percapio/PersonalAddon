@@ -61,6 +61,8 @@ local COUNTER_NAMES = {
     "percentReadsPlain", "percentReadsAbsent", "percentReadsWithheld",
     "filterReadsWithheld", "platesWithoutToken", "valuesPassedHidden", "passFailures",
     "targetMarked", "enemyPlatesOff", "sweepFaults",
+    -- Patch 03 section 9 (audit finding 11): the Auto choice's test reads.
+    "autoRoleReadsPlain", "autoRoleReadsUnread",
 }
 
 local state = {
@@ -87,6 +89,11 @@ local state = {
     palette = nil,
     -- The nameplates feature's colour strings the palette was built from.
     paletteSource = {},
+    -- Patch 03 section 5.5: the stored choice, read with the colours, and the role and
+    -- Auto reading the last sweep resolved; nil before the first sweep.
+    roleChoice = Threat.ROLE_CHOICE.DPS,
+    role = nil,
+    auto = nil,
     sweepFaultNoted = false,
     -- This UI load's diagnostics table, bound at enable.
     counters = {},
@@ -317,6 +324,8 @@ local function refreshPalette()
     if changed then
         state.palette = Threat.PaletteFrom(settings)
     end
+    -- Patch 03 section 5.5: the role choice is the nameplates feature's setting too.
+    state.roleChoice = Threat.RoleChoiceFrom(settings)
 end
 
 -- A withheld read omits the tag rather than guessing it.
@@ -548,7 +557,7 @@ end
 local function drawRow(row, record, targetPlate, counters)
     local token = record.token
 
-    local verdict = Threat.ResolveVerdict(record.aggro, Threat.Disposition(token, counters))
+    local verdict = Threat.ResolveVerdict(record.aggro, Threat.Disposition(token, counters), state.role)
     record.verdict = verdict
     -- Ceded has no colour of its own: there is no Blizzard bar here to cede to.
     local colour = state.palette[verdict] or state.palette[VERDICT.ELSEWHERE]
@@ -768,6 +777,9 @@ local function sweep()
         checkEnemyPlates(counters)
     end
     refreshPalette()
+    -- Patch 03 section 5.5: the role once per sweep, as the plates resolve it. Under
+    -- Auto this is the sweep's one test read.
+    state.role, state.auto = Threat.ResolveRole(state.roleChoice, counters)
 
     local plateCount = currentPlates(counters)
     local allies, allyCount = Threat.Allies()
@@ -903,6 +915,9 @@ local function enable(config)
     end
 
     state.counters = ns.Diagnostics.CountersFor(FEATURE_ID)
+    -- Patch 03 section 5.5 (audit finding 4): the colours and the role choice from the
+    -- start, not from the first fight's sweep.
+    refreshPalette()
     ensurePanel()
     applyWidth()
     anchorPanel()
@@ -1098,6 +1113,12 @@ ns.ThreatPanel = {
             panelShown = state.panelShown,
             anchorIsPlayerFrame = state.anchorIsPlayerFrame == true,
             rows = rows,
+            -- Patch 03 section 5.5 (audit finding 4): the choice from the store at this
+            -- call, with no client read; the role and Auto reading as the last sweep left
+            -- them, nil before the first.
+            roleChoice = Threat.RoleChoiceFrom((ns.ConfigStore.Feature(NAMEPLATES_ID) or {}).settings),
+            role = state.role,
+            auto = state.auto,
             counters = state.counters,
             poolConstructed = constructed,
             poolLive = live,

@@ -31,6 +31,19 @@ local ICON_SIZE = 14
 -- from. Named because the width floor is computed from it.
 local ICON_TEXT_GAP = 4
 
+-- Patch 03 sections 6.2 and 8.1: the role box under the panel. Tank and DPS share the
+-- first row, Auto takes the second; layout values, in pixels, not settings.
+local ROLE_BOX_GAP = 2
+local ROLE_BOX_PADDING = 4
+local ROLE_BUTTON_HEIGHT = 16
+local ROLE_BUTTON_GAP = 2
+local ROLE_BOX_HEIGHT = ROLE_BOX_PADDING * 2 + ROLE_BUTTON_HEIGHT * 2 + ROLE_BUTTON_GAP
+-- The chosen button and the others: background and text.
+local ROLE_LIT = { background = { 0.22, 0.42, 0.80, 0.95 }, text = { 1, 1, 1 } }
+local ROLE_DIM = { background = { 0.12, 0.12, 0.12, 0.70 }, text = { 0.62, 0.62, 0.62 } }
+local ROLE_LABELS = { Tank = "Tank", Dps = "DPS", Auto = "Auto" }
+local AUTO_LABELS = { Tank = "Auto: Tank", NotTank = "Auto: DPS", Unread = "Auto: ?" }
+
 local CAPABILITY = {
     NOT_YET_READ = "NotYetRead",
     READABLE = "Readable",
@@ -92,12 +105,18 @@ local state = {
     withheldReads = 0,
     iconFailures = 0,
     reads = 0,
+    -- Patch 03 section 6: { chrome, frame, buttons } once built at enable; the choice
+    -- and Auto reading the last relight showed.
+    roleBox = nil,
+    roleShownChoice = nil,
+    roleShownAuto = nil,
     settings = {
         anchorOffsetX = -4,
         anchorOffsetY = 0,
         panelWidth = 96,
         panelAlpha = 0.8,
         pollSeconds = 1,
+        roleChoice = true,
     },
 }
 
@@ -539,6 +558,149 @@ local function ensurePanel()
     ns.FramePool.Prewarm(state.rowPool)
 end
 
+-- Role box (Patch 03 section 6) ---------------------------------------------------
+--
+-- Tank, DPS and Auto under the panel, clicked with the mouse. A child of the panel,
+-- which is ours (rule 6), so it shows and hides with it. The pad cannot reach it, and
+-- must not: SmartNavigation collects buttons only from the panel it tracks, and a
+-- pad-reachable addon button is GAPBugs01 G1's carrier (section 6.3). So the buttons
+-- carry an OnClick and nothing else: no OnEnter, no OnLeave, no tooltip.
+
+local function lightRoleButton(button, lit)
+    local look = lit and ROLE_LIT or ROLE_DIM
+    local background = look.background
+    if button.background.SetColorTexture then
+        button.background:SetColorTexture(background[1], background[2], background[3], background[4])
+    else
+        button.background:SetTexture(background[1], background[2], background[3], background[4])
+    end
+    button.label:SetTextColor(look.text[1], look.text[2], look.text[3])
+end
+
+-- The chosen button lit and the others dimmed; under Auto, the Auto label shows what
+-- the game's test answers now (section 6.5). Runs only while the feature is enabled
+-- and the box exists (audit finding 5). Reads our own store, and under Auto the test,
+-- once, counted in this feature's table.
+local function relightRoleBox()
+    local box = state.roleBox
+    if not (state.enabled and box) then
+        return
+    end
+    local Threat = ns.Threat
+    local stored = ns.ConfigStore.Feature(Threat.ROLE_FEATURE_ID)
+    local choice = Threat.RoleChoiceFrom(stored and stored.settings)
+    local auto = Threat.AUTO_READING.NOT_ASKED
+    if choice == Threat.ROLE_CHOICE.AUTO then
+        local _
+        _, auto = Threat.ResolveRole(choice, ns.Diagnostics.CountersFor(FEATURE_ID))
+    end
+    for buttonChoice, button in pairs(box.buttons) do
+        lightRoleButton(button, buttonChoice == choice)
+    end
+    box.buttons[Threat.ROLE_CHOICE.AUTO].label:SetText(
+        AUTO_LABELS[auto] or ROLE_LABELS[Threat.ROLE_CHOICE.AUTO])
+    state.roleShownChoice = choice
+    state.roleShownAuto = auto
+end
+
+-- A click writes through the one write path, shared with /pa role (section 6.4), and
+-- relights only when the write landed.
+local function onRoleClicked(button)
+    if ns.Threat.WriteRoleChoice(button.choice) == ns.Threat.ROLE_WRITE.WRITTEN then
+        relightRoleBox()
+    end
+end
+
+-- The engine's dispatch of a click to our own button. Isolated like a handler: an
+-- error faults the feature instead of reaching the client's error window.
+local function onRoleButtonClick(button)
+    local ok, err = ns.Isolation.Call(onRoleClicked, button)
+    if not ok then
+        ns.Registry.Fault(FEATURE_ID, "raised handling a role box click", err)
+    end
+end
+
+local function createRoleButton(parent, choice)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetHeight(ROLE_BUTTON_HEIGHT)
+    button:EnableMouse(true)
+    button:RegisterForClicks("LeftButtonUp")
+    button.choice = choice
+    button.background = button:CreateTexture(nil, "BACKGROUND")
+    button.background:SetAllPoints(button)
+    button.label = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    button.label:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.label:SetText(ROLE_LABELS[choice])
+    button:SetScript("OnClick", onRoleButtonClick)
+    button:Show()
+    return button
+end
+
+-- Made once, at enable, beside the panel: nothing is created while a bag is open
+-- (Patch 01 section 0.2). Tank and DPS meet at the box's top centre, so they split any
+-- width in two without code in applyWidth (audit finding 9); Auto spans them both.
+local function ensureRoleBox()
+    if state.roleBox or not state.panel then
+        return
+    end
+    local ROLE_CHOICE = ns.Threat.ROLE_CHOICE
+    local chrome = ns.PanelChrome.Build({
+        parent = state.panel,
+        width = state.settings.panelWidth,
+        height = ROLE_BOX_HEIGHT,
+        alpha = state.settings.panelAlpha,
+        ownerKey = "rolebox",
+        ownerLabel = "the role box",
+    })
+    local frame = chrome.frame
+    frame:SetPoint("TOPLEFT", state.panel, "BOTTOMLEFT", 0, -ROLE_BOX_GAP)
+    frame:SetPoint("TOPRIGHT", state.panel, "BOTTOMRIGHT", 0, -ROLE_BOX_GAP)
+
+    local halfGap = ROLE_BUTTON_GAP / 2
+    local tank = createRoleButton(frame, ROLE_CHOICE.TANK)
+    tank:SetPoint("TOPLEFT", frame, "TOPLEFT", ROLE_BOX_PADDING, -ROLE_BOX_PADDING)
+    tank:SetPoint("TOPRIGHT", frame, "TOP", -halfGap, -ROLE_BOX_PADDING)
+    local dps = createRoleButton(frame, ROLE_CHOICE.DPS)
+    dps:SetPoint("TOPLEFT", frame, "TOP", halfGap, -ROLE_BOX_PADDING)
+    dps:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -ROLE_BOX_PADDING, -ROLE_BOX_PADDING)
+    local auto = createRoleButton(frame, ROLE_CHOICE.AUTO)
+    auto:SetPoint("TOPLEFT", tank, "BOTTOMLEFT", 0, -ROLE_BUTTON_GAP)
+    auto:SetPoint("TOPRIGHT", dps, "BOTTOMRIGHT", 0, -ROLE_BUTTON_GAP)
+
+    state.roleBox = {
+        chrome = chrome,
+        frame = frame,
+        buttons = {
+            [ROLE_CHOICE.TANK] = tank,
+            [ROLE_CHOICE.DPS] = dps,
+            [ROLE_CHOICE.AUTO] = auto,
+        },
+    }
+end
+
+-- Shown with the panel while roleChoice is on (section 6.2). With it off, the stored
+-- choice still applies.
+local function applyRoleBoxWanted()
+    local box = state.roleBox
+    if not box then
+        return
+    end
+    if state.settings.roleChoice then
+        box.frame:Show()
+    else
+        box.frame:Hide()
+    end
+end
+
+-- The box keeps its own chrome: PanelChrome holds a frame at alpha 1 and fades the
+-- background alone, so a child does not follow the panel's opacity (audit finding 1).
+-- Called wherever the panel's background opacity is set.
+local function applyRoleBoxAlpha()
+    if state.roleBox then
+        ns.PanelChrome.SetAlpha(state.roleBox.chrome, state.settings.panelAlpha)
+    end
+end
+
 local function signatureOf(snapshot)
     local parts = {}
     for index = 1, #snapshot.rows do
@@ -607,6 +769,7 @@ local function render(snapshot)
     state.panel:SetHeight(PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
         + max(0, shown - 1) * ROW_SPACING)
     ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
+    applyRoleBoxAlpha()
     state.panel:Show()
     return true
 end
@@ -677,7 +840,10 @@ local function showPlaceholders()
     state.panel:SetHeight(PANEL_PADDING * 2 + max(1, shown) * ROW_HEIGHT
         + max(0, shown - 1) * ROW_SPACING)
     ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
+    applyRoleBoxAlpha()
     state.panel:Show()
+    -- Patch 03 section 6.5: no poll runs in the preview, so the box is lit here.
+    relightRoleBox()
     return shown
 end
 
@@ -751,6 +917,8 @@ local function pollTick()
             return
         end
         refresh()
+        -- Patch 03 section 6.5: an outside change, or Auto's answer, within one poll.
+        relightRoleBox()
     end)
     if not ok then
         ns.Registry.Fault(FEATURE_ID, "raised while refreshing the skills window", err)
@@ -768,6 +936,7 @@ local function showWindow()
     state.shown = true
     state.lastSignature = nil
     refresh()
+    relightRoleBox()
     startPoll()
 end
 
@@ -799,6 +968,7 @@ local function readSettings(config)
     state.settings.anchorOffsetY = settings.anchorOffsetY or state.settings.anchorOffsetY
     state.settings.panelAlpha = settings.panelAlpha or state.settings.panelAlpha
     state.settings.pollSeconds = settings.pollSeconds or state.settings.pollSeconds
+    state.settings.roleChoice = (settings.roleChoice ~= false)
 end
 
 local BAG_EVENTS = { "ContainerFrame.OpenBag", "ContainerFrame.CloseBag" }
@@ -826,6 +996,9 @@ local function enable(config)
     ensurePanel()
     applyWidth()
     anchorPanel()
+    -- Patch 03 section 6.2: the role box, made here with the panel, never at a bag open.
+    ensureRoleBox()
+    applyRoleBoxWanted()
     registerPreview()
 
     for index = 1, #BAG_EVENTS do
@@ -864,6 +1037,13 @@ local function onConfigChanged(config, changedKey)
         end
     elseif changedKey == "panelAlpha" then
         ns.PanelChrome.SetAlpha(state.chrome, state.settings.panelAlpha)
+        applyRoleBoxAlpha()
+    elseif changedKey == "roleChoice" then
+        -- Patch 03 section 6.5 (audit finding 5): lit at once when it turns on.
+        applyRoleBoxWanted()
+        if state.settings.roleChoice then
+            relightRoleBox()
+        end
     elseif changedKey == "pollSeconds" then
         if state.poll then
             startPoll()
@@ -884,6 +1064,8 @@ ns.Registry.Register(FEATURE_ID, {
         panelWidth = 96,
         panelAlpha = 0.8,
         pollSeconds = 1,
+        -- Patch 03 section 8.2.
+        roleChoice = true,
     },
     schema = {
         -- Phase 13: the minimum is padding, icon, gap and the least the rank
@@ -909,6 +1091,11 @@ ns.Registry.Register(FEATURE_ID, {
             unit = ns.ConfigSchema.UNIT.FRACTION,
             minimum = 0.1, maximum = 1.0, step = 0.05,
         },
+        -- Patch 03 section 8.2.
+        roleChoice = {
+            kind = ns.ConfigSchema.KIND.TOGGLE, label = "Show the Tank / DPS / Auto choice", order = 4,
+            description = "A Tank / DPS / Auto switch under this window, clicked with the mouse. Tank: a mob you hold turns green, one about to change hands orange, one on your group red, on nameplates and the threat panel. Auto: Tank whenever the game counts you as tanking.",
+        },
         pollSeconds = {
             kind = ns.ConfigSchema.KIND.NUMBER, label = "Refresh interval while open",
             minimum = 0.5, maximum = 5, step = 0.5, curated = false,
@@ -929,12 +1116,36 @@ local function slotLabel(slot)
     return "slot " .. tostring(slot)
 end
 
+-- Whether one of our own frames is shown, read through ClientRead as the secret-read
+-- lint asks of every secret-capable method (README rule 10), as the bag's read is.
+local function ownFrameShown(frame)
+    if not frame then
+        return false
+    end
+    local kind, shown = ns.ClientRead.Call(frame.IsShown, "boolean", frame)
+    return kind == ns.ClientRead.PLAIN and shown == true
+end
+
+-- The role box is on screen when it is shown and so is its parent panel.
+local function roleBoxShown()
+    return state.roleBox ~= nil and ownFrameShown(state.roleBox.frame) and ownFrameShown(state.panel)
+end
+
 ns.EquippedSkills = {
     Refresh = function()
         if state.enabled and state.shown then
             state.lastSignature = nil
             refresh()
         end
+    end,
+    -- Patch 03 section 9: the role box for /pa role, with no skill read.
+    RoleBoxState = function()
+        return {
+            enabled = state.enabled,
+            created = state.roleBox ~= nil,
+            wanted = state.settings.roleChoice,
+            shown = roleBoxShown(),
+        }
     end,
     Inspect = function()
         local snapshot = state.lastSnapshot
@@ -988,6 +1199,16 @@ ns.EquippedSkills = {
             iconFailures = state.iconFailures,
             reads = state.reads,
             borderStyle = state.chrome and state.chrome.borderStyle or "none",
+            -- Patch 03 section 9: the role box, as the last relight showed it.
+            roleBox = {
+                created = state.roleBox ~= nil,
+                wanted = state.settings.roleChoice,
+                shown = roleBoxShown(),
+                choice = state.roleShownChoice,
+                auto = state.roleShownAuto,
+                frame = state.roleBox and state.roleBox.frame or nil,
+                buttons = state.roleBox and state.roleBox.buttons or nil,
+            },
             poolConstructed = constructed,
             poolLive = live,
             poolFree = free,
