@@ -10,13 +10,6 @@ A modular, controller-first quality-of-life addon developed for World of Warcraf
 
 ## Table of Contents
 
-- [Visual Tour & Interface Showcase](#visual-tour--interface-showcase)
-  - [Settings Navigation & Panel Chrome](#settings-navigation--panel-chrome)
-  - [Combat HUD & Damage Metrics](#combat-hud--damage-metrics)
-  - [Nameplates & Target Awareness](#nameplates--target-awareness)
-  - [Bags, Skills & Loot Feedback](#bags-skills--loot-feedback)
-  - [Consumable Macros & Gamepad Bar Integration](#consumable-macros--gamepad-bar-integration)
-  - [Quests & NPC Tooltip Intelligence](#quests--npc-tooltip-intelligence)
 - [Installation](#installation)
 - [Core Features](#core-features)
   - [Combat](#combat)
@@ -27,111 +20,14 @@ A modular, controller-first quality-of-life addon developed for World of Warcraf
   - [Developer & Preview Tools](#developer--preview-tools)
 - [Command Reference](#command-reference)
 - [Troubleshooting & Known Issues](#troubleshooting--known-issues)
-- [Native Client Capabilities](#what-the-game-already-does)
-- [Attempted & Dropped Features](#tried-and-not-possible)
-- [Planned Features](#planned)
-- [Rules for Future Development (Taint & Isolation)](#rules-for-future-development)
-  - [Documented Exceptions](#known-exceptions-kept-on-purpose)
-  - [Taint Tracing Protocol](#to-trace-how-taint-reached-a-refusal)
-- [Development & Verification Tooling](#development)
-- [Credits & License](#credits)
-
----
-
-## Visual Tour & Interface Showcase
-
-### Settings Navigation & Panel Chrome
-
-PersonalAddon integrates directly into the client's native Settings hierarchy using Blizzard's Settings API rather than external widget frameworks. Every setting is registered with vertical subcategories, pass-through value formatters, and parent-linked option indentations.
-
-![Settings Navigation](Images/general.png)
-
-- **Root Navigation:** Found under **Options > AddOns > PersonalAddon**.
-- **Category Tree:** Modular pages for **Combat**, **Nameplates**, **Bags & loot**, **Consumables**, and **Quests**.
-- **Live Preview System:** The *"Show all windows for adjusting"* toggle renders synthetic preview frames so scales, offsets, and widths can be tuned in real time without entering combat.
-- **Implementation:** [`Features/SettingsPanel.lua`](Features/SettingsPanel.lua) and [`Core/Preview.lua`](Core/Preview.lua).
-
----
-
-### Combat HUD & Damage Metrics
-
-Combat modules provide low-overhead combat telemetry while respecting Blizzard's secret-value lockdowns on restricted maps.
-
-| In-Game Damage Breakdown HUD | Combat Configuration Panel |
-| :---: | :---: |
-| ![Damage Breakdown HUD](Images/Screenshot%202026-10-11%20223253.png) | ![Combat Settings](Images/combat.png) |
-| *Damage breakdown anchored above player unit frame with spell icons, DPS, and relative contribution.* | *Fine-grained controls for Five-Second Rule indicator, damage meters, and threat rows.* |
-
-- **Damage Breakdown:** Renders the last fight's damage by spell directly above the player frame: a header with the fight's length and DPS, then each spell's icon, DPS, and share, with shares that always add up to 100%. Reads Blizzard's internal meter rather than processing combat log text strings.
-- **Threat Panel:** Displays attacking mobs, current threat margins, target markers, and health bars in the same HUD anchor during encounters.
-- **Five-Second Rule (FSR):** Smooth status sweep texture mapped across the mana bar tracking spirit regeneration windows for casters. Only a cast that spends mana starts it; wand shots, Auto Shot, and potions leave it alone. After the window, a gold line keeps WoW Classic's two-second regen rhythm.
-- **Upkeep:** Out of combat, the buffs and weapon enchants about to run out, and your ammo or soul shards, beside the damage and threat panels.
-- **Implementations:** [`Features/DamageBreakdown.lua`](Features/DamageBreakdown.lua), [`Features/ThreatPanel.lua`](Features/ThreatPanel.lua), [`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua), and [`Features/Upkeep.lua`](Features/Upkeep.lua).
-
----
-
-### Nameplates & Target Awareness
-
-Custom nameplate restyling prioritizes threat accountability, target hierarchy, and social context without replacing Blizzard's nameplate frames or introducing frame-creation taint.
-
-| Nameplate Customization In-Game | Nameplate Color & Geometry Settings |
-| :---: | :---: |
-| ![Nameplate with Guild Name](Images/Screenshot%202026-10-11%20223858.png) | ![Nameplates Settings](Images/nameplates.png) |
-| *Nameplate with custom height scaling and sanitized guild name ("Beta Baddies") rendered beneath the health bar.* | *Settings panel showing proportional height scaling (55%) and 6-tier threat priority color pickers.* |
-
-- **Proportional Health Bar Height:** Configured as a fractional percentage (30% to 100%) of the game's base scale to ensure cross-resolution and UI scale consistency.
-- **Guild Names:** Displayed under player health bars in secondary weight with outline filtering and full escape-code neutralization ([`Core/EscapeGuard.lua`](Core/EscapeGuard.lua)).
-- **NPC Roles:** Friendly NPCs show their role (Innkeeper, Weapon Merchant, Flight Master) in the guild name's place, read from QuestieDB.
-- **Name Alignment:** On the Thin and Cast Focus styles, an option moves each nameplate's name from the middle of the bar to its left end.
-- **Player Name Colours:** Red for a player who can fight you, light orange for the other faction; your own faction keeps the game's white.
-- **Threat-Priority Color Palette:** Six prioritized color states reflecting aggro status, pull proximity, outside taps, and neutral disposition.
-- **Implementation:** [`Features/Nameplates.lua`](Features/Nameplates.lua).
-
----
-
-### Bags, Skills & Loot Feedback
-
-Streamlined inventory management focused on non-disruptive automation and clear feedback.
-
-| Skills Panel & Toast Notification Configuration | Bag Sorting & Auto-Vendor Options |
-| :---: | :---: |
-| ![Bags and Loot Settings Page 1](Images/bags_n_loot1.png) | ![Bags and Loot Settings Page 2](Images/bags_n_loot2.png) |
-| *Geometry and opacity controls for Equipped Skills dock and toast notification triggers.* | *Throttle controls for post-close bag sorting and merchant auto-vend.* |
-
-- **Equipped Skills Panel:** Docks adjacent to open bags displaying weapon skill ranks, defense, and primary professions. Under it, a Tank / DPS / Auto switch for the threat colours. Mouse only: the controller's cursor never reaches addon buttons, on purpose.
-- **Custom Loot Toasts:** Independent pop-ups for looted currency, uncommon-or-better items, quest objects, and the gold a merchant visit earns you, without hooking Blizzard's alert frames.
-- **Safe Container Sorting:** Automatically executes Clean Up Bags on bag close with a 60-second cooldown lock, verifying no item locks are held.
-- **Auto-Junk Liquidation:** Executes automated grey-item sales upon opening merchant frames, with the proceeds folded into the merchant visit toast.
-- **Implementations:** [`Features/EquippedSkills.lua`](Features/EquippedSkills.lua), [`Features/Toasts.lua`](Features/Toasts.lua), [`Features/AutoSortBags.lua`](Features/AutoSortBags.lua), and [`Features/AutoSellJunk.lua`](Features/AutoSellJunk.lua).
-
----
-
-### Consumable Macros & Gamepad Bar Integration
-
-Consumable automation designed specifically for controller players, ensuring optimal item assignment without risking action-bar taint or execution blocks.
-
-![Consumables Settings and Gamepad UI Action Bar](Images/macros.png)
-
-- **Dynamic Macro Maintenance:** Generates and maintains four character-specific macros (`PA Heal`, `PA Bandage`, `PA Food`, `PA Water`) that dynamically target the highest-tier consumable available in bags.
-- **Blizzard Gamepad Action Bar Docking:** Seamlessly placed into controller action-bar slots (shown above as `PA H1`, `PA F4`, `PA B12` in the Gamepad cross-bar).
-- **Bar Writer Guard:** Checks action-bar execution context after every macro modification to ensure the addon never becomes flagged as the active action-bar writer.
-- **Implementation:** [`Features/ConsumableMacros.lua`](Features/ConsumableMacros.lua).
-
----
-
-### Quests & NPC Tooltip Intelligence
-
-World quest integration built around lightweight database bridges and clean visual cues.
-
-| NPC Unit Tooltip with Available Quests | Quest Settings Panel |
-| :---: | :---: |
-| ![Available Quests Tooltip](Images/Screenshot%202026-10-11%20223535.png) | ![Quest Settings](Images/quests.png) |
-| *NPC tooltip augmented with available quest line ([30] A Noble Brew) colored by level difficulty.* | *Offsets and scale sliders for nameplate markers and tooltip quest injection switches.* |
-
-- **NPC Tooltip Quest Lists:** Appends accepted and available quests with difficulty coloring directly into the unit tooltip during Blizzard's layout pre-calculation pass.
-- **Nameplate Quest Markers:** Positions quest target indicators above relevant hostile units; automatically suspends itself in dungeons and raids where unit GUIDs are restricted by the client.
-- **Bridge Architecture:** Interfaces with QuestieDB queries via [`Core/QuestieDBBridge.lua`](Core/QuestieDBBridge.lua) without requiring the full Questie interface suite. QuestieDB is its own addon; Questie itself may stay disabled.
-- **Implementations:** [`Features/NPCQuests.lua`](Features/NPCQuests.lua) and [`Features/QuestMarkers.lua`](Features/QuestMarkers.lua).
+- [What the Game Already Does](#what-the-game-already-does)
+- [Tried and Not Possible](#tried-and-not-possible)
+- [Rules for Future Development](#rules-for-future-development)
+  - [Known Exceptions (Kept on Purpose)](#known-exceptions-kept-on-purpose)
+  - [To Trace How Taint Reached a Refusal](#to-trace-how-taint-reached-a-refusal)
+- [Development](#development)
+- [Credits](#credits)
+- [License](#license)
 
 ---
 
@@ -148,13 +44,21 @@ World quest integration built around lightweight database bridges and clean visu
 3. Optional, for the NPC quest tooltips, the quest markers and NPC roles: install **QuestieDB**. It is a separate addon, and an addon manager may install Questie without it (the live launch's update removed it). Questie itself is not needed. `/pa quests` reports whether QuestieDB is usable.
 4. Launch the game and verify that **PersonalAddon** is checked in the AddOns menu.
 
-All configuration options are accessible in-game via **Options > AddOns > PersonalAddon**, through subcategory menus (**Combat**, **Nameplates**, **Bags & loot**, **Consumables**, **Quests**), or via `/pa` slash commands.
+All configuration options are accessible in-game via **Options > AddOns > PersonalAddon**, through subcategory menus (**Combat**, **Nameplates**, **Bags & loot**, **Consumables**, **Quests**), or via `/pa` slash commands. The pages are the game's own Settings ([`Features/SettingsPanel.lua`](Features/SettingsPanel.lua)), so a controller moves through them like any other Options page.
 
 ---
 
 ## Core Features
 
 ### Combat
+
+| Damage breakdown after a fight | Five-second rule and damage breakdown settings |
+| :---: | :---: |
+| ![Damage breakdown](Images/damage_breakdown_window.png) | ![Combat settings: five-second rule and damage breakdown](Images/combat_settings_fsr_damage_breakdown.png) |
+| *Ten seconds at 29 DPS: each spell's DPS and share, and a "+2" row for the two spells past the row limit. The shares add up to 100%.* | *The five-second rule's line and regen ticks; the damage breakdown's whole-session switch, rows, placement, and hiding in combat.* |
+| **Threat panel settings** | **Upkeep settings** |
+| ![Combat settings: threat panel](Images/combat_settings_threat_panel.png) | ![Combat settings: Upkeep](Images/combat_settings_upkeep.png) |
+| *Rows, width, placement, the level and elite tag, and the target mark.* | *The warning window, the short-buff rule, weapon enchants, ammo and shards, the low-supply toast, and placement beside the damage and threat panels.* |
 
 - **Five-Second Rule ([`Features/FiveSecondRule.lua`](Features/FiveSecondRule.lua)):**
   For mana users, a calibrated indicator sweeps across the player mana bar displaying the elapsed time until spirit-based mana regeneration resumes. A cast that spends mana restarts the sweep; a cast that costs no mana — a wand shot, Auto Shot, a potion — leaves the sweep alone. After the window, a gold line keeps WoW Classic's two-second regen rhythm until your next mana-costing cast or the end of the fight. It is a rhythm for the Classic habit, not the game's own ticks: mana stays masked from addons. Its own switch turns it off.
@@ -180,6 +84,15 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
 ### Nameplates
 
+![Nameplates with NPC roles and guild names](Images/npc_roles_and_guild_tags.png)
+
+*Friendly nameplates: NPC roles such as Priest Trainer under NPCs, guild names under players, and every name at the left end of its bar.*
+
+| Nameplates settings | Colours, player names and rare alerts |
+| :---: | :---: |
+| ![Nameplates settings](Images/nameplate_settings_nameplates.png) | ![Nameplates settings: colours and rare alerts](Images/nameplate_settings_threat_colors_rare_alerts.png) |
+| *Colouring, bar height, name alignment, guild names, NPC roles, player name colours, and your target's colour.* | *The six threat colours, highest priority first; the two player name colours; rare alerts' sound and repeat time.* |
+
 - **Nameplate Threat Colors ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Recolors hostile and neutral nameplates based on tank/damage-dealer threat hierarchy:
 
@@ -196,7 +109,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
   Tank, DPS or Auto is chosen with the mouse in a small box under the skills window while your bags are open. Auto follows the game's own test for whether you are tanking. DPS is the default, and the threat panel follows. Orange means "about to change hands" in both roles.
 - **Guild Names on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
-  Draws player guild tags underneath health bars in secondary muted white with black outline shaders. Strings pass through [`Core/EscapeGuard.lua`](Core/EscapeGuard.lua) to strip formatting exploits before drawing.
+  Draws player guild tags underneath health bars in secondary muted white with black outline shaders. Strings pass through [`Core/EscapeGuard.lua`](Core/EscapeGuard.lua) to strip formatting exploits before drawing. Off by default.
 - **NPC Roles on Nameplates ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
   Under the health bar of a friendly NPC, in the guild name's place and at its size: the role its tooltip shows — Innkeeper, Weapon Merchant, Flight Master — read from QuestieDB rather than scraped from the tooltip. "Friendly" is the client's own answer for the character you are playing, so it works the same for Alliance and Horde. Hostile and attackable units never get one, and a unit that turns hostile loses it. Its own switch, off by default; the text passes through [`Core/EscapeGuard.lua`](Core/EscapeGuard.lua) like a guild name. Requires QuestieDB and friendly NPC nameplates enabled. **Nothing is shown in dungeons and raids**, where the client withholds which NPC a unit is.
 - **Names at the Left End of the Bar ([`Features/Nameplates.lua`](Features/Nameplates.lua)):**
@@ -218,6 +131,14 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
 ### Bags & Loot
 
+| Skills window | Tank / DPS / Auto switch |
+| :---: | :---: |
+| ![Skills window](Images/skills_window.png) | ![Tank, DPS and Auto switch](Images/nameplate_threat_mode_selector.png) |
+| *Professions, weapon skills and Defense, as rank / maximum.* | *Under the skills window. Auto is selected and shows what the game's tank test answers: DPS.* |
+| **Equipped skills and toasts settings** | **Toasts, tidy bags and sell junk settings** |
+| ![Bags & loot settings: equipped skills and toasts](Images/bags_and_loot_settings_equipped_skills.png) | ![Bags & loot settings: toasts, tidy bags and sell junk](Images/bags_and_loot_settings_toasts_tidy_bag_sell_junk.png) |
+| *The skills window's width, placement and opacity, the switch's own checkbox, and which toasts show.* | *How long toasts stay and where, the time between bag tidies, and selling junk.* |
+
 - **Equipped Skills Panel ([`Features/EquippedSkills.lua`](Features/EquippedSkills.lua)):**
   When bags are open, docks a compact skill summary against the left container frame showing primary profession ranks, equipped weapon skills, and defense as `rank / maximum`. Under it, a Tank / DPS / Auto switch for the threat colours. Mouse only: the controller's cursor never reaches addon buttons, on purpose. Its own checkbox hides it, and `/pa role` sets the same choice from chat.
 - **Custom Toast Alerts ([`Features/Toasts.lua`](Features/Toasts.lua)):**
@@ -228,6 +149,11 @@ All configuration options are accessible in-game via **Options > AddOns > Person
   Triggers Blizzard's `Sell All Junk` handler upon interacting with merchant frames without confirmation modals, reporting total proceeds in the merchant visit toast, or on its own toast when that is switched off (in chat when toasts are off).
 
 ### Consumables
+
+| Consumables settings |
+| :---: |
+| ![Consumables settings](Images/consumables_settings_consumables.png) |
+| *A switch per macro, conjured food and water first, and the Well Fed rule.* |
 
 - **Dynamic Consumable Macros ([`Features/ConsumableMacros.lua`](Features/ConsumableMacros.lua)):**
   Generates four automated character macros that bind the optimal carried recovery item:
@@ -249,17 +175,22 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
 ### Quests
 
+| NPC tooltip | Quests settings |
+| :---: | :---: |
+| ![NPC tooltip listing an available quest](Images/Screenshot%202026-10-11%20223535.png) | ![Quests settings](Images/quests_settings_npc_tooltip_quest_markers.png) |
+| *An NPC's tooltip listing the quest it has for you, coloured by difficulty.* | *Tooltip quests; the quest markers' offsets and size, and whether they stay until the quest leaves your log.* |
+
 - **Available Quests on NPC Tooltips ([`Features/NPCQuests.lua`](Features/NPCQuests.lua)):**
-  Hooks unit tooltip pre-render calculations to display all currently available quests offered by the targeted NPC, styled with difficulty level coloration. Queries [`Core/QuestieDBBridge.lua`](Core/QuestieDBBridge.lua) without requiring the full Questie addon to be running.
+  Lists the quests an NPC offers you on its tooltip, coloured by difficulty. Quests already completed or in your log, and those your level does not allow, are left out. Queries [`Core/QuestieDBBridge.lua`](Core/QuestieDBBridge.lua) without requiring the full Questie addon to be running.
 - **Objective-Aware Quest Markers ([`Features/QuestMarkers.lua`](Features/QuestMarkers.lua)):**
   Pairs QuestieDB's typed objective rows against the client's own objective list, honoring QuestieDB's published per-quest ordering hints (`LibQuestieDB.ObjectiveFirst`). A quest whose rows cannot be paired — by row count or by objective type — falls back to whole-quest completion rather than guessing, and `/pa quests` reports which path every quest in the log took.
 
 ### Developer & Preview Tools
 
 - **Comprehensive Preview Mode ([`Core/Preview.lua`](Core/Preview.lua)):**
-  Activating *"Show all windows for adjusting"* renders mock instances of the skills panel, damage breakdown/threat HUD, Upkeep, and toast notifications above the settings interface to facilitate spatial positioning. Upkeep's samples show beside the threat HUD's, not in turn with them. Automatically dismisses upon entering combat.
+  Activating *"Show all windows for adjusting"*, on the PersonalAddon page, renders mock instances of the skills panel, damage breakdown/threat HUD, Upkeep, and toast notifications above the settings interface to facilitate spatial positioning. Upkeep's samples show beside the threat HUD's, not in turn with them. Automatically dismisses upon entering combat.
 - **Fast UI Reload ([`Features/ReloadCommand.lua`](Features/ReloadCommand.lua)):**
-  Provides `/rl` to reload the user interface.
+  Provides `/rl` to reload the user interface. Its switch, Reload command, is on the PersonalAddon page.
 
 ---
 
@@ -267,7 +198,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
 | Command | Functionality |
 |---|---|
-| `/pa status` | Summarizes operational state of all registered features |
+| `/pa status`, `/pa status all` | Summarizes the state of every feature; `all` adds the internal ones |
 | `/pa on <feature>`, `/pa off <feature>` | Toggles specific feature modules on or off |
 | `/pa get <feature>`, `/pa set <feature> <k> <v>` | Reads or updates a specific configuration key |
 | `/pa skills` | Dumps current skills panel layout and tracked values to chat |
@@ -281,9 +212,13 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 | `/pa dps`, `/pa threat`, `/pa plates`, `/pa fsr` | Dumps state of the damage meter (entries merged per spell, the shares' sum), threat monitor, nameplates (guild names, NPC roles and whether they can be read, name alignment and its capability, player name colours and why each name was left alone, and the draw distance), and FSR tracker (casts that spent mana, cost nothing, or could not be priced, and the regen ticks: started, skipped and stopped, by reason) |
 | `/pa preview [on\|off\|threat\|dps]` | Manages visual adjustment preview mode and toggles active HUD anchor |
 | `/pa panel` | Inspects settings registration tree and category building diagnostics |
-| `/pa blocked` | Outputs protected function refusals attributed to PersonalAddon |
-| `/pa diag`, `/pa diag clear` | Inspects or clears operational diagnostic counters across previous 5 sessions |
+| `/pa blocked`, `/pa blocked stack <n>`, `/pa blocked clear`, `/pa blocked selftest` | Lists the refusals the client blamed on PersonalAddon, with their paths; `stack` prints one record's saved stack, `clear` empties the saved log, `selftest` checks the recorder against fixed samples |
+| `/pa taint`, `/pa taint <name>` | Asks the client whether the Blizzard variables past refusals named are tainted, and by whom; with a name, checks that one |
+| `/pa diag`, `/pa diag clear` | Shows counters and fault notes from the last five sessions; `clear` drops all but the current one |
 | `/pa help` | Displays the complete slash command reference |
+| `/rl` | Reloads the interface |
+
+`/personaladdon` is the same command as `/pa`.
 
 ---
 
@@ -298,7 +233,7 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 - **Symptoms:** Subsequent controller inputs (such as updating interact icons via `SetPreferredGamepadInteractTarget`, jumping, or Game Menu navigation) are refused. The client attributes taint to whichever addon last modified the execution state.
 - **Verification:** When this defect triggers, `/pa blocked` displays a call stack passing through Blizzard's `MainActionBarFrame.lua` or `FrameControlsManager.lua` rather than addon source files. Diagnostic counters increment `refusalsOurs` accompanied by `knownDefectHintShown`.
 - **Workaround:** Enter `/reload` in chat. Detailed architectural analysis is documented in [`Architecture/20261002-GAPBugs01.md`](Architecture/20261002-GAPBugs01.md).
-- **Still present on the live client** (1.60.1.70790, 2026-11-04): BlockWatch recorded these refusals, attributed to another addon, on launch day.
+- **Still present on the live client:** BlockWatch recorded these refusals, attributed to another addon, on launch day (1.60.1.70790, 2026-11-04). The code path behind them is unchanged through 1.60.1.71037 (patch check, 2026-11-22).
 
 ### Tidy Bags Never Runs
 
@@ -332,6 +267,11 @@ All configuration options are accessible in-game via **Options > AddOns > Person
 
 - **Mechanism:** Player name colours are off by default. On the Large and Block styles the name sits inside the bar and is left alone. With the game's class colour for friendly names on, friendly players keep it. Players of your own faction stay white by design, unless they can fight you.
 - **Fix:** Turn on **Options → AddOns → PersonalAddon → Nameplates → Colour player names**, on the Thin or Cast Focus style. `/pa plates` says why each name was left alone (`left:`). Details in [`Architecture/20261122-Phase22.md`](Architecture/20261122-Phase22.md) §3.
+
+### Your Target's Nameplate Flickers
+
+- **Mechanism:** The game recolours the bar of the unit you have selected on its own, and PersonalAddon writes the threat colour back, so the game's colour can show for a moment.
+- **Fix:** Turn on **Options → AddOns → PersonalAddon → Nameplates → Leave your target's colour alone**. That plate then keeps the game's colour instead of its threat colour; every other plate keeps its own.
 
 ### The Role Switch Won't Take the Controller
 
@@ -367,6 +307,7 @@ To eliminate redundant execution overhead, PersonalAddon intentionally omits fea
 - A rarity icon on enemy nameplates: **Options → Nameplates → Rarity Icon**. Forever turned it on in build 1.60.1.70790, and PersonalAddon's rare/elite ring was retired for it ([`Architecture/20261104-Patch02.md`](Architecture/20261104-Patch02.md) §5).
 - Container cleanup accessible through the bag Manage menu.
 - A buff frame that, collapsed, shows only buffs with 90 seconds or less left and flashes them under 31 seconds; Edit Mode moves it. Upkeep differs in its 30-second window, its place beside the combat panels, ignoring short buffs, and its ammo and shard counts.
+- Your own group buffs on raid frames: **Cooldown Settings → Group Buffs**. A buff moved to Shown is drawn on the raid frame of each member who has it from you, in combat too, and a visual alert can mark it.
 - A swing timer.
 - Item and reagent counts on action buttons, gamepad bars included.
 - Native vendor junk selling and transaction summaries, and the "You gained" chat receipt on leaving a merchant (PersonalAddon shows the same figure as a toast).
@@ -399,15 +340,6 @@ Architectural decisions and experiments evaluated across development phases and 
 | Nameplate Draw Distance | Both distance settings are secure on Forever: all plates 45 yards, players 40. Addons are refused, Blizzard runs typed `/console` and the developer console insecurely, and Camelot leaves out the slider Classic offers. `/pa plates` shows both | [Phase 22](Architecture/20261122-Phase22.md) §7, build 1.60.1.71037 |
 | Regen Ticks from the Game | Mana is secret to addons in and out of combat; the tick line is a fixed two-second rhythm instead | [Patch 03](Architecture/20261122-Patch03.md) §1.3, §4, build 1.60.1.71037 |
 | Controller-Selectable Addon Buttons | The pad cursor runs an addon button's scripts inside its own execution and keeps the button as its current one: G1's carrier | [Patch 03](Architecture/20261122-Patch03.md) §6.3, [GAPBugs01](Architecture/20261002-GAPBugs01.md) §2.9 |
-
----
-
-## Planned
-
-Both items are currently **on hold** pending taint isolation verification under Rule 8:
-
-- **Lower-Center NPC Windows:** Relocating gossip, quest, merchant, and trainer dialog frames to lower screen center with adjustable offsets.
-- **Paragraph Paging for Gossip:** Implementing progressive dialogue text presentation inspired by Immersion.
 
 ---
 
@@ -473,22 +405,23 @@ Offline verification and analysis tools reside under [`Tools/`](Tools/) and do n
 # Execute offline test suite across all feature phases
 python Tools/harness/run.py
 
-# Execute secret-value AST linter
+# Run the secret-read lint
 python Tools/lint/secret_lint.py
 
 # Verify Blizzard UI export premises against current client build
 python Tools/patchcheck/patch_check.py status
 ```
 
-- **[`Tools/harness/`](Tools/harness/):** Runs the full addon suite offline in a pure Lua 5.1 environment with mocked Blizzard APIs.
-- **[`Tools/lint/`](Tools/lint/):** AST lint verifying all client API calls route through [`Core/ClientRead.lua`](Core/ClientRead.lua).
+- **[`Tools/harness/`](Tools/harness/):** Loads the addon into a real Lua 5.1 over stubbed client APIs and runs the checks of every phase and patch, each session in a fresh runtime. The lint runs first.
+- **[`Tools/lint/`](Tools/lint/):** Fails on any read of a client function, widget method or event that the client's own API docs mark as able to return a secret value, unless the line goes through [`Core/ClientRead.lua`](Core/ClientRead.lua) or an allowlist entry gives the reason.
 - **[`Tools/patchcheck/`](Tools/patchcheck/):** Compares code premises in [`Tools/patchcheck/premises.toml`](Tools/patchcheck/premises.toml) against Blizzard UI exports. It finds the client binary by the name `client_binary` gives in [`Tools/config.toml`](Tools/config.toml) (default `Wow.exe`). Refer to [`Tools/README.md`](Tools/README.md) for update workflows.
+- **In game:** `/pa fault` arms a fault probe (then cast anything), `/pa failenable` enables a probe feature whose enable always fails, and `/pa pool` exercises both frame-pool drop policies.
 
 ---
 
 ## Credits
 
-Inspired by architectural principles and features from Leatrix Plus, FiveSecondRule, Threat Plates, DynamicCam, and Immersion.
+Inspired by architectural principles and features from Leatrix Plus, FiveSecondRule, Threat Plates, AutoPotion, DynamicCam, and Immersion.
 
 ---
 
