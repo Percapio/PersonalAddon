@@ -902,3 +902,10 @@ statement = "The game's tank test is not a restricted call"
 source = "Patch 03 section 5.7"
 consequence = "Rule 7: every Auto read would be a refusal. Remove Auto from the box and re-read section 5.7 before the next build (Core/Threat.lua)"
 check = { kind = "FlagAbsent", entry = "UnitHasEffectivelyTankAura", flag = "HasRestrictions" }
+
+[[premise]]
+id = "DUMP-FORCES-INSECURE"
+statement = "/dump evaluates its expression insecurely: DevTools_DumpCommand calls forceinsecure() first"
+source = "Architecture/PROJECT.md, Verification"
+consequence = "/dump canaccessvalue(...) may now run secure and call readable what addon code cannot read. Stop using /dump as a secrecy probe until another probe is proven, and re-check the client facts plans took from one (Architecture/PROJECT.md)"
+check = { kind = "Pattern", file = "Blizzard_SharedXML/Dump.lua", regex = 'function DevTools_DumpCommand\(msg, editBox\)\s*forceinsecure\(\);', expect = "Present" }

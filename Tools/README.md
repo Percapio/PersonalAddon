@@ -14,12 +14,23 @@ the files `PersonalAddon.toc` lists. The design is
 ## Setup
 
 Python 3.12 or later. The patch check and the lint need nothing else. The harness
-needs lupa, in a virtual environment kept outside the repo:
+needs lupa, pinned in `requirements.txt`, importable by the `python` that runs it.
+Install it into that Python:
+
+```
+python -m pip install -r Tools\requirements.txt
+```
+
+or into a virtual environment kept outside the repo, and run the tools with its
+`python`:
 
 ```
 python -m venv C:\tmp\PersonalAddonVenv
 C:\tmp\PersonalAddonVenv\Scripts\pip install -r Tools\requirements.txt
 ```
+
+`python -I` skips the user site-packages, so it won't find a lupa installed there
+(a Microsoft Store Python installs there by default).
 
 Every path is worked out from where the tools sit, three folders below the client.
 To override one, such as the baseline store's location, put the key in

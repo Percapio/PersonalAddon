@@ -443,8 +443,9 @@ class RealExportTests(unittest.TestCase):
         # retired five ring premises and added one: 86 - 5 + 1 (Patch 02 section 2.3).
         # Phase 21 added thirteen, premises 87-99 (Phase 21 section 12). Phase 22 added
         # thirteen more, premises 100-112 (Phase 22 section 10). Patch 03 added eight,
-        # premises 113-120 (Patch 03 section 10).
-        self.assertEqual(len(register), 116)
+        # premises 113-120 (Patch 03 section 10). Architecture/PROJECT.md added one on
+        # 2026-11-28, DUMP-FORCES-INSECURE, for its /dump secrecy probe; T1 checks it holds.
+        self.assertEqual(len(register), 117)
         current = views.build_view(paths.EXPORT, paths.load_config(), premises.call_names(register))
         by_id = {premise.id: premise for premise in register}
         for premise_id in ("BAR-VALUE-TAKES-HIDDEN", "BAR-RANGE-TAKES-HIDDEN", "TEXT-TAKES-HIDDEN",
